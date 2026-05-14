@@ -81,7 +81,10 @@ services:
         NEXT_PUBLIC_API_URL: http://localhost:4000
         NEXT_PUBLIC_APP_URL: http://localhost:3000
         NEXT_PUBLIC_SOCKET_URL: http://localhost:4000
-        NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: pk_test_placeholder
+        NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: ${NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY:-pk_test_placeholder}
+        NEXT_PUBLIC_STRIPE_PRICE_BASIC: ${NEXT_PUBLIC_STRIPE_PRICE_BASIC:-price_basic}
+        NEXT_PUBLIC_STRIPE_PRICE_PRO: ${NEXT_PUBLIC_STRIPE_PRICE_PRO:-price_pro}
+        NEXT_PUBLIC_STRIPE_PRICE_ENTERPRISE: ${NEXT_PUBLIC_STRIPE_PRICE_ENTERPRISE:-price_enterprise}
     container_name: fitsaas-web
     restart: unless-stopped
     ports:

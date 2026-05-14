@@ -53,6 +53,7 @@ const navByRole: Record<string, NavItem[]> = {
     { icon: Building2, label: 'Academias', href: '/admin/tenants' },
     { icon: Users, label: 'Usuários', href: '/admin/users' },
     { icon: CreditCard, label: 'Assinaturas', href: '/admin/subscriptions' },
+    { icon: CreditCard, label: 'Meu Plano', href: '/admin/billing' },
     { icon: BarChart3, label: 'Analytics', href: '/admin/analytics' },
     { icon: Bell, label: 'Notificações', href: '/admin/notifications' },
     { icon: Settings, label: 'Configurações', href: '/admin/settings' },
