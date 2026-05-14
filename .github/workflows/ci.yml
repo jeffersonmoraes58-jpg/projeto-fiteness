@@ -21,20 +21,19 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: pnpm/action-setup@v3
-        with:
-          version: 9
-
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'pnpm'
+          cache: 'npm'
+          cache-dependency-path: apps/api/package-lock.json
 
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+      - name: Install API dependencies
+        working-directory: apps/api
+        run: npm ci --legacy-peer-deps
 
       - name: Run API tests
-        run: pnpm --filter api test --ci --coverage
+        working-directory: apps/api
+        run: npm test -- --ci --coverage --forceExit
 
       - name: Upload coverage
         uses: actions/upload-artifact@v4
@@ -110,8 +109,11 @@ jobs:
           build-args: |
             NEXT_PUBLIC_API_URL=${{ vars.NEXT_PUBLIC_API_URL }}
             NEXT_PUBLIC_APP_URL=${{ vars.NEXT_PUBLIC_APP_URL }}
-            NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=${{ vars.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY }}
             NEXT_PUBLIC_SOCKET_URL=${{ vars.NEXT_PUBLIC_SOCKET_URL }}
+            NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=${{ vars.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY }}
+            NEXT_PUBLIC_STRIPE_PRICE_BASIC=${{ vars.NEXT_PUBLIC_STRIPE_PRICE_BASIC }}
+            NEXT_PUBLIC_STRIPE_PRICE_PRO=${{ vars.NEXT_PUBLIC_STRIPE_PRICE_PRO }}
+            NEXT_PUBLIC_STRIPE_PRICE_ENTERPRISE=${{ vars.NEXT_PUBLIC_STRIPE_PRICE_ENTERPRISE }}
 
       - name: Export image tag
         id: tag
@@ -143,15 +145,9 @@ jobs:
 
             # Pull latest images
             echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
-            IMAGE_TAG=${{ needs.build.outputs.image_tag }}
-
             docker compose -f docker-compose.prod.yml pull api web
 
-            # Run migrations
-            docker compose -f docker-compose.prod.yml run --rm api \
-              sh -c "npx prisma migrate deploy"
-
-            # Rolling restart (zero-downtime)
+            # Rolling restart (migrations run inside api entrypoint)
             docker compose -f docker-compose.prod.yml up -d --no-deps api web nginx
 
             # Cleanup old images
