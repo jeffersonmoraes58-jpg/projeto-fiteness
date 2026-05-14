@@ -1,0 +1,1130 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ================================================
+// ENUMS
+// ================================================
+
+enum UserRole {
+  ADMIN
+  TRAINER
+  NUTRITIONIST
+  STUDENT
+  STUDIO_OWNER
+}
+
+enum SubscriptionStatus {
+  TRIAL
+  ACTIVE
+  PAST_DUE
+  CANCELED
+  EXPIRED
+}
+
+enum SubscriptionPlan {
+  FREE
+  BASIC
+  PRO
+  ENTERPRISE
+}
+
+enum WorkoutStatus {
+  DRAFT
+  ACTIVE
+  ARCHIVED
+}
+
+enum DietStatus {
+  DRAFT
+  ACTIVE
+  ARCHIVED
+}
+
+enum ExerciseCategory {
+  CHEST
+  BACK
+  SHOULDERS
+  BICEPS
+  TRICEPS
+  LEGS
+  GLUTES
+  CORE
+  CARDIO
+  FULL_BODY
+  MOBILITY
+}
+
+enum MuscleGroup {
+  PECTORALIS_MAJOR
+  PECTORALIS_MINOR
+  LATISSIMUS_DORSI
+  TRAPEZIUS
+  RHOMBOIDS
+  DELTOID
+  BICEPS_BRACHII
+  TRICEPS_BRACHII
+  FOREARMS
+  QUADRICEPS
+  HAMSTRINGS
+  GLUTES
+  CALVES
+  ABS
+  OBLIQUES
+  LOWER_BACK
+  HIP_FLEXORS
+}
+
+enum GoalType {
+  LOSE_WEIGHT
+  GAIN_MUSCLE
+  IMPROVE_ENDURANCE
+  INCREASE_FLEXIBILITY
+  MAINTAIN_WEIGHT
+  ATHLETIC_PERFORMANCE
+  REHABILITATION
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+  PREFER_NOT_TO_SAY
+}
+
+enum MealType {
+  BREAKFAST
+  MORNING_SNACK
+  LUNCH
+  AFTERNOON_SNACK
+  DINNER
+  EVENING_SNACK
+  PRE_WORKOUT
+  POST_WORKOUT
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  FAILED
+  REFUNDED
+  CANCELED
+}
+
+enum PaymentProvider {
+  STRIPE
+  MERCADO_PAGO
+}
+
+enum NotificationType {
+  WORKOUT_REMINDER
+  DIET_REMINDER
+  WATER_REMINDER
+  ACHIEVEMENT
+  MESSAGE
+  PAYMENT
+  SYSTEM
+  CHALLENGE
+}
+
+enum MessageType {
+  TEXT
+  IMAGE
+  AUDIO
+  VIDEO
+  FILE
+}
+
+enum ActivityLevel {
+  SEDENTARY
+  LIGHTLY_ACTIVE
+  MODERATELY_ACTIVE
+  VERY_ACTIVE
+  EXTRA_ACTIVE
+}
+
+enum CheckInStatus {
+  COMPLETED
+  SKIPPED
+  PARTIAL
+}
+
+// ================================================
+// TENANT (Multi-tenant / White-label)
+// ================================================
+
+model Tenant {
+  id              String    @id @default(cuid())
+  name            String
+  slug            String    @unique
+  domain          String?   @unique
+  logoUrl         String?
+  faviconUrl      String?
+  primaryColor    String    @default("#6366f1")
+  secondaryColor  String    @default("#8b5cf6")
+  accentColor     String    @default("#06b6d4")
+  darkMode        Boolean   @default(true)
+  appName         String?
+  splashScreenUrl String?
+  customCss       String?
+  isActive        Boolean   @default(true)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  users           User[]
+  subscription    TenantSubscription?
+  settings        TenantSettings?
+
+  @@map("tenants")
+}
+
+model TenantSettings {
+  id                    String   @id @default(cuid())
+  tenantId              String   @unique
+  allowStudentSelfSignup Boolean @default(true)
+  maxStudents           Int      @default(50)
+  maxTrainers           Int      @default(5)
+  enableAI              Boolean  @default(true)
+  enableChat            Boolean  @default(true)
+  enableNotifications   Boolean  @default(true)
+  enableGamification    Boolean  @default(true)
+  enableNutrition       Boolean  @default(true)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("tenant_settings")
+}
+
+model TenantSubscription {
+  id           String             @id @default(cuid())
+  tenantId     String             @unique
+  plan         SubscriptionPlan   @default(FREE)
+  status       SubscriptionStatus @default(TRIAL)
+  trialEndsAt  DateTime?
+  currentPeriodStart DateTime?
+  currentPeriodEnd   DateTime?
+  stripeCustomerId     String?
+  stripeSubscriptionId String?
+  cancelAtPeriodEnd   Boolean   @default(false)
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+
+  tenant   Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  payments Payment[]
+
+  @@map("tenant_subscriptions")
+}
+
+// ================================================
+// USERS & PROFILES
+// ================================================
+
+model User {
+  id            String    @id @default(cuid())
+  tenantId      String
+  email         String
+  password      String?
+  role          UserRole  @default(STUDENT)
+  isActive      Boolean   @default(true)
+  emailVerified Boolean   @default(false)
+  googleId      String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  lastLoginAt   DateTime?
+
+  tenant          Tenant            @relation(fields: [tenantId], references: [id])
+  profile         Profile?
+  trainer         Trainer?
+  nutritionist    Nutritionist?
+  student         Student?
+  notifications   Notification[]
+  sentMessages    Message[]         @relation("SentMessages")
+  chatParticipants ChatParticipant[]
+  refreshTokens   RefreshToken[]
+  deviceTokens    DeviceToken[]
+  auditLogs       AuditLog[]
+
+  @@unique([tenantId, email])
+  @@map("users")
+}
+
+model Profile {
+  id          String    @id @default(cuid())
+  userId      String    @unique
+  firstName   String
+  lastName    String
+  phone       String?
+  avatarUrl   String?
+  bio         String?
+  gender      Gender?
+  birthDate   DateTime?
+  city        String?
+  state       String?
+  country     String    @default("BR")
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("profiles")
+}
+
+model RefreshToken {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("refresh_tokens")
+}
+
+model DeviceToken {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  platform  String
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("device_tokens")
+}
+
+// ================================================
+// TRAINER
+// ================================================
+
+model Trainer {
+  id             String   @id @default(cuid())
+  userId         String   @unique
+  cref           String?
+  specialties    String[]
+  experienceYears Int     @default(0)
+  rating         Float    @default(0)
+  totalStudents  Int      @default(0)
+  isAvailable    Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  students        TrainerStudent[]
+  workouts        Workout[]
+  exercises       Exercise[]
+  appointments    Appointment[]
+  assessments     PhysicalAssessment[]
+
+  @@map("trainers")
+}
+
+model TrainerStudent {
+  id          String    @id @default(cuid())
+  trainerId   String
+  studentId   String
+  isActive    Boolean   @default(true)
+  startedAt   DateTime  @default(now())
+  endedAt     DateTime?
+  monthlyFee  Float?
+  notes       String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  trainer  Trainer  @relation(fields: [trainerId], references: [id])
+  student  Student  @relation(fields: [studentId], references: [id])
+
+  @@unique([trainerId, studentId])
+  @@map("trainer_students")
+}
+
+// ================================================
+// NUTRITIONIST
+// ================================================
+
+model Nutritionist {
+  id             String   @id @default(cuid())
+  userId         String   @unique
+  crn            String?
+  specialties    String[]
+  experienceYears Int     @default(0)
+  rating         Float    @default(0)
+  totalPatients  Int      @default(0)
+  isAvailable    Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  user         User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  patients     NutritionistPatient[]
+  diets        Diet[]
+  foodDatabase FoodDatabase[]
+  consultations NutritionalConsultation[]
+
+  @@map("nutritionists")
+}
+
+model NutritionistPatient {
+  id             String    @id @default(cuid())
+  nutritionistId String
+  studentId      String
+  isActive       Boolean   @default(true)
+  startedAt      DateTime  @default(now())
+  endedAt        DateTime?
+  monthlyFee     Float?
+  notes          String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  nutritionist Nutritionist @relation(fields: [nutritionistId], references: [id])
+  student      Student      @relation(fields: [studentId], references: [id])
+
+  @@unique([nutritionistId, studentId])
+  @@map("nutritionist_patients")
+}
+
+// ================================================
+// STUDENT
+// ================================================
+
+model Student {
+  id               String      @id @default(cuid())
+  userId           String      @unique
+  goalType         GoalType?
+  activityLevel    ActivityLevel @default(SEDENTARY)
+  medicalHistory   String?
+  allergies        String[]
+  medications      String[]
+  observations     String?
+  emergencyContact String?
+  emergencyPhone   String?
+  points           Int         @default(0)
+  streak           Int         @default(0)
+  level            Int         @default(1)
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+
+  user                  User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  trainers              TrainerStudent[]
+  nutritionists         NutritionistPatient[]
+  workoutPlans          WorkoutPlan[]
+  dietPlans             DietPlan[]
+  workoutLogs           WorkoutLog[]
+  mealLogs              MealLog[]
+  waterLogs             WaterLog[]
+  bodyMeasurements      BodyMeasurement[]
+  progressPhotos        ProgressPhoto[]
+  physicalAssessments   PhysicalAssessment[]
+  goals                 Goal[]
+  challenges            StudentChallenge[]
+  achievements          Achievement[]
+  habits                Habit[]
+  anamnesis             Anamnesis?
+  nutritionalAssessments NutritionalAssessment[]
+
+  @@map("students")
+}
+
+model Anamnesis {
+  id                  String   @id @default(cuid())
+  studentId           String   @unique
+  practicesExercise   Boolean  @default(false)
+  exerciseFrequency   String?
+  previousInjuries    String?
+  surgeries           String?
+  cardiovascularIssues Boolean @default(false)
+  bloodPressure       String?
+  cholesterol         String?
+  diabetes            Boolean  @default(false)
+  smoking             Boolean  @default(false)
+  alcohol             String?
+  sleepHours          Float?
+  stressLevel         Int?
+  mainGoal            String?
+  observations        String?
+  completedAt         DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@map("anamnesis")
+}
+
+// ================================================
+// PHYSICAL ASSESSMENT
+// ================================================
+
+model PhysicalAssessment {
+  id              String   @id @default(cuid())
+  studentId       String
+  trainerId       String?
+  assessedAt      DateTime @default(now())
+  weight          Float
+  height          Float
+  bmi             Float
+  bodyFatPercent  Float?
+  muscleMassKg    Float?
+  visceralFat     Float?
+  metabolicAge    Int?
+  boneDensity     Float?
+  waterPercent    Float?
+  neckCm          Float?
+  shouldersCm     Float?
+  chestCm         Float?
+  waistCm         Float?
+  hipCm           Float?
+  abdomenCm       Float?
+  rightArmCm      Float?
+  leftArmCm       Float?
+  rightThighCm    Float?
+  leftThighCm     Float?
+  rightCalfCm     Float?
+  leftCalfCm      Float?
+  notes           String?
+  createdAt       DateTime @default(now())
+
+  student Student  @relation(fields: [studentId], references: [id])
+  trainer Trainer? @relation(fields: [trainerId], references: [id])
+
+  @@map("physical_assessments")
+}
+
+model BodyMeasurement {
+  id          String   @id @default(cuid())
+  studentId   String
+  measuredAt  DateTime @default(now())
+  weight      Float?
+  bodyFat     Float?
+  muscleMass  Float?
+  waist       Float?
+  hip         Float?
+  chest       Float?
+  arm         Float?
+  thigh       Float?
+  notes       String?
+
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@map("body_measurements")
+}
+
+model ProgressPhoto {
+  id          String   @id @default(cuid())
+  studentId   String
+  photoUrl    String
+  angle       String
+  takenAt     DateTime @default(now())
+  weight      Float?
+  notes       String?
+  createdAt   DateTime @default(now())
+
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@map("progress_photos")
+}
+
+// ================================================
+// EXERCISES
+// ================================================
+
+model Exercise {
+  id             String          @id @default(cuid())
+  trainerId      String?
+  name           String
+  description    String?
+  instructions   String?
+  category       ExerciseCategory
+  muscleGroups   MuscleGroup[]
+  equipment      String[]
+  difficulty     Int             @default(1)
+  videoUrl       String?
+  gifUrl         String?
+  thumbnailUrl   String?
+  isPublic       Boolean         @default(false)
+  isAIGenerated  Boolean         @default(false)
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  trainer          Trainer?          @relation(fields: [trainerId], references: [id])
+  workoutExercises WorkoutExercise[]
+
+  @@map("exercises")
+}
+
+// ================================================
+// WORKOUTS
+// ================================================
+
+model Workout {
+  id          String        @id @default(cuid())
+  trainerId   String
+  name        String
+  description String?
+  status      WorkoutStatus @default(DRAFT)
+  level       Int           @default(1)
+  duration    Int?
+  isTemplate  Boolean       @default(false)
+  tags        String[]
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  trainer   Trainer           @relation(fields: [trainerId], references: [id])
+  exercises WorkoutExercise[]
+  plans     WorkoutPlan[]
+
+  @@map("workouts")
+}
+
+model WorkoutExercise {
+  id              String   @id @default(cuid())
+  workoutId       String
+  exerciseId      String
+  order           Int
+  sets            Int      @default(3)
+  reps            String?
+  weight          Float?
+  restSeconds     Int      @default(60)
+  tempo           String?
+  notes           String?
+  isDropSet       Boolean  @default(false)
+  isSuperSet      Boolean  @default(false)
+  superSetGroupId String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  workout  Workout  @relation(fields: [workoutId], references: [id], onDelete: Cascade)
+  exercise Exercise @relation(fields: [exerciseId], references: [id])
+  logs     WorkoutExerciseLog[]
+
+  @@map("workout_exercises")
+}
+
+model WorkoutPlan {
+  id          String   @id @default(cuid())
+  studentId   String
+  workoutId   String
+  division    String?
+  dayOfWeek   Int[]
+  startDate   DateTime
+  endDate     DateTime?
+  isActive    Boolean  @default(true)
+  order       Int      @default(0)
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  student  Student     @relation(fields: [studentId], references: [id])
+  workout  Workout     @relation(fields: [workoutId], references: [id])
+  logs     WorkoutLog[]
+
+  @@map("workout_plans")
+}
+
+model WorkoutLog {
+  id            String        @id @default(cuid())
+  studentId     String
+  workoutPlanId String?
+  startedAt     DateTime      @default(now())
+  completedAt   DateTime?
+  duration      Int?
+  status        CheckInStatus @default(COMPLETED)
+  notes         String?
+  feeling       Int?
+  createdAt     DateTime      @default(now())
+
+  student      Student              @relation(fields: [studentId], references: [id])
+  workoutPlan  WorkoutPlan?         @relation(fields: [workoutPlanId], references: [id])
+  exerciseLogs WorkoutExerciseLog[]
+
+  @@map("workout_logs")
+}
+
+model WorkoutExerciseLog {
+  id                String   @id @default(cuid())
+  workoutLogId      String
+  workoutExerciseId String
+  setNumber         Int
+  reps              Int?
+  weight            Float?
+  duration          Int?
+  notes             String?
+  createdAt         DateTime @default(now())
+
+  workoutLog      WorkoutLog      @relation(fields: [workoutLogId], references: [id], onDelete: Cascade)
+  workoutExercise WorkoutExercise @relation(fields: [workoutExerciseId], references: [id])
+
+  @@map("workout_exercise_logs")
+}
+
+// ================================================
+// NUTRITION
+// ================================================
+
+model FoodDatabase {
+  id             String   @id @default(cuid())
+  nutritionistId String?
+  name           String
+  brand          String?
+  portion        Float    @default(100)
+  portionUnit    String   @default("g")
+  calories       Float
+  protein        Float
+  carbs          Float
+  fat            Float
+  fiber          Float?
+  sodium         Float?
+  sugar          Float?
+  saturatedFat   Float?
+  isPublic       Boolean  @default(false)
+  barcode        String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  nutritionist Nutritionist? @relation(fields: [nutritionistId], references: [id])
+  mealFoods    MealFood[]
+
+  @@map("food_database")
+}
+
+model Diet {
+  id             String     @id @default(cuid())
+  nutritionistId String
+  name           String
+  description    String?
+  status         DietStatus @default(DRAFT)
+  totalCalories  Float?
+  totalProtein   Float?
+  totalCarbs     Float?
+  totalFat       Float?
+  totalFiber     Float?
+  isTemplate     Boolean    @default(false)
+  tags           String[]
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+
+  nutritionist Nutritionist @relation(fields: [nutritionistId], references: [id])
+  meals        DietMeal[]
+  plans        DietPlan[]
+
+  @@map("diets")
+}
+
+model DietMeal {
+  id       String   @id @default(cuid())
+  dietId   String
+  name     String
+  type     MealType
+  order    Int      @default(0)
+  time     String?
+  calories Float?
+  protein  Float?
+  carbs    Float?
+  fat      Float?
+  notes    String?
+
+  diet  Diet       @relation(fields: [dietId], references: [id], onDelete: Cascade)
+  foods MealFood[]
+
+  @@map("diet_meals")
+}
+
+model MealFood {
+  id        String @id @default(cuid())
+  mealId    String
+  foodId    String
+  quantity  Float
+  unit      String @default("g")
+  calories  Float
+  protein   Float
+  carbs     Float
+  fat       Float
+
+  meal DietMeal     @relation(fields: [mealId], references: [id], onDelete: Cascade)
+  food FoodDatabase @relation(fields: [foodId], references: [id])
+
+  @@map("meal_foods")
+}
+
+model DietPlan {
+  id          String   @id @default(cuid())
+  studentId   String
+  dietId      String
+  startDate   DateTime
+  endDate     DateTime?
+  isActive    Boolean  @default(true)
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  student  Student    @relation(fields: [studentId], references: [id])
+  diet     Diet       @relation(fields: [dietId], references: [id])
+  mealLogs MealLog[]
+
+  @@map("diet_plans")
+}
+
+model MealLog {
+  id         String   @id @default(cuid())
+  studentId  String
+  dietPlanId String?
+  loggedAt   DateTime @default(now())
+  mealType   MealType
+  calories   Float    @default(0)
+  protein    Float    @default(0)
+  carbs      Float    @default(0)
+  fat        Float    @default(0)
+  notes      String?
+  photoUrl   String?
+
+  student  Student  @relation(fields: [studentId], references: [id])
+  dietPlan DietPlan? @relation(fields: [dietPlanId], references: [id])
+  items    MealLogItem[]
+
+  @@map("meal_logs")
+}
+
+model MealLogItem {
+  id       String @id @default(cuid())
+  logId    String
+  name     String
+  quantity Float
+  unit     String @default("g")
+  calories Float
+  protein  Float
+  carbs    Float
+  fat      Float
+
+  log MealLog @relation(fields: [logId], references: [id], onDelete: Cascade)
+
+  @@map("meal_log_items")
+}
+
+// ================================================
+// NUTRITIONAL ASSESSMENT
+// ================================================
+
+model NutritionalAssessment {
+  id               String   @id @default(cuid())
+  studentId        String
+  nutritionistId   String?
+  assessedAt       DateTime @default(now())
+  weight           Float
+  height           Float
+  age              Int
+  gender           Gender
+  activityLevel    ActivityLevel
+  goal             GoalType
+  bmi              Float
+  tmb              Float
+  get              Float
+  proteinTarget    Float
+  carbsTarget      Float
+  fatTarget        Float
+  fiberTarget      Float?
+  waterTarget      Float?
+  dietaryRestrictions String[]
+  foodAllergies    String[]
+  observations     String?
+
+  student Student @relation(fields: [studentId], references: [id])
+
+  @@map("nutritional_assessments")
+}
+
+model NutritionalConsultation {
+  id             String   @id @default(cuid())
+  nutritionistId String
+  studentId      String
+  scheduledAt    DateTime
+  completedAt    DateTime?
+  notes          String?
+  nextConsultation DateTime?
+  createdAt      DateTime @default(now())
+
+  nutritionist Nutritionist @relation(fields: [nutritionistId], references: [id])
+
+  @@map("nutritional_consultations")
+}
+
+// ================================================
+// WATER TRACKING
+// ================================================
+
+model WaterLog {
+  id        String   @id @default(cuid())
+  studentId String
+  amount    Float
+  loggedAt  DateTime @default(now())
+  goal      Float    @default(2000)
+
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@map("water_logs")
+}
+
+// ================================================
+// GOALS & GAMIFICATION
+// ================================================
+
+model Goal {
+  id          String    @id @default(cuid())
+  studentId   String
+  type        GoalType
+  title       String
+  description String?
+  targetValue Float?
+  currentValue Float?
+  unit        String?
+  targetDate  DateTime?
+  isCompleted Boolean   @default(false)
+  completedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@map("goals")
+}
+
+model Challenge {
+  id          String   @id @default(cuid())
+  title       String
+  description String?
+  type        String
+  duration    Int
+  targetValue Float?
+  points      Int      @default(100)
+  badgeUrl    String?
+  startDate   DateTime
+  endDate     DateTime
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  participants StudentChallenge[]
+
+  @@map("challenges")
+}
+
+model StudentChallenge {
+  id          String   @id @default(cuid())
+  studentId   String
+  challengeId String
+  joinedAt    DateTime @default(now())
+  progress    Float    @default(0)
+  isCompleted Boolean  @default(false)
+  completedAt DateTime?
+
+  student   Student   @relation(fields: [studentId], references: [id])
+  challenge Challenge @relation(fields: [challengeId], references: [id])
+
+  @@unique([studentId, challengeId])
+  @@map("student_challenges")
+}
+
+model Achievement {
+  id          String   @id @default(cuid())
+  studentId   String
+  title       String
+  description String?
+  badgeUrl    String?
+  points      Int      @default(50)
+  earnedAt    DateTime @default(now())
+  category    String?
+
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@map("achievements")
+}
+
+model Habit {
+  id          String   @id @default(cuid())
+  studentId   String
+  name        String
+  description String?
+  frequency   String
+  targetCount Int      @default(1)
+  currentStreak Int    @default(0)
+  longestStreak Int   @default(0)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  student Student    @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  logs    HabitLog[]
+
+  @@map("habits")
+}
+
+model HabitLog {
+  id        String   @id @default(cuid())
+  habitId   String
+  loggedAt  DateTime @default(now())
+  completed Boolean  @default(true)
+  notes     String?
+
+  habit Habit @relation(fields: [habitId], references: [id], onDelete: Cascade)
+
+  @@map("habit_logs")
+}
+
+// ================================================
+// APPOINTMENTS
+// ================================================
+
+model Appointment {
+  id          String   @id @default(cuid())
+  trainerId   String
+  studentId   String
+  scheduledAt DateTime
+  duration    Int      @default(60)
+  type        String   @default("WORKOUT_SESSION")
+  status      String   @default("SCHEDULED")
+  notes       String?
+  location    String?
+  videoUrl    String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  trainer Trainer @relation(fields: [trainerId], references: [id])
+
+  @@map("appointments")
+}
+
+// ================================================
+// CHAT & MESSAGES
+// ================================================
+
+model Chat {
+  id        String   @id @default(cuid())
+  tenantId  String?
+  type      String   @default("DIRECT")
+  name      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  participants ChatParticipant[]
+  messages     Message[]
+
+  @@map("chats")
+}
+
+model ChatParticipant {
+  id     String @id @default(cuid())
+  chatId String
+  userId String
+  joinedAt DateTime @default(now())
+  lastRead DateTime?
+
+  chat Chat @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id])
+
+  @@unique([chatId, userId])
+  @@map("chat_participants")
+}
+
+model Message {
+  id          String      @id @default(cuid())
+  chatId      String
+  senderId    String
+  type        MessageType @default(TEXT)
+  content     String?
+  fileUrl     String?
+  fileName    String?
+  fileSize    Int?
+  isRead      Boolean     @default(false)
+  editedAt    DateTime?
+  deletedAt   DateTime?
+  createdAt   DateTime    @default(now())
+
+  chat   Chat @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  sender User @relation("SentMessages", fields: [senderId], references: [id])
+
+  @@map("messages")
+}
+
+// ================================================
+// NOTIFICATIONS
+// ================================================
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  type      NotificationType
+  title     String
+  body      String
+  data      Json?
+  isRead    Boolean          @default(false)
+  sentAt    DateTime?
+  readAt    DateTime?
+  createdAt DateTime         @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("notifications")
+}
+
+// ================================================
+// PAYMENTS & SUBSCRIPTIONS
+// ================================================
+
+model Payment {
+  id                   String             @id @default(cuid())
+  tenantSubscriptionId String?
+  amount               Float
+  currency             String             @default("BRL")
+  status               PaymentStatus      @default(PENDING)
+  provider             PaymentProvider    @default(STRIPE)
+  externalId           String?
+  description          String?
+  metadata             Json?
+  paidAt               DateTime?
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+
+  tenantSubscription TenantSubscription? @relation(fields: [tenantSubscriptionId], references: [id])
+
+  @@map("payments")
+}
+
+model Coupon {
+  id           String   @id @default(cuid())
+  code         String   @unique
+  description  String?
+  discountType String
+  discountValue Float
+  maxUses      Int?
+  usedCount    Int      @default(0)
+  validFrom    DateTime
+  validUntil   DateTime?
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+
+  @@map("coupons")
+}
+
+// ================================================
+// AUDIT & MONITORING
+// ================================================
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  tenantId  String?
+  action    String
+  resource  String?
+  resourceId String?
+  data      Json?
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id])
+
+  @@map("audit_logs")
+}
