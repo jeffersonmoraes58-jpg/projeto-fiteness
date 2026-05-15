@@ -527,7 +527,7 @@ function WorkoutSummaryModal({ workoutName, startTime, isPending, onConfirm, onC
   const mins = Math.floor(durationMs / 60000);
   const secs = Math.floor((durationMs % 60000) / 1000);
   const durationStr = `${mins}:${String(secs).padStart(2, '0')}`;
-  const dateStr = endTime.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' });
+  const dateStr = endTime.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
   const startStr = startTime.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
   const endStr = endTime.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
 
@@ -724,7 +724,13 @@ function generateWorkoutCard({ workoutName, dateStr, startStr, endStr, durationS
     roundRect(ctx, x, y, bW, bH, 18); ctx.fill();
     ctx.fillStyle = 'rgba(255,255,255,0.45)'; ctx.font = '26px system-ui,sans-serif';
     ctx.textAlign = 'center'; ctx.fillText(s.label, x + bW / 2, y + 36);
-    ctx.fillStyle = '#ffffff'; ctx.font = 'bold 34px system-ui,sans-serif';
+    ctx.fillStyle = '#ffffff';
+    let fSize = 34;
+    ctx.font = `bold ${fSize}px system-ui,sans-serif`;
+    while (ctx.measureText(s.value).width > bW - 16 && fSize > 18) {
+      fSize -= 2;
+      ctx.font = `bold ${fSize}px system-ui,sans-serif`;
+    }
     ctx.fillText(s.value, x + bW / 2, y + 82);
   });
 
