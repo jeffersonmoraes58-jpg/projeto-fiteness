@@ -52,7 +52,7 @@ export default function TrainerSettings() {
       const { data } = await api.post('/uploads/avatar', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
-      await api.patch('/users/me', { profile: { avatarUrl: data.data?.url || data.url } });
+      await api.put('/users/me/profile', { avatarUrl: data.url ?? data.data?.url });
       queryClient.invalidateQueries({ queryKey: ['trainer-profile'] });
       toast.success('Foto atualizada!');
     } catch {
