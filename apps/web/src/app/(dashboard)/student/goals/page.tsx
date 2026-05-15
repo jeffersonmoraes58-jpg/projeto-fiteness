@@ -58,7 +58,7 @@ export default function StudentGoals() {
   });
 
   const completeMutation = useMutation({
-    mutationFn: (id: string) => api.patch(`/goals/${id}`, { isCompleted: true }),
+    mutationFn: (id: string) => api.post(`/goals/${id}/complete`),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['student-goals-list'] }),
   });
 

@@ -41,11 +41,22 @@ export class GoalsService {
     const student = await this.getStudent(userId);
     const goal = await this.prisma.goal.findUnique({ where: { id } });
     if (!goal || goal.studentId !== student.id) throw new ForbiddenException();
-    const updated = await this.prisma.goal.update({
-      where: { id },
-      data: { isCompleted: true, completedAt: new Date(), currentValue: goal.targetValue },
-    });
-    await this.prisma.student.update({ where: { id: student.id }, data: { points: { increment: 50 } } });
+    const [updated] = await Promise.all([
+      this.prisma.goal.update({
+        where: { id },
+        data: { isCompleted: true, completedAt: new Date(), currentValue: goal.targetValue },
+      }),
+      this.prisma.student.update({ where: { id: student.id }, data: { points: { increment: 200 } } }),
+      this.prisma.achievement.create({
+        data: {
+          studentId: student.id,
+          title: 'Meta Atingida',
+          description: `Concluiu a meta: ${goal.title}`,
+          points: 200,
+          category: 'metas',
+        },
+      }),
+    ]);
     return updated;
   }
 
