@@ -1,13 +1,14 @@
 'use client';
 
-import { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { useState, useRef } from 'react';
+import { motion } from 'framer-motion';
 import {
   TrendingUp, TrendingDown, Scale, Ruler, Camera,
   Plus, ArrowUpRight, ArrowDownRight, Minus,
-  Activity, Dumbbell, Calendar, X, Save,
+  Activity, Dumbbell, Calendar, X, Save, Upload,
 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import axios from 'axios';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
 
@@ -57,145 +58,297 @@ function NewMeasurementModal({ onClose }: { onClose: () => void }) {
   };
 
   return (
-    <AnimatePresence>
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
-        onClick={onClose}
+    <div
+      style={{
+        position: 'fixed', inset: 0, zIndex: 9999,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        padding: '1rem', backgroundColor: 'rgba(0,0,0,0.65)',
+      }}
+      onClick={onClose}
+    >
+      <div
+        style={{
+          width: '100%', maxWidth: '32rem',
+          backgroundColor: 'hsl(var(--card))',
+          border: '1px solid hsl(var(--border))',
+          borderRadius: '1rem',
+          boxShadow: '0 25px 60px rgba(0,0,0,0.6)',
+          overflow: 'hidden',
+        }}
+        onClick={(e) => e.stopPropagation()}
       >
-        <motion.div
-          initial={{ scale: 0.95, opacity: 0, y: 10 }}
-          animate={{ scale: 1, opacity: 1, y: 0 }}
-          exit={{ scale: 0.95, opacity: 0, y: 10 }}
-          transition={{ type: 'spring', damping: 25 }}
-          className="w-full max-w-lg bg-card border border-border rounded-2xl shadow-2xl overflow-hidden"
-          onClick={(e) => e.stopPropagation()}
-        >
-          {/* Header */}
-          <div className="flex items-center justify-between px-6 py-4 border-b border-border">
-            <div className="flex items-center gap-2">
-              <Scale className="w-4 h-4 text-primary" />
-              <h2 className="font-semibold">Nova Medição</h2>
-            </div>
-            <button
-              onClick={onClose}
-              className="w-8 h-8 rounded-lg hover:bg-accent flex items-center justify-center transition-all"
-            >
-              <X className="w-4 h-4" />
-            </button>
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-border">
+          <div className="flex items-center gap-2">
+            <Scale className="w-4 h-4 text-primary" />
+            <h2 className="font-semibold">Nova Medição</h2>
+          </div>
+          <button
+            onClick={onClose}
+            className="w-8 h-8 rounded-lg hover:bg-accent flex items-center justify-center transition-all"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="p-6 space-y-5 max-h-[75vh] overflow-y-auto">
+          {/* Peso (required) */}
+          <div>
+            <label className="text-sm font-medium mb-1.5 block">
+              Peso (kg) <span className="text-red-400">*</span>
+            </label>
+            <input
+              type="number"
+              step="0.1"
+              min="1"
+              value={form.weight}
+              onChange={set('weight')}
+              placeholder="Ex: 75.5"
+              className="input-field"
+              autoFocus
+              required
+            />
           </div>
 
-          <form onSubmit={handleSubmit} className="p-6 space-y-5 max-h-[75vh] overflow-y-auto">
-            {/* Peso (required) */}
-            <div>
-              <label className="text-sm font-medium mb-1.5 block">
-                Peso (kg) <span className="text-red-400">*</span>
-              </label>
-              <input
-                type="number"
-                step="0.1"
-                min="1"
-                value={form.weight}
-                onChange={set('weight')}
-                placeholder="Ex: 75.5"
-                className="input-field"
-                autoFocus
-                required
-              />
+          {/* Composição corporal */}
+          <div>
+            <div className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3">
+              Composição Corporal (opcional)
             </div>
-
-            {/* Composição corporal */}
-            <div>
-              <div className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3">
-                Composição Corporal (opcional)
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                {[
-                  { field: 'bodyFat',    label: 'Gordura Corporal (%)', placeholder: 'Ex: 18.5' },
-                  { field: 'muscleMass', label: 'Massa Muscular (kg)',   placeholder: 'Ex: 35.0' },
-                ].map(({ field, label, placeholder }) => (
-                  <div key={field}>
-                    <label className="text-xs text-muted-foreground block mb-1">{label}</label>
-                    <input
-                      type="number"
-                      step="0.1"
-                      min="0"
-                      value={form[field as keyof typeof form]}
-                      onChange={set(field)}
-                      placeholder={placeholder}
-                      className="input-field py-2 text-sm"
-                    />
-                  </div>
-                ))}
-              </div>
+            <div className="grid grid-cols-2 gap-3">
+              {[
+                { field: 'bodyFat',    label: 'Gordura Corporal (%)', placeholder: 'Ex: 18.5' },
+                { field: 'muscleMass', label: 'Massa Muscular (kg)',   placeholder: 'Ex: 35.0' },
+              ].map(({ field, label, placeholder }) => (
+                <div key={field}>
+                  <label className="text-xs text-muted-foreground block mb-1">{label}</label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    min="0"
+                    value={form[field as keyof typeof form]}
+                    onChange={set(field)}
+                    placeholder={placeholder}
+                    className="input-field py-2 text-sm"
+                  />
+                </div>
+              ))}
             </div>
+          </div>
 
-            {/* Medidas */}
-            <div>
-              <div className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3">
-                Medidas (cm, opcional)
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                {[
-                  { field: 'waist', label: 'Cintura',  placeholder: 'Ex: 80' },
-                  { field: 'hip',   label: 'Quadril',  placeholder: 'Ex: 95' },
-                  { field: 'chest', label: 'Peito',    placeholder: 'Ex: 100' },
-                  { field: 'arm',   label: 'Braço',    placeholder: 'Ex: 35' },
-                  { field: 'thigh', label: 'Coxa',     placeholder: 'Ex: 55' },
-                ].map(({ field, label, placeholder }) => (
-                  <div key={field}>
-                    <label className="text-xs text-muted-foreground block mb-1">{label}</label>
-                    <input
-                      type="number"
-                      step="0.1"
-                      min="0"
-                      value={form[field as keyof typeof form]}
-                      onChange={set(field)}
-                      placeholder={placeholder}
-                      className="input-field py-2 text-sm"
-                    />
-                  </div>
-                ))}
-              </div>
+          {/* Medidas */}
+          <div>
+            <div className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3">
+              Medidas (cm, opcional)
             </div>
-
-            {/* Observações */}
-            <div>
-              <label className="text-sm font-medium mb-1.5 block">Observações</label>
-              <textarea
-                value={form.notes}
-                onChange={set('notes')}
-                placeholder="Como você está se sentindo? Alguma observação..."
-                className="input-field resize-none min-h-[72px]"
-                rows={3}
-              />
+            <div className="grid grid-cols-2 gap-3">
+              {[
+                { field: 'waist', label: 'Cintura',  placeholder: 'Ex: 80' },
+                { field: 'hip',   label: 'Quadril',  placeholder: 'Ex: 95' },
+                { field: 'chest', label: 'Peito',    placeholder: 'Ex: 100' },
+                { field: 'arm',   label: 'Braço',    placeholder: 'Ex: 35' },
+                { field: 'thigh', label: 'Coxa',     placeholder: 'Ex: 55' },
+              ].map(({ field, label, placeholder }) => (
+                <div key={field}>
+                  <label className="text-xs text-muted-foreground block mb-1">{label}</label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    min="0"
+                    value={form[field as keyof typeof form]}
+                    onChange={set(field)}
+                    placeholder={placeholder}
+                    className="input-field py-2 text-sm"
+                  />
+                </div>
+              ))}
             </div>
+          </div>
 
-            {error && (
-              <div className="glass rounded-xl p-3 border border-red-500/20 text-red-400 text-sm">
-                {error}
-              </div>
+          {/* Observações */}
+          <div>
+            <label className="text-sm font-medium mb-1.5 block">Observações</label>
+            <textarea
+              value={form.notes}
+              onChange={set('notes')}
+              placeholder="Como você está se sentindo? Alguma observação..."
+              className="input-field resize-none min-h-[72px]"
+              rows={3}
+            />
+          </div>
+
+          {error && (
+            <div className="glass rounded-xl p-3 border border-red-500/20 text-red-400 text-sm">
+              {error}
+            </div>
+          )}
+
+          <div className="flex gap-3 pt-1">
+            <button type="button" onClick={onClose} className="btn-secondary flex-1">
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              disabled={mutation.isPending}
+              className="btn-primary flex-1 flex items-center justify-center gap-2 disabled:opacity-50"
+            >
+              <Save className="w-4 h-4" />
+              {mutation.isPending ? 'Salvando...' : 'Salvar medição'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// ─── Add Photo Modal ──────────────────────────────────────────────────────────
+
+const ANGLES = ['Frente', 'Costas', 'Lateral esquerda', 'Lateral direita'];
+
+function AddPhotoModal({ onClose }: { onClose: () => void }) {
+  const qc = useQueryClient();
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [preview, setPreview] = useState<string | null>(null);
+  const [file, setFile] = useState<File | null>(null);
+  const [angle, setAngle] = useState(ANGLES[0]);
+  const [error, setError] = useState('');
+  const [uploading, setUploading] = useState(false);
+
+  const saveMutation = useMutation({
+    mutationFn: (data: { photoUrl: string; angle: string }) =>
+      api.post('/progress/photos', data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['student-progress'] });
+      onClose();
+    },
+    onError: (e: any) => {
+      const msg = e?.message || 'Erro ao salvar foto';
+      setError(Array.isArray(msg) ? msg.join(', ') : msg);
+      setUploading(false);
+    },
+  });
+
+  const handleFile = (f: File) => {
+    setFile(f);
+    setError('');
+    const reader = new FileReader();
+    reader.onload = (e) => setPreview(e.target?.result as string);
+    reader.readAsDataURL(f);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!file) { setError('Selecione uma foto'); return; }
+    setUploading(true);
+    try {
+      const storage = typeof window !== 'undefined' ? localStorage.getItem('fitsaas-auth') : null;
+      const token = storage ? JSON.parse(storage).state?.accessToken : null;
+      const form = new FormData();
+      form.append('file', file);
+      const { data } = await axios.post(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/v1/uploads/progress-photo`,
+        form,
+        { headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'multipart/form-data' } },
+      );
+      const photoUrl = data?.data?.url || data?.url;
+      if (!photoUrl) throw new Error('URL da foto não retornada');
+      saveMutation.mutate({ photoUrl, angle });
+    } catch (err: any) {
+      const msg = err?.response?.data?.message || err?.message || 'Erro no upload';
+      setError(Array.isArray(msg) ? msg.join(', ') : msg);
+      setUploading(false);
+    }
+  };
+
+  const isPending = uploading || saveMutation.isPending;
+
+  return (
+    <div
+      style={{
+        position: 'fixed', inset: 0, zIndex: 9999,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        padding: '1rem', backgroundColor: 'rgba(0,0,0,0.65)',
+      }}
+      onClick={onClose}
+    >
+      <div
+        style={{
+          width: '100%', maxWidth: '28rem',
+          backgroundColor: 'hsl(var(--card))',
+          border: '1px solid hsl(var(--border))',
+          borderRadius: '1rem',
+          boxShadow: '0 25px 60px rgba(0,0,0,0.6)',
+          overflow: 'hidden',
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between px-6 py-4 border-b border-border">
+          <div className="flex items-center gap-2">
+            <Camera className="w-4 h-4 text-primary" />
+            <h2 className="font-semibold">Adicionar Foto de Progresso</h2>
+          </div>
+          <button onClick={onClose} className="w-8 h-8 rounded-lg hover:bg-accent flex items-center justify-center transition-all">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          {/* File picker */}
+          <div
+            className="border-2 border-dashed border-border rounded-xl p-6 flex flex-col items-center justify-center gap-3 cursor-pointer hover:border-primary/50 transition-colors"
+            onClick={() => fileRef.current?.click()}
+          >
+            {preview ? (
+              <img src={preview} alt="preview" className="w-full max-h-48 object-contain rounded-lg" />
+            ) : (
+              <>
+                <Upload className="w-8 h-8 text-muted-foreground" />
+                <p className="text-sm text-muted-foreground text-center">
+                  Clique para selecionar uma foto<br />
+                  <span className="text-xs">JPG, PNG, WebP — máx. 10 MB</span>
+                </p>
+              </>
             )}
+            <input
+              ref={fileRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              className="hidden"
+              onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f); }}
+            />
+          </div>
 
-            <div className="flex gap-3 pt-1">
-              <button type="button" onClick={onClose} className="btn-secondary flex-1">
-                Cancelar
-              </button>
-              <button
-                type="submit"
-                disabled={mutation.isPending}
-                className="btn-primary flex-1 flex items-center justify-center gap-2 disabled:opacity-50"
-              >
-                <Save className="w-4 h-4" />
-                {mutation.isPending ? 'Salvando...' : 'Salvar medição'}
-              </button>
-            </div>
-          </form>
-        </motion.div>
-      </motion.div>
-    </AnimatePresence>
+          {/* Angle */}
+          <div>
+            <label className="text-sm font-medium mb-1.5 block">Ângulo</label>
+            <select
+              value={angle}
+              onChange={(e) => setAngle(e.target.value)}
+              className="input-field"
+            >
+              {ANGLES.map((a) => <option key={a} value={a}>{a}</option>)}
+            </select>
+          </div>
+
+          {error && (
+            <div className="glass rounded-xl p-3 border border-red-500/20 text-red-400 text-sm">{error}</div>
+          )}
+
+          <div className="flex gap-3 pt-1">
+            <button type="button" onClick={onClose} className="btn-secondary flex-1">Cancelar</button>
+            <button
+              type="submit"
+              disabled={isPending || !file}
+              className="btn-primary flex-1 flex items-center justify-center gap-2 disabled:opacity-50"
+            >
+              <Save className="w-4 h-4" />
+              {isPending ? 'Enviando...' : 'Salvar foto'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
   );
 }
 
@@ -204,6 +357,7 @@ function NewMeasurementModal({ onClose }: { onClose: () => void }) {
 export default function StudentProgress() {
   const [period, setPeriod] = useState('1 mês');
   const [showModal, setShowModal] = useState(false);
+  const [showPhotoModal, setShowPhotoModal] = useState(false);
 
   const { data: progress } = useQuery({
     queryKey: ['student-progress'],
@@ -232,6 +386,7 @@ export default function StudentProgress() {
   return (
     <>
       {showModal && <NewMeasurementModal onClose={() => setShowModal(false)} />}
+      {showPhotoModal && <AddPhotoModal onClose={() => setShowPhotoModal(false)} />}
 
       <div className="space-y-6">
         {/* Header */}
@@ -241,7 +396,7 @@ export default function StudentProgress() {
             <p className="text-muted-foreground text-sm mt-1">Acompanhe seu progresso ao longo do tempo</p>
           </div>
           <button
-            onClick={() => setShowModal(true)}
+            onClick={() => { console.log('[debug] Nova medição clicked, showModal=', showModal); setShowModal(true); }}
             className="btn-primary flex items-center gap-2 text-sm py-2"
           >
             <Plus className="w-4 h-4" />
@@ -401,7 +556,10 @@ export default function StudentProgress() {
               <Camera className="w-4 h-4 text-muted-foreground" />
               Fotos de Progresso
             </h2>
-            <button className="text-xs text-primary flex items-center gap-1 hover:underline">
+            <button
+              onClick={() => setShowPhotoModal(true)}
+              className="text-xs text-primary flex items-center gap-1 hover:underline"
+            >
               <Plus className="w-3 h-3" /> Adicionar
             </button>
           </div>
