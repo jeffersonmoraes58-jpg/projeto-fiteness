@@ -95,12 +95,69 @@ export class StudentsService {
         completedAt: new Date(),
       },
     });
-    // Update streak
     await this.prisma.student.update({
       where: { id: student.id },
       data: { streak: { increment: 1 }, points: { increment: 10 } },
     });
+    await this.checkAndAwardAchievements(student.id);
     return log;
+  }
+
+  private async checkAndAwardAchievements(studentId: string): Promise<void> {
+    const [student, totalLogs, weekLogs, existing] = await Promise.all([
+      this.prisma.student.findUnique({ where: { id: studentId } }),
+      this.prisma.workoutLog.count({ where: { studentId } }),
+      this.prisma.workoutLog.count({
+        where: { studentId, completedAt: { gte: new Date(Date.now() - 7 * 86400000) } },
+      }),
+      this.prisma.achievement.findMany({ where: { studentId }, select: { title: true } }),
+    ]);
+    if (!student) return;
+
+    const earned = new Set(existing.map((a) => a.title));
+    const toCreate: Array<{ title: string; description: string; points: number; category: string }> = [];
+
+    // Workout count
+    for (const m of [
+      { count: 1,   title: 'Primeiro Treino', description: 'Completou o primeiro treino!',   points: 50,   category: 'treino' },
+      { count: 10,  title: '10 Treinos',      description: 'Completou 10 treinos!',           points: 100,  category: 'treino' },
+      { count: 50,  title: '50 Treinos',      description: 'Completou 50 treinos!',           points: 300,  category: 'treino' },
+      { count: 100, title: '100 Treinos',     description: 'Completou 100 treinos!',          points: 1000, category: 'treino' },
+    ]) {
+      if (totalLogs >= m.count && !earned.has(m.title)) toCreate.push(m);
+    }
+
+    // Beast mode
+    if (weekLogs >= 5 && !earned.has('Beast Mode'))
+      toCreate.push({ title: 'Beast Mode', description: 'Treinou 5x em uma semana!', points: 200, category: 'treino' });
+
+    // Streak
+    const streak = student.streak ?? 0;
+    if (streak >= 7 && !earned.has('7 dias seguidos'))
+      toCreate.push({ title: '7 dias seguidos', description: 'Treinou 7 dias consecutivos!', points: 150, category: 'sequencia' });
+    if (streak >= 30 && !earned.has('30 dias seguidos'))
+      toCreate.push({ title: '30 dias seguidos', description: 'Treinou 30 dias consecutivos!', points: 500, category: 'sequencia' });
+
+    // Level
+    const newLevel = Math.floor((student.points ?? 0) / 500) + 1;
+    if (newLevel >= 5 && !earned.has('Nível 5'))
+      toCreate.push({ title: 'Nível 5', description: 'Alcançou o nível 5!', points: 250, category: 'nivel' });
+    if (newLevel >= 10 && !earned.has('Nível 10'))
+      toCreate.push({ title: 'Nível 10', description: 'Alcançou o nível 10!', points: 500, category: 'nivel' });
+
+    if (toCreate.length === 0) {
+      await this.prisma.student.update({ where: { id: studentId }, data: { level: newLevel } });
+      return;
+    }
+
+    const bonusPoints = toCreate.reduce((sum, a) => sum + a.points, 0);
+    await Promise.all([
+      this.prisma.achievement.createMany({ data: toCreate.map((a) => ({ ...a, studentId })) }),
+      this.prisma.student.update({
+        where: { id: studentId },
+        data: { points: { increment: bonusPoints }, level: newLevel },
+      }),
+    ]);
   }
 
   async getDietPlan(userId: string) {
