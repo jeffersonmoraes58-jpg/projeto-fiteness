@@ -118,13 +118,13 @@ export class StudentsService {
     const toCreate: Array<{ title: string; description: string; points: number; category: string }> = [];
 
     // Workout count
-    for (const m of [
+    for (const { count, ...achievement } of [
       { count: 1,   title: 'Primeiro Treino', description: 'Completou o primeiro treino!',   points: 50,   category: 'treino' },
       { count: 10,  title: '10 Treinos',      description: 'Completou 10 treinos!',           points: 100,  category: 'treino' },
       { count: 50,  title: '50 Treinos',      description: 'Completou 50 treinos!',           points: 300,  category: 'treino' },
       { count: 100, title: '100 Treinos',     description: 'Completou 100 treinos!',          points: 1000, category: 'treino' },
     ]) {
-      if (totalLogs >= m.count && !earned.has(m.title)) toCreate.push(m);
+      if (totalLogs >= count && !earned.has(achievement.title)) toCreate.push(achievement);
     }
 
     // Beast mode
