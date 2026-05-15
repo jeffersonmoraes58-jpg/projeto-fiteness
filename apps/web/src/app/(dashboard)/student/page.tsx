@@ -19,10 +19,11 @@ export default function StudentDashboard() {
     queryFn: () => api.get('/students/me/dashboard').then((r) => r.data.data),
   });
 
-  const { data: todayWorkout } = useQuery({
+  const { data: _workoutPlans } = useQuery({
     queryKey: ['student-today-workout'],
     queryFn: () => api.get('/students/me/workout-plan').then((r) => r.data.data),
   });
+  const todayWorkout = _workoutPlans?.[0]?.workout ?? null;
 
   const { data: todayDiet } = useQuery({
     queryKey: ['student-today-diet'],
@@ -36,10 +37,12 @@ export default function StudentDashboard() {
 
   const firstName = user?.profile?.firstName || 'Aluno';
 
+  const s = stats?.stats;
+
   const statCards = [
     {
       label: 'Sequência',
-      value: stats?.streak ?? '—',
+      value: s?.streak ?? 0,
       suffix: ' dias',
       icon: Flame,
       color: 'from-orange-600 to-red-600',
@@ -47,23 +50,23 @@ export default function StudentDashboard() {
     },
     {
       label: 'Treinos na semana',
-      value: stats?.weeklyWorkouts ?? '—',
+      value: s?.workoutsThisWeek ?? 0,
       suffix: '',
       icon: Dumbbell,
       color: 'from-purple-600 to-indigo-600',
       bg: 'from-purple-600/10 to-indigo-600/10',
     },
     {
-      label: 'Calorias hoje',
-      value: stats?.caloriesToday ?? '—',
-      suffix: ' kcal',
+      label: 'Pontos',
+      value: s?.points ?? 0,
+      suffix: ' pts',
       icon: Zap,
       color: 'from-yellow-500 to-orange-500',
       bg: 'from-yellow-500/10 to-orange-500/10',
     },
     {
       label: 'Água hoje',
-      value: stats?.waterToday ?? '—',
+      value: s?.waterToday ?? 0,
       suffix: ' ml',
       icon: Droplets,
       color: 'from-cyan-500 to-blue-500',
@@ -81,13 +84,13 @@ export default function StudentDashboard() {
           </h1>
           <p className="text-muted-foreground text-sm mt-1">
             Vamos arrasar hoje? Você está em uma sequência de{' '}
-            <span className="text-orange-400 font-semibold">{stats?.streak ?? 0} dias</span>!
+            <span className="text-orange-400 font-semibold">{stats?.stats?.streak ?? 0} dias</span>!
           </p>
         </div>
         <div className="hidden sm:flex items-center gap-2 glass rounded-2xl px-4 py-2">
           <Star className="w-4 h-4 text-yellow-400" />
-          <span className="text-sm font-semibold">{stats?.points ?? 0} pts</span>
-          <span className="text-xs text-muted-foreground">Nível {stats?.level ?? 1}</span>
+          <span className="text-sm font-semibold">{stats?.stats?.points ?? 0} pts</span>
+          <span className="text-xs text-muted-foreground">Nível {stats?.stats?.level ?? 1}</span>
         </div>
       </div>
 
@@ -183,7 +186,7 @@ export default function StudentDashboard() {
               </h2>
               <span className="text-xs text-muted-foreground">Meta: 2.000 ml</span>
             </div>
-            <WaterTracker current={stats?.waterToday ?? 0} goal={2000} />
+            <WaterTracker current={stats?.stats?.waterToday ?? 0} goal={2000} />
           </motion.div>
         </div>
 
