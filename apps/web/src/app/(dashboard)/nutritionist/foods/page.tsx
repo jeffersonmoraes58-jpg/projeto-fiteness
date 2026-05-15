@@ -21,11 +21,11 @@ export default function NutritionistFoods() {
 
   const { data: foods, isLoading } = useQuery({
     queryKey: ['foods-database', search],
-    queryFn: () => api.get(`/meals/foods?search=${search}`).then((r) => r.data.data),
+    queryFn: () => api.get(`/nutritionists/me/foods?search=${encodeURIComponent(search)}`).then((r) => r.data.data),
   });
 
   const createMutation = useMutation({
-    mutationFn: (data: any) => api.post('/meals/foods', data),
+    mutationFn: (data: any) => api.post('/nutritionists/me/foods', data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['foods-database'] });
       setShowAddForm(false);
