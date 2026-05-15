@@ -61,8 +61,8 @@ export default function StudentAchievements() {
       <div className="grid grid-cols-3 gap-4">
         {[
           { label: 'Desbloqueadas', value: earned?.length ?? 0, icon: Trophy, color: 'from-yellow-500 to-orange-500' },
-          { label: 'Pontos ganhos', value: totalPoints, icon: Star, color: 'from-purple-500 to-indigo-500' },
-          { label: 'Nível atual', value: stats?.level ?? 1, icon: Zap, color: 'from-cyan-500 to-blue-500' },
+          { label: 'Pontos ganhos', value: stats?.stats?.points ?? totalPoints, icon: Star, color: 'from-purple-500 to-indigo-500' },
+          { label: 'Nível atual', value: stats?.stats?.level ?? 1, icon: Zap, color: 'from-cyan-500 to-blue-500' },
         ].map((s, i) => (
           <motion.div
             key={s.label}
@@ -93,19 +93,19 @@ export default function StudentAchievements() {
               {stats?.level ?? 1}
             </div>
             <div>
-              <div className="font-semibold">Nível {stats?.level ?? 1}</div>
-              <div className="text-xs text-muted-foreground">{totalPoints} / {(stats?.level ?? 1) * 500} pontos</div>
+              <div className="font-semibold">Nível {stats?.stats?.level ?? 1}</div>
+              <div className="text-xs text-muted-foreground">{stats?.stats?.points ?? totalPoints} / {(stats?.stats?.level ?? 1) * 500} pontos</div>
             </div>
           </div>
           <div className="text-right">
             <div className="text-xs text-muted-foreground">Próximo nível</div>
-            <div className="text-sm font-semibold">{Math.max(((stats?.level ?? 1) * 500) - totalPoints, 0)} pts</div>
+            <div className="text-sm font-semibold">{Math.max(((stats?.stats?.level ?? 1) * 500) - (stats?.stats?.points ?? totalPoints), 0)} pts</div>
           </div>
         </div>
         <div className="w-full h-2 bg-white/10 rounded-full overflow-hidden">
           <motion.div
             initial={{ width: 0 }}
-            animate={{ width: `${Math.min((totalPoints / ((stats?.level ?? 1) * 500)) * 100, 100)}%` }}
+            animate={{ width: `${Math.min(((stats?.stats?.points ?? totalPoints) / ((stats?.stats?.level ?? 1) * 500)) * 100, 100)}%` }}
             transition={{ duration: 1, ease: 'easeOut' }}
             className="h-full bg-gradient-to-r from-purple-500 to-indigo-500 rounded-full"
           />
