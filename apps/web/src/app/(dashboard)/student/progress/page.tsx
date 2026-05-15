@@ -396,7 +396,7 @@ export default function StudentProgress() {
             <p className="text-muted-foreground text-sm mt-1">Acompanhe seu progresso ao longo do tempo</p>
           </div>
           <button
-            onClick={() => { console.log('[debug] Nova medição clicked, showModal=', showModal); setShowModal(true); }}
+            onClick={() => setShowModal(true)}
             className="btn-primary flex items-center gap-2 text-sm py-2"
           >
             <Plus className="w-4 h-4" />
