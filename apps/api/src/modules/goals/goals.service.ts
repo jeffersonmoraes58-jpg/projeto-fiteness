@@ -21,7 +21,13 @@ export class GoalsService {
 
   async create(userId: string, data: any) {
     const student = await this.getStudent(userId);
-    return this.prisma.goal.create({ data: { studentId: student.id, ...data } });
+    return this.prisma.goal.create({
+      data: {
+        studentId: student.id,
+        ...data,
+        targetDate: data.targetDate ? new Date(data.targetDate) : undefined,
+      },
+    });
   }
 
   async update(userId: string, id: string, data: any) {
