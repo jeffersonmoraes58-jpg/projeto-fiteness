@@ -6,9 +6,10 @@ import {
   Apple, Droplets, Plus, ChevronDown, ChevronUp,
   Coffee, Sun, UtensilsCrossed, Moon, Zap, CheckCircle2,
 } from 'lucide-react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
+import toast from 'react-hot-toast';
 
 const MEAL_ICONS: Record<string, any> = {
   BREAKFAST: Coffee,
@@ -32,15 +33,36 @@ const MEAL_LABELS: Record<string, string> = {
   POST_WORKOUT: 'Pós-treino',
 };
 
+const WATER_AMOUNTS = [150, 200, 300, 500];
+
 export default function StudentDiet() {
   const [expandedMeal, setExpandedMeal] = useState<string | null>('BREAKFAST');
+  const [showWaterPicker, setShowWaterPicker] = useState(false);
+  const queryClient = useQueryClient();
 
   const { data: dietPlan } = useQuery({
     queryKey: ['student-diet-plan'],
     queryFn: () => api.get('/students/me/diet').then((r) => r.data.data),
   });
 
+  const { data: waterData } = useQuery({
+    queryKey: ['student-water-today'],
+    queryFn: () => api.get('/students/me/water/today').then((r) => r.data.data),
+  });
+
+  const waterMutation = useMutation({
+    mutationFn: (amount: number) => api.post('/students/me/water', { amount }),
+    onSuccess: (_, amount) => {
+      queryClient.invalidateQueries({ queryKey: ['student-water-today'] });
+      toast.success(`+${amount}ml registrado!`);
+      setShowWaterPicker(false);
+    },
+    onError: () => toast.error('Erro ao registrar água'),
+  });
+
   const todayLog: any = null;
+  const waterTotal = waterData?.total ?? 0;
+  const waterGoal = 2000;
 
   const totalCalories = dietPlan?.diet?.totalCalories ?? 0;
   const consumedCalories = todayLog?.calories ?? 0;
@@ -143,28 +165,62 @@ export default function StudentDiet() {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.1 }}
-        className="glass-card flex items-center gap-4"
+        className="glass-card"
       >
-        <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-cyan-500 to-blue-500 flex items-center justify-center flex-shrink-0">
-          <Droplets className="w-6 h-6 text-white" />
-        </div>
-        <div className="flex-1">
-          <div className="font-medium">Hidratação</div>
-          <div className="text-xs text-muted-foreground mt-0.5">
-            {todayLog?.water ?? 0} ml de 2.000 ml
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-cyan-500 to-blue-500 flex items-center justify-center flex-shrink-0">
+            <Droplets className="w-6 h-6 text-white" />
           </div>
-          <div className="w-full h-1.5 bg-white/10 rounded-full overflow-hidden mt-2">
+          <div className="flex-1">
+            <div className="font-medium">Hidratação</div>
+            <div className="text-xs text-muted-foreground mt-0.5">
+              {waterTotal} ml de {waterGoal} ml
+            </div>
+            <div className="w-full h-1.5 bg-white/10 rounded-full overflow-hidden mt-2">
+              <motion.div
+                key={waterTotal}
+                initial={{ width: 0 }}
+                animate={{ width: `${Math.min((waterTotal / waterGoal) * 100, 100)}%` }}
+                transition={{ duration: 0.8, delay: 0.2 }}
+                className="h-full bg-gradient-to-r from-cyan-500 to-blue-500 rounded-full"
+              />
+            </div>
+          </div>
+          <button
+            onClick={() => setShowWaterPicker((v) => !v)}
+            className="w-10 h-10 rounded-xl bg-cyan-500/10 flex items-center justify-center hover:bg-cyan-500/20 transition-all"
+          >
+            <Plus className="w-4 h-4 text-cyan-400" />
+          </button>
+        </div>
+
+        <AnimatePresence>
+          {showWaterPicker && (
             <motion.div
-              initial={{ width: 0 }}
-              animate={{ width: `${Math.min(((todayLog?.water ?? 0) / 2000) * 100, 100)}%` }}
-              transition={{ duration: 0.8, delay: 0.2 }}
-              className="h-full bg-gradient-to-r from-cyan-500 to-blue-500 rounded-full"
-            />
-          </div>
-        </div>
-        <button className="w-10 h-10 rounded-xl bg-cyan-500/10 flex items-center justify-center hover:bg-cyan-500/20 transition-all">
-          <Plus className="w-4 h-4 text-cyan-400" />
-        </button>
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              className="overflow-hidden"
+            >
+              <div className="pt-4 mt-4 border-t border-border/50">
+                <p className="text-xs text-muted-foreground mb-3">Quanto você bebeu?</p>
+                <div className="grid grid-cols-4 gap-2">
+                  {WATER_AMOUNTS.map((ml) => (
+                    <button
+                      key={ml}
+                      onClick={() => waterMutation.mutate(ml)}
+                      disabled={waterMutation.isPending}
+                      className="flex flex-col items-center gap-1 p-3 rounded-xl bg-cyan-500/10 hover:bg-cyan-500/20 transition-all disabled:opacity-60"
+                    >
+                      <Droplets className="w-4 h-4 text-cyan-400" />
+                      <span className="text-xs font-medium text-cyan-400">{ml}ml</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </motion.div>
 
       {/* Meals */}
