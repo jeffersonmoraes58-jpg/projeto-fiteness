@@ -4,7 +4,7 @@ import { useState, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import {
   Dumbbell, ChevronLeft, Clock, Layers, Zap, Users, UserCheck,
-  Calendar, CheckSquare, Square, Plus, Trash2, Search, Save, CheckCircle,
+  Calendar, CheckSquare, Square, Plus, Trash2, Search, Save, CheckCircle, Video,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
@@ -29,6 +29,7 @@ interface WorkoutExerciseRow {
   reps: string;
   weight: number | null;
   restSeconds: number | null;
+  videoUrl: string;
 }
 
 export default function WorkoutDetailPage() {
@@ -65,6 +66,7 @@ export default function WorkoutDetailPage() {
               reps: String(e.reps || '10'),
               weight: e.weight ?? null,
               restSeconds: e.restSeconds ?? 60,
+              videoUrl: e.exercise?.videoUrl || '',
             })),
           );
           setExercisesLoaded(true);
@@ -93,6 +95,7 @@ export default function WorkoutDetailPage() {
           reps: r.reps,
           weight: r.weight ?? undefined,
           restSeconds: r.restSeconds ?? undefined,
+          videoUrl: r.videoUrl || undefined,
         })),
       }),
     onSuccess: () => {
@@ -148,7 +151,7 @@ export default function WorkoutDetailPage() {
       if (exerciseRows.find((r) => r.exerciseId === ex.id)) return;
       setExerciseRows((prev) => [
         ...prev,
-        { exerciseId: ex.id, name: ex.name, sets: 3, reps: '10', weight: null, restSeconds: 60 },
+        { exerciseId: ex.id, name: ex.name, sets: 3, reps: '10', weight: null, restSeconds: 60, videoUrl: ex.videoUrl || '' },
       ]);
     },
     [exerciseRows],
@@ -351,6 +354,19 @@ export default function WorkoutDetailPage() {
                       className="input-field py-1.5 text-sm text-center"
                     />
                   </div>
+                </div>
+                <div>
+                  <label className="text-xs text-muted-foreground block mb-1 flex items-center gap-1">
+                    <Video className="w-3 h-3" />
+                    URL do vídeo (YouTube, Vimeo ou .mp4)
+                  </label>
+                  <input
+                    type="url"
+                    value={row.videoUrl}
+                    onChange={(e) => updateRow(i, 'videoUrl', e.target.value)}
+                    placeholder="https://youtube.com/watch?v=..."
+                    className="input-field py-1.5 text-sm"
+                  />
                 </div>
               </div>
             ))}

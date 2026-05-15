@@ -70,10 +70,10 @@ export function LandingHero() {
             Começar grátis
             <ArrowRight className="w-4 h-4" />
           </Link>
-          <button className="btn-secondary flex items-center gap-2 text-base px-7 py-3">
+          <Link href="/login" className="btn-secondary flex items-center gap-2 text-base px-7 py-3">
             <Play className="w-4 h-4 fill-current" />
             Ver demo
-          </button>
+          </Link>
         </motion.div>
 
         <motion.p

@@ -1,4 +1,4 @@
-.PHONY: dev prod up down logs migrate seed test build clean ssl help
+.PHONY: dev prod up down logs migrate seed seed.docker test build clean ssl help
 
 # ── Development ──────────────────────────────────────────────────────────────
 dev:
@@ -40,6 +40,10 @@ migrate.prod:
 seed:
 	pnpm db:seed
 
+seed.docker:
+	docker compose cp packages/database/prisma/seed.ts api:/app/prisma/seed.ts
+	docker compose exec api sh -c "node -e \"require('ts-node').register({compilerOptions:{module:'CommonJS'}}); require('/app/prisma/seed.ts')\""
+
 # ── SSL (Let's Encrypt) ───────────────────────────────────────────────────────
 ssl:
 	@echo "Run: docker compose -f docker-compose.prod.yml run --rm certbot certonly --webroot -w /var/www/certbot -d $(DOMAIN) --email $(EMAIL) --agree-tos --no-eff-email"
@@ -76,7 +80,8 @@ help:
 	@echo ""
 	@echo "  make migrate      Run DB migrations (dev)"
 	@echo "  make migrate.prod Run DB migrations (prod)"
-	@echo "  make seed         Seed database"
+	@echo "  make seed         Seed database (host)
+  make seed.docker  Seed database via running Docker container"
 	@echo ""
 	@echo "  make test         Run unit tests"
 	@echo "  make test.cov     Run tests with coverage"

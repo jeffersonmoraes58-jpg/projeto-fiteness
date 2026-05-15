@@ -92,6 +92,16 @@ export class WorkoutsService {
 
     if (dto.exercises !== undefined) {
       await this.prisma.workoutExercise.deleteMany({ where: { workoutId: id } });
+
+      // Persist videoUrl on the Exercise entity for any exercise that has it set
+      for (const ex of dto.exercises) {
+        if (ex.videoUrl !== undefined) {
+          await this.prisma.exercise.update({
+            where: { id: ex.exerciseId },
+            data: { videoUrl: ex.videoUrl || null },
+          });
+        }
+      }
     }
 
     return this.prisma.workout.update({

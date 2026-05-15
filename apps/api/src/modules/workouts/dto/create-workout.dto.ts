@@ -59,6 +59,11 @@ export class WorkoutExerciseDto {
   @IsOptional()
   @IsString()
   superSetGroupId?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  videoUrl?: string;
 }
 
 export class CreateWorkoutDto {
