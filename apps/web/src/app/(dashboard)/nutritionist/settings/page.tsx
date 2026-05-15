@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { motion } from 'framer-motion';
 import {
   User, Camera, Mail, Phone, MapPin, Award,
@@ -14,6 +14,8 @@ import toast from 'react-hot-toast';
 export default function NutritionistSettings() {
   const { user, logout } = useAuthStore();
   const [editing, setEditing] = useState(false);
+  const [avatarUploading, setAvatarUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const queryClient = useQueryClient();
 
   const { data: profile } = useQuery({
@@ -45,6 +47,27 @@ export default function NutritionistSettings() {
 
   const fullName = `${profile?.profile?.firstName || user?.profile?.firstName || ''} ${profile?.profile?.lastName || user?.profile?.lastName || ''}`.trim();
   const initials = fullName.split(' ').map((n) => n[0]).slice(0, 2).join('').toUpperCase();
+
+  const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setAvatarUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      const { data } = await api.post('/uploads/avatar', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      await api.patch('/users/me', { profile: { avatarUrl: data.data?.url || data.url } });
+      queryClient.invalidateQueries({ queryKey: ['nutritionist-profile'] });
+      toast.success('Foto atualizada!');
+    } catch {
+      toast.error('Erro ao enviar foto');
+    } finally {
+      setAvatarUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
 
   return (
     <div className="space-y-6 max-w-2xl mx-auto">
@@ -94,7 +117,18 @@ export default function NutritionistSettings() {
               ? <img src={profile.profile.avatarUrl} alt="" className="w-full h-full rounded-2xl object-cover" />
               : initials || <User className="w-8 h-8" />}
           </div>
-          <button className="absolute -bottom-1 -right-1 w-7 h-7 bg-primary rounded-lg flex items-center justify-center hover:bg-primary/80 transition-all">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            className="hidden"
+            onChange={handleAvatarChange}
+          />
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            disabled={avatarUploading}
+            className="absolute -bottom-1 -right-1 w-7 h-7 bg-primary rounded-lg flex items-center justify-center hover:bg-primary/80 transition-all disabled:opacity-60"
+          >
             <Camera className="w-3.5 h-3.5 text-white" />
           </button>
         </div>
