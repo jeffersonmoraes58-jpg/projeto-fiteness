@@ -86,6 +86,20 @@ const EMPTY_ASSESSMENT = {
   observations: '',
 };
 
+const TIMING_OPTIONS = [
+  'Em jejum',
+  'Café da manhã',
+  'Pré-treino',
+  'Intra-treino',
+  'Pós-treino',
+  'Almoço',
+  'Jantar',
+  'Antes de dormir',
+  'Com as refeições',
+];
+
+const EMPTY_SUPPLEMENT_ITEM = { name: '', dosage: '', frequency: '', timing: '', notes: '' };
+
 const EMPTY_PHYSICAL = {
   weight: '',
   height: '',
@@ -181,6 +195,14 @@ export default function PatientDetailPage() {
   const [physicalOpen, setPhysicalOpen] = useState(false);
   const [physicalForm, setPhysicalForm] = useState(EMPTY_PHYSICAL);
   const [showPhysicalHistory, setShowPhysicalHistory] = useState(false);
+
+  const [suppOpen, setSuppOpen] = useState(false);
+  const [suppPlanName, setSuppPlanName] = useState('');
+  const [suppStartDate, setSuppStartDate] = useState(() => new Date().toISOString().split('T')[0]);
+  const [suppEndDate, setSuppEndDate] = useState('');
+  const [suppObs, setSuppObs] = useState('');
+  const [suppItems, setSuppItems] = useState([{ ...EMPTY_SUPPLEMENT_ITEM }]);
+  const [expandedPlan, setExpandedPlan] = useState<string | null>(null);
 
   const { data: patients, isLoading } = useQuery({
     queryKey: ['nutritionist-patients'],
@@ -362,6 +384,62 @@ export default function PatientDetailPage() {
       rightCalfCm: opt(physicalForm.rightCalfCm),
       leftCalfCm: opt(physicalForm.leftCalfCm),
       notes: physicalForm.notes || null,
+    });
+  };
+
+  const { data: suppPlans, isLoading: suppLoading } = useQuery({
+    queryKey: ['supplementation-plans', id],
+    queryFn: () =>
+      api.get(`/nutritionists/me/patients/${id}/supplementation-plans`).then((r) => r.data),
+    enabled: !!patient && suppOpen,
+  });
+
+  const suppMutation = useMutation({
+    mutationFn: (data: any) =>
+      api.post(`/nutritionists/me/patients/${id}/supplementation-plans`, data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['supplementation-plans', id] });
+      setSuppPlanName('');
+      setSuppStartDate(new Date().toISOString().split('T')[0]);
+      setSuppEndDate('');
+      setSuppObs('');
+      setSuppItems([{ ...EMPTY_SUPPLEMENT_ITEM }]);
+      toast.success('Plano de suplementação criado!');
+    },
+    onError: (e: any) => {
+      const msg = e.response?.data?.message || e.message || 'Erro ao salvar plano';
+      toast.error(Array.isArray(msg) ? msg.join(', ') : msg);
+    },
+  });
+
+  const togglePlanActive = useMutation({
+    mutationFn: ({ planId, isActive }: { planId: string; isActive: boolean }) =>
+      api.patch(`/nutritionists/me/supplementation-plans/${planId}`, { isActive }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['supplementation-plans', id] }),
+  });
+
+  const addSuppItem = () => setSuppItems((prev) => [...prev, { ...EMPTY_SUPPLEMENT_ITEM }]);
+  const removeSuppItem = (i: number) => setSuppItems((prev) => prev.filter((_, idx) => idx !== i));
+  const updateSuppItem = (i: number, field: string, value: string) =>
+    setSuppItems((prev) => prev.map((item, idx) => idx === i ? { ...item, [field]: value } : item));
+
+  const handleSuppSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!suppPlanName.trim()) { toast.error('Informe o nome do plano'); return; }
+    if (suppItems.some((it) => !it.name.trim() || !it.dosage.trim() || !it.frequency.trim())) {
+      toast.error('Preencha nome, dosagem e frequência de todos os suplementos');
+      return;
+    }
+    suppMutation.mutate({
+      name: suppPlanName.trim(),
+      startDate: suppStartDate,
+      endDate: suppEndDate || null,
+      observations: suppObs || null,
+      items: suppItems.map(({ name, dosage, frequency, timing, notes }) => ({
+        name, dosage, frequency,
+        timing: timing || null,
+        notes: notes || null,
+      })),
     });
   };
 
@@ -1225,6 +1303,198 @@ export default function PatientDetailPage() {
                 )}
               </div>
             )}
+          </div>
+        )}
+      </motion.div>
+
+      {/* Plano de suplementação */}
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.28 }} className="glass-card">
+        <button type="button" onClick={() => setSuppOpen((o) => !o)} className="w-full flex items-center justify-between">
+          <h2 className="font-semibold flex items-center gap-2">
+            <Apple className="w-4 h-4 text-lime-400" />
+            Plano de Suplementação
+            {suppPlans && suppPlans.length > 0 && (
+              <span className="text-xs px-2 py-0.5 rounded-full bg-lime-500/10 text-lime-400 ml-1">
+                {suppPlans.filter((p: any) => p.isActive).length} ativo{suppPlans.filter((p: any) => p.isActive).length !== 1 ? 's' : ''}
+              </span>
+            )}
+          </h2>
+          {suppOpen ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
+        </button>
+
+        {suppOpen && (
+          <div className="mt-5 space-y-6">
+            {/* Planos existentes */}
+            {suppLoading ? (
+              <div className="space-y-2">{[...Array(2)].map((_, i) => <div key={i} className="h-14 rounded-xl bg-white/5 animate-pulse" />)}</div>
+            ) : suppPlans && suppPlans.length > 0 && (
+              <div className="space-y-3">
+                <p className="text-xs font-semibold text-lime-400 uppercase tracking-wide">Planos existentes</p>
+                {suppPlans.map((plan: any) => (
+                  <div key={plan.id} className={cn('glass rounded-xl overflow-hidden border', plan.isActive ? 'border-lime-500/20' : 'border-white/5 opacity-60')}>
+                    <button
+                      type="button"
+                      onClick={() => setExpandedPlan(expandedPlan === plan.id ? null : plan.id)}
+                      className="w-full p-4 flex items-center justify-between text-left"
+                    >
+                      <div>
+                        <div className="font-medium text-sm">{plan.name}</div>
+                        <div className="text-xs text-muted-foreground mt-0.5">
+                          {new Date(plan.startDate).toLocaleDateString('pt-BR')}
+                          {plan.endDate && ` → ${new Date(plan.endDate).toLocaleDateString('pt-BR')}`}
+                          {' · '}{plan.items.length} suplemento{plan.items.length !== 1 ? 's' : ''}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); togglePlanActive.mutate({ planId: plan.id, isActive: !plan.isActive }); }}
+                          className={cn('text-xs px-2 py-1 rounded-lg transition-colors', plan.isActive ? 'bg-lime-500/20 text-lime-400 hover:bg-lime-500/30' : 'bg-white/5 text-muted-foreground hover:bg-white/10')}
+                        >
+                          {plan.isActive ? 'Ativo' : 'Inativo'}
+                        </button>
+                        {expandedPlan === plan.id ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
+                      </div>
+                    </button>
+
+                    {expandedPlan === plan.id && (
+                      <div className="px-4 pb-4 space-y-2 border-t border-white/5 pt-3">
+                        {plan.items.map((item: any, i: number) => (
+                          <div key={item.id ?? i} className="glass rounded-lg p-3 space-y-1">
+                            <div className="flex items-center justify-between">
+                              <span className="text-sm font-semibold">{item.name}</span>
+                              <span className="text-xs font-medium text-lime-400">{item.dosage}</span>
+                            </div>
+                            <div className="text-xs text-muted-foreground flex flex-wrap gap-x-3">
+                              <span>{item.frequency}</span>
+                              {item.timing && <span>· {item.timing}</span>}
+                            </div>
+                            {item.notes && <p className="text-xs text-muted-foreground">{item.notes}</p>}
+                          </div>
+                        ))}
+                        {plan.observations && <p className="text-xs text-muted-foreground pt-1">{plan.observations}</p>}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Novo plano */}
+            <form onSubmit={handleSuppSubmit} className="space-y-5">
+              <h3 className="text-sm font-semibold flex items-center gap-2">
+                <Plus className="w-3.5 h-3.5 text-lime-400" />
+                Novo plano
+              </h3>
+
+              <div className="space-y-3">
+                <div>
+                  <label className="text-sm font-medium mb-1.5 block">Nome do plano *</label>
+                  <input
+                    type="text"
+                    value={suppPlanName}
+                    onChange={(e) => setSuppPlanName(e.target.value)}
+                    placeholder="Ex: Suplementação para hipertrofia"
+                    className="input-field"
+                    required
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-sm font-medium mb-1.5 block">Início *</label>
+                    <input type="date" value={suppStartDate} onChange={(e) => setSuppStartDate(e.target.value)} className="input-field" required />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium mb-1.5 block">Término</label>
+                    <input type="date" value={suppEndDate} onChange={(e) => setSuppEndDate(e.target.value)} className="input-field" min={suppStartDate} />
+                  </div>
+                </div>
+              </div>
+
+              {/* Itens */}
+              <div className="space-y-3">
+                <p className="text-xs font-semibold text-lime-400 uppercase tracking-wide">Suplementos</p>
+                {suppItems.map((item, i) => (
+                  <div key={i} className="glass rounded-xl p-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-medium text-muted-foreground">Suplemento {i + 1}</span>
+                      {suppItems.length > 1 && (
+                        <button type="button" onClick={() => removeSuppItem(i)} className="text-xs text-red-400 hover:text-red-300 transition-colors">
+                          Remover
+                        </button>
+                      )}
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="col-span-2">
+                        <label className="text-sm font-medium mb-1.5 block">Nome *</label>
+                        <input
+                          type="text"
+                          value={item.name}
+                          onChange={(e) => updateSuppItem(i, 'name', e.target.value)}
+                          placeholder="Ex: Whey Protein, Creatina"
+                          className="input-field"
+                          required
+                        />
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium mb-1.5 block">Dosagem *</label>
+                        <input
+                          type="text"
+                          value={item.dosage}
+                          onChange={(e) => updateSuppItem(i, 'dosage', e.target.value)}
+                          placeholder="Ex: 30g, 5g, 2 cáps."
+                          className="input-field"
+                          required
+                        />
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium mb-1.5 block">Frequência *</label>
+                        <input
+                          type="text"
+                          value={item.frequency}
+                          onChange={(e) => updateSuppItem(i, 'frequency', e.target.value)}
+                          placeholder="Ex: 1x ao dia"
+                          className="input-field"
+                          required
+                        />
+                      </div>
+                      <div className="col-span-2">
+                        <label className="text-sm font-medium mb-1.5 block">Momento de uso</label>
+                        <select value={item.timing} onChange={(e) => updateSuppItem(i, 'timing', e.target.value)} className="input-field">
+                          <option value="">Selecione...</option>
+                          {TIMING_OPTIONS.map((t) => <option key={t} value={t}>{t}</option>)}
+                        </select>
+                      </div>
+                      <div className="col-span-2">
+                        <label className="text-sm font-medium mb-1.5 block">Observações</label>
+                        <input
+                          type="text"
+                          value={item.notes}
+                          onChange={(e) => updateSuppItem(i, 'notes', e.target.value)}
+                          placeholder="Ex: Tomar com 200ml de água"
+                          className="input-field"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+
+                <button type="button" onClick={addSuppItem} className="w-full glass rounded-xl p-3 text-sm text-lime-400 hover:bg-white/5 transition-colors flex items-center justify-center gap-2 border border-dashed border-lime-500/30">
+                  <Plus className="w-4 h-4" />
+                  Adicionar suplemento
+                </button>
+              </div>
+
+              <div>
+                <label className="text-sm font-medium mb-1.5 block">Observações gerais</label>
+                <textarea value={suppObs} onChange={(e) => setSuppObs(e.target.value)} placeholder="Orientações gerais sobre o plano..." rows={2} className="input-field resize-none" />
+              </div>
+
+              <button type="submit" disabled={suppMutation.isPending} className="btn-primary w-full flex items-center justify-center gap-2 disabled:opacity-50">
+                <Save className="w-4 h-4" />
+                {suppMutation.isPending ? 'Salvando...' : 'Criar plano'}
+              </button>
+            </form>
           </div>
         )}
       </motion.div>

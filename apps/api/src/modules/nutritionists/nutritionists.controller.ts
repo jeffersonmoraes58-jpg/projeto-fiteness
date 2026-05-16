@@ -99,6 +99,24 @@ export class NutritionistsController {
     return this.service.createPhysicalAssessment(user.id, studentId, body);
   }
 
+  @Get('me/patients/:studentId/supplementation-plans')
+  @ApiOperation({ summary: 'Listar planos de suplementação do paciente' })
+  getSupplementationPlans(@CurrentUser() user: any, @Param('studentId') studentId: string) {
+    return this.service.getSupplementationPlans(user.id, studentId);
+  }
+
+  @Post('me/patients/:studentId/supplementation-plans')
+  @ApiOperation({ summary: 'Criar plano de suplementação' })
+  createSupplementationPlan(@CurrentUser() user: any, @Param('studentId') studentId: string, @Body() body: any) {
+    return this.service.createSupplementationPlan(user.id, studentId, body);
+  }
+
+  @Patch('me/supplementation-plans/:planId')
+  @ApiOperation({ summary: 'Atualizar plano de suplementação' })
+  updateSupplementationPlan(@CurrentUser() user: any, @Param('planId') planId: string, @Body() body: any) {
+    return this.service.updateSupplementationPlan(user.id, planId, body);
+  }
+
   @Patch('me')
   @ApiOperation({ summary: 'Atualizar perfil do nutricionista' })
   update(@CurrentUser() user: any, @Body() body: any) {

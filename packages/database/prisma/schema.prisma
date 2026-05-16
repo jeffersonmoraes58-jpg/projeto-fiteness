@@ -366,6 +366,7 @@ model Nutritionist {
   diets        Diet[]
   foodDatabase FoodDatabase[]
   consultations NutritionalConsultation[]
+  supplementationPlans SupplementationPlan[]
 
   @@map("nutritionists")
 }
@@ -427,6 +428,7 @@ model Student {
   habits                Habit[]
   anamnesis             Anamnesis?
   nutritionalAssessments NutritionalAssessment[]
+  supplementationPlans  SupplementationPlan[]
 
   @@map("students")
 }
@@ -850,6 +852,43 @@ model NutritionalConsultation {
   nutritionist Nutritionist @relation(fields: [nutritionistId], references: [id])
 
   @@map("nutritional_consultations")
+}
+
+// ================================================
+// SUPPLEMENTATION
+// ================================================
+
+model SupplementationPlan {
+  id             String    @id @default(cuid())
+  studentId      String
+  nutritionistId String
+  name           String
+  startDate      DateTime  @default(now())
+  endDate        DateTime?
+  isActive       Boolean   @default(true)
+  observations   String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  student      Student      @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  nutritionist Nutritionist @relation(fields: [nutritionistId], references: [id])
+  items        SupplementationPlanItem[]
+
+  @@map("supplementation_plans")
+}
+
+model SupplementationPlanItem {
+  id        String  @id @default(cuid())
+  planId    String
+  name      String
+  dosage    String
+  frequency String
+  timing    String?
+  notes     String?
+
+  plan SupplementationPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+
+  @@map("supplementation_plan_items")
 }
 
 // ================================================

@@ -178,5 +178,56 @@ export class NutritionistsService {
       data: { studentId, ...data },
     });
   }
+
+  async getSupplementationPlans(userId: string, studentId: string) {
+    const n = await this.getNutritionist(userId);
+    const relation = await this.prisma.nutritionistPatient.findFirst({
+      where: { nutritionistId: n.id, studentId },
+    });
+    if (!relation) throw new NotFoundException('Paciente não encontrado');
+    return this.prisma.supplementationPlan.findMany({
+      where: { studentId },
+      include: { items: true },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  async createSupplementationPlan(userId: string, studentId: string, data: any) {
+    const n = await this.getNutritionist(userId);
+    const relation = await this.prisma.nutritionistPatient.findFirst({
+      where: { nutritionistId: n.id, studentId },
+    });
+    if (!relation) throw new NotFoundException('Paciente não encontrado');
+    const { items, ...planData } = data;
+    return this.prisma.supplementationPlan.create({
+      data: {
+        studentId,
+        nutritionistId: n.id,
+        ...planData,
+        items: items?.length ? { create: items } : undefined,
+      },
+      include: { items: true },
+    });
+  }
+
+  async updateSupplementationPlan(userId: string, planId: string, data: any) {
+    const n = await this.getNutritionist(userId);
+    const plan = await this.prisma.supplementationPlan.findFirst({
+      where: { id: planId, nutritionistId: n.id },
+    });
+    if (!plan) throw new NotFoundException('Plano não encontrado');
+    const { items, ...planData } = data;
+    if (items) {
+      await this.prisma.supplementationPlanItem.deleteMany({ where: { planId } });
+    }
+    return this.prisma.supplementationPlan.update({
+      where: { id: planId },
+      data: {
+        ...planData,
+        ...(items && { items: { create: items } }),
+      },
+      include: { items: true },
+    });
+  }
 }
 
