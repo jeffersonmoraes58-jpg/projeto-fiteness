@@ -87,6 +87,18 @@ export class NutritionistsController {
     return this.service.createNutritionalAssessment(user.id, studentId, body);
   }
 
+  @Get('me/patients/:studentId/physical-assessments')
+  @ApiOperation({ summary: 'Listar avaliações antropométricas do paciente' })
+  getPhysicalAssessments(@CurrentUser() user: any, @Param('studentId') studentId: string) {
+    return this.service.getPhysicalAssessments(user.id, studentId);
+  }
+
+  @Post('me/patients/:studentId/physical-assessments')
+  @ApiOperation({ summary: 'Criar avaliação antropométrica do paciente' })
+  createPhysicalAssessment(@CurrentUser() user: any, @Param('studentId') studentId: string, @Body() body: any) {
+    return this.service.createPhysicalAssessment(user.id, studentId, body);
+  }
+
   @Patch('me')
   @ApiOperation({ summary: 'Atualizar perfil do nutricionista' })
   update(@CurrentUser() user: any, @Body() body: any) {

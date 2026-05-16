@@ -86,6 +86,29 @@ const EMPTY_ASSESSMENT = {
   observations: '',
 };
 
+const EMPTY_PHYSICAL = {
+  weight: '',
+  height: '',
+  bodyFatPercent: '',
+  muscleMassKg: '',
+  visceralFat: '',
+  metabolicAge: '',
+  waterPercent: '',
+  neckCm: '',
+  shouldersCm: '',
+  chestCm: '',
+  waistCm: '',
+  hipCm: '',
+  abdomenCm: '',
+  rightArmCm: '',
+  leftArmCm: '',
+  rightThighCm: '',
+  leftThighCm: '',
+  rightCalfCm: '',
+  leftCalfCm: '',
+  notes: '',
+};
+
 const DAYS = [
   { label: 'Dom', value: 0 },
   { label: 'Seg', value: 1 },
@@ -154,6 +177,10 @@ export default function PatientDetailPage() {
   const [assessmentOpen, setAssessmentOpen] = useState(false);
   const [assessmentForm, setAssessmentForm] = useState(EMPTY_ASSESSMENT);
   const [showHistory, setShowHistory] = useState(false);
+
+  const [physicalOpen, setPhysicalOpen] = useState(false);
+  const [physicalForm, setPhysicalForm] = useState(EMPTY_PHYSICAL);
+  const [showPhysicalHistory, setShowPhysicalHistory] = useState(false);
 
   const { data: patients, isLoading } = useQuery({
     queryKey: ['nutritionist-patients'],
@@ -271,6 +298,70 @@ export default function PatientDetailPage() {
         ? assessmentForm.foodAllergies.split(',').map((s) => s.trim()).filter(Boolean)
         : [],
       observations: assessmentForm.observations || null,
+    });
+  };
+
+  const { data: physicalAssessments, isLoading: physicalLoading } = useQuery({
+    queryKey: ['physical-assessments', id],
+    queryFn: () =>
+      api.get(`/nutritionists/me/patients/${id}/physical-assessments`).then((r) => r.data),
+    enabled: !!patient && physicalOpen,
+  });
+
+  const setPhyField = (field: string, value: any) =>
+    setPhysicalForm((prev) => ({ ...prev, [field]: value }));
+
+  const physicalBmi = (() => {
+    const w = parseFloat(physicalForm.weight);
+    const h = parseFloat(physicalForm.height);
+    if (!w || !h) return null;
+    return calcBmi(w, h / 100);
+  })();
+
+  const physicalMutation = useMutation({
+    mutationFn: (data: any) =>
+      api.post(`/nutritionists/me/patients/${id}/physical-assessments`, data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['physical-assessments', id] });
+      setPhysicalForm(EMPTY_PHYSICAL);
+      setShowPhysicalHistory(true);
+      toast.success('Avaliação antropométrica registrada!');
+    },
+    onError: (e: any) => {
+      const msg = e.response?.data?.message || e.message || 'Erro ao salvar avaliação';
+      toast.error(Array.isArray(msg) ? msg.join(', ') : msg);
+    },
+  });
+
+  const handlePhysicalSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const w = parseFloat(physicalForm.weight);
+    const h = parseFloat(physicalForm.height);
+    if (!w || !h) { toast.error('Peso e altura são obrigatórios'); return; }
+    const opt = (val: string) => (val !== '' ? parseFloat(val) : null);
+    const optInt = (val: string) => (val !== '' ? parseInt(val) : null);
+    physicalMutation.mutate({
+      weight: w,
+      height: h / 100,
+      bmi: physicalBmi ? parseFloat(physicalBmi.toFixed(2)) : 0,
+      bodyFatPercent: opt(physicalForm.bodyFatPercent),
+      muscleMassKg: opt(physicalForm.muscleMassKg),
+      visceralFat: opt(physicalForm.visceralFat),
+      metabolicAge: optInt(physicalForm.metabolicAge),
+      waterPercent: opt(physicalForm.waterPercent),
+      neckCm: opt(physicalForm.neckCm),
+      shouldersCm: opt(physicalForm.shouldersCm),
+      chestCm: opt(physicalForm.chestCm),
+      waistCm: opt(physicalForm.waistCm),
+      hipCm: opt(physicalForm.hipCm),
+      abdomenCm: opt(physicalForm.abdomenCm),
+      rightArmCm: opt(physicalForm.rightArmCm),
+      leftArmCm: opt(physicalForm.leftArmCm),
+      rightThighCm: opt(physicalForm.rightThighCm),
+      leftThighCm: opt(physicalForm.leftThighCm),
+      rightCalfCm: opt(physicalForm.rightCalfCm),
+      leftCalfCm: opt(physicalForm.leftCalfCm),
+      notes: physicalForm.notes || null,
     });
   };
 
@@ -912,6 +1003,222 @@ export default function PatientDetailPage() {
                             )}
                           </div>
                         )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+      </motion.div>
+
+      {/* Avaliação antropométrica */}
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }} className="glass-card">
+        <button
+          type="button"
+          onClick={() => setPhysicalOpen((o) => !o)}
+          className="w-full flex items-center justify-between"
+        >
+          <h2 className="font-semibold flex items-center gap-2">
+            <Scale className="w-4 h-4 text-orange-400" />
+            Avaliação Antropométrica
+            {physicalAssessments && physicalAssessments.length > 0 && (
+              <span className="text-xs px-2 py-0.5 rounded-full bg-orange-500/10 text-orange-400 ml-1">
+                {physicalAssessments.length} registro{physicalAssessments.length > 1 ? 's' : ''}
+              </span>
+            )}
+          </h2>
+          {physicalOpen ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
+        </button>
+
+        {physicalOpen && (
+          <div className="mt-5 space-y-6">
+            <form onSubmit={handlePhysicalSubmit} className="space-y-5">
+              <h3 className="text-sm font-semibold flex items-center gap-2">
+                <Plus className="w-3.5 h-3.5 text-orange-400" />
+                Nova avaliação
+              </h3>
+
+              {/* Medidas básicas */}
+              <div className="space-y-3">
+                <p className="text-xs font-semibold text-orange-400 uppercase tracking-wide">Medidas Básicas</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-sm font-medium mb-1.5 block">Peso (kg) *</label>
+                    <input type="number" step="0.1" min="1" value={physicalForm.weight}
+                      onChange={(e) => setPhyField('weight', e.target.value)}
+                      placeholder="70.5" className="input-field" required />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium mb-1.5 block">Altura (cm) *</label>
+                    <input type="number" step="0.1" min="1" value={physicalForm.height}
+                      onChange={(e) => setPhyField('height', e.target.value)}
+                      placeholder="170" className="input-field" required />
+                  </div>
+                </div>
+
+                {physicalBmi && (
+                  <div className={cn(
+                    'glass rounded-xl p-3 flex items-center justify-between',
+                    physicalBmi < 18.5 ? 'border border-blue-500/30' :
+                    physicalBmi < 25 ? 'border border-emerald-500/30' :
+                    physicalBmi < 30 ? 'border border-yellow-500/30' : 'border border-red-500/30',
+                  )}>
+                    <span className="text-sm text-muted-foreground">IMC calculado</span>
+                    <div className="text-right">
+                      <span className={cn(
+                        'text-lg font-bold',
+                        physicalBmi < 18.5 ? 'text-blue-400' :
+                        physicalBmi < 25 ? 'text-emerald-400' :
+                        physicalBmi < 30 ? 'text-yellow-400' : 'text-red-400',
+                      )}>{physicalBmi.toFixed(1)}</span>
+                      <span className="text-xs text-muted-foreground ml-2">
+                        {physicalBmi < 18.5 ? 'Abaixo do peso' : physicalBmi < 25 ? 'Peso normal' : physicalBmi < 30 ? 'Sobrepeso' : 'Obesidade'}
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Composição corporal */}
+              <div className="space-y-3">
+                <p className="text-xs font-semibold text-orange-400 uppercase tracking-wide">Composição Corporal</p>
+                <div className="grid grid-cols-2 gap-3">
+                  {[
+                    { key: 'bodyFatPercent', label: '% Gordura', placeholder: '20.5' },
+                    { key: 'muscleMassKg', label: 'Massa muscular (kg)', placeholder: '35.0' },
+                    { key: 'visceralFat', label: 'Gordura visceral', placeholder: '8' },
+                    { key: 'waterPercent', label: '% Água corporal', placeholder: '55.0' },
+                    { key: 'metabolicAge', label: 'Idade metabólica', placeholder: '28' },
+                  ].map(({ key, label, placeholder }) => (
+                    <div key={key}>
+                      <label className="text-sm font-medium mb-1.5 block">{label}</label>
+                      <input type="number" step="0.1" min="0"
+                        value={(physicalForm as any)[key]}
+                        onChange={(e) => setPhyField(key, e.target.value)}
+                        placeholder={placeholder} className="input-field" />
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Perimetria */}
+              <div className="space-y-3">
+                <p className="text-xs font-semibold text-orange-400 uppercase tracking-wide">Perimetria (cm)</p>
+                <div className="grid grid-cols-2 gap-3">
+                  {[
+                    { key: 'neckCm', label: 'Pescoço' },
+                    { key: 'shouldersCm', label: 'Ombros' },
+                    { key: 'chestCm', label: 'Tórax' },
+                    { key: 'waistCm', label: 'Cintura' },
+                    { key: 'abdomenCm', label: 'Abdômen' },
+                    { key: 'hipCm', label: 'Quadril' },
+                    { key: 'rightArmCm', label: 'Braço D' },
+                    { key: 'leftArmCm', label: 'Braço E' },
+                    { key: 'rightThighCm', label: 'Coxa D' },
+                    { key: 'leftThighCm', label: 'Coxa E' },
+                    { key: 'rightCalfCm', label: 'Panturrilha D' },
+                    { key: 'leftCalfCm', label: 'Panturrilha E' },
+                  ].map(({ key, label }) => (
+                    <div key={key}>
+                      <label className="text-sm font-medium mb-1.5 block">{label}</label>
+                      <input type="number" step="0.1" min="0"
+                        value={(physicalForm as any)[key]}
+                        onChange={(e) => setPhyField(key, e.target.value)}
+                        placeholder="—" className="input-field" />
+                    </div>
+                  ))}
+                </div>
+
+                {/* Relação cintura-quadril */}
+                {physicalForm.waistCm && physicalForm.hipCm && (
+                  <div className="glass rounded-xl p-3 flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">Relação cintura/quadril (RCQ)</span>
+                    <span className="font-bold text-orange-400">
+                      {(parseFloat(physicalForm.waistCm) / parseFloat(physicalForm.hipCm)).toFixed(2)}
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              {/* Observações */}
+              <div>
+                <label className="text-sm font-medium mb-1.5 block">Observações</label>
+                <textarea value={physicalForm.notes} onChange={(e) => setPhyField('notes', e.target.value)}
+                  placeholder="Observações adicionais..." rows={2} className="input-field resize-none" />
+              </div>
+
+              <button type="submit" disabled={physicalMutation.isPending}
+                className="btn-primary w-full flex items-center justify-center gap-2 disabled:opacity-50">
+                <Save className="w-4 h-4" />
+                {physicalMutation.isPending ? 'Salvando...' : 'Registrar avaliação'}
+              </button>
+            </form>
+
+            {/* Histórico */}
+            {physicalAssessments && physicalAssessments.length > 0 && (
+              <div>
+                <button type="button" onClick={() => setShowPhysicalHistory((h) => !h)}
+                  className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
+                  <History className="w-4 h-4" />
+                  {showPhysicalHistory ? 'Ocultar histórico' : `Ver histórico (${physicalAssessments.length})`}
+                </button>
+
+                {showPhysicalHistory && (
+                  <div className="mt-3 space-y-3">
+                    {physicalLoading ? (
+                      <div className="h-16 rounded-xl bg-white/5 animate-pulse" />
+                    ) : physicalAssessments.map((a: any) => (
+                      <div key={a.id} className="glass rounded-xl p-4 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs text-muted-foreground">
+                            {new Date(a.assessedAt).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' })}
+                          </span>
+                          <span className="text-xs font-medium">
+                            {a.weight} kg · {(a.height * 100).toFixed(0)} cm · IMC {a.bmi?.toFixed(1)}
+                          </span>
+                        </div>
+
+                        {(a.bodyFatPercent || a.muscleMassKg || a.waterPercent || a.visceralFat) && (
+                          <div className="grid grid-cols-4 gap-2 text-center text-xs">
+                            {[
+                              { label: '% Gord.', value: a.bodyFatPercent, suffix: '%' },
+                              { label: 'Músculo', value: a.muscleMassKg, suffix: 'kg' },
+                              { label: '% Água', value: a.waterPercent, suffix: '%' },
+                              { label: 'Visceral', value: a.visceralFat, suffix: '' },
+                            ].map((m) => m.value != null && (
+                              <div key={m.label} className="glass rounded-lg p-1.5">
+                                <div className="font-semibold">{m.value}{m.suffix}</div>
+                                <div className="text-muted-foreground">{m.label}</div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        {(a.waistCm || a.hipCm || a.abdomenCm) && (
+                          <div className="flex flex-wrap gap-2 text-xs">
+                            {[
+                              { label: 'Cintura', value: a.waistCm },
+                              { label: 'Quadril', value: a.hipCm },
+                              { label: 'Abdômen', value: a.abdomenCm },
+                              { label: 'Tórax', value: a.chestCm },
+                              { label: 'Braço D', value: a.rightArmCm },
+                              { label: 'Coxa D', value: a.rightThighCm },
+                            ].filter((m) => m.value != null).map((m) => (
+                              <span key={m.label} className="glass px-2 py-1 rounded-lg">
+                                {m.label}: <strong>{m.value} cm</strong>
+                              </span>
+                            ))}
+                            {a.waistCm && a.hipCm && (
+                              <span className="glass px-2 py-1 rounded-lg text-orange-400">
+                                RCQ: <strong>{(a.waistCm / a.hipCm).toFixed(2)}</strong>
+                              </span>
+                            )}
+                          </div>
+                        )}
+
+                        {a.notes && <p className="text-xs text-muted-foreground">{a.notes}</p>}
                       </div>
                     ))}
                   </div>

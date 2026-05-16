@@ -155,5 +155,28 @@ export class NutritionistsService {
       data: { studentId, nutritionistId: n.id, ...data },
     });
   }
+
+  async getPhysicalAssessments(userId: string, studentId: string) {
+    const n = await this.getNutritionist(userId);
+    const relation = await this.prisma.nutritionistPatient.findFirst({
+      where: { nutritionistId: n.id, studentId },
+    });
+    if (!relation) throw new NotFoundException('Paciente não encontrado');
+    return this.prisma.physicalAssessment.findMany({
+      where: { studentId },
+      orderBy: { assessedAt: 'desc' },
+    });
+  }
+
+  async createPhysicalAssessment(userId: string, studentId: string, data: any) {
+    const n = await this.getNutritionist(userId);
+    const relation = await this.prisma.nutritionistPatient.findFirst({
+      where: { nutritionistId: n.id, studentId },
+    });
+    if (!relation) throw new NotFoundException('Paciente não encontrado');
+    return this.prisma.physicalAssessment.create({
+      data: { studentId, ...data },
+    });
+  }
 }
 
