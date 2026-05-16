@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Patch, Body, Param, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Put, Patch, Delete, Body, Param, Query, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { NutritionistsService } from './nutritionists.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -97,6 +97,24 @@ export class NutritionistsController {
   @ApiOperation({ summary: 'Criar avaliação antropométrica do paciente' })
   createPhysicalAssessment(@CurrentUser() user: any, @Param('studentId') studentId: string, @Body() body: any) {
     return this.service.createPhysicalAssessment(user.id, studentId, body);
+  }
+
+  @Get('me/patients/:studentId/progress-photos')
+  @ApiOperation({ summary: 'Listar fotos de progresso do paciente' })
+  getProgressPhotos(@CurrentUser() user: any, @Param('studentId') studentId: string) {
+    return this.service.getProgressPhotos(user.id, studentId);
+  }
+
+  @Post('me/patients/:studentId/progress-photos')
+  @ApiOperation({ summary: 'Registrar foto de progresso do paciente' })
+  addProgressPhoto(@CurrentUser() user: any, @Param('studentId') studentId: string, @Body() body: any) {
+    return this.service.addProgressPhoto(user.id, studentId, body);
+  }
+
+  @Delete('me/patients/:studentId/progress-photos/:photoId')
+  @ApiOperation({ summary: 'Excluir foto de progresso' })
+  deleteProgressPhoto(@CurrentUser() user: any, @Param('studentId') studentId: string, @Param('photoId') photoId: string) {
+    return this.service.deleteProgressPhoto(user.id, studentId, photoId);
   }
 
   @Get('me/patients/:studentId/weight-log')

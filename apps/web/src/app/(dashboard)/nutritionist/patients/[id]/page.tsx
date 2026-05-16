@@ -6,6 +6,7 @@ import {
   Users, ChevronLeft, Apple, Calendar, MessageCircle, UserCheck, Dumbbell,
   CheckSquare, Square, ClipboardList, ChevronDown, ChevronUp, Save, Scale,
   Plus, History, ClipboardCheck, X, TrendingUp, TrendingDown, Minus, Activity,
+  Camera, Trash2, ImageOff,
 } from 'lucide-react';
 import Link from 'next/link';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
@@ -217,6 +218,16 @@ export default function PatientDetailPage() {
   const [physicalForm, setPhysicalForm] = useState(EMPTY_PHYSICAL);
   const [showPhysicalHistory, setShowPhysicalHistory] = useState(false);
 
+  const [photosOpen, setPhotosOpen] = useState(false);
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [photoPreview, setPhotoPreview] = useState('');
+  const [photoAngle, setPhotoAngle] = useState('Frente');
+  const [photoDate, setPhotoDate] = useState(() => new Date().toISOString().slice(0, 16));
+  const [photoWeight, setPhotoWeight] = useState('');
+  const [photoNotes, setPhotoNotes] = useState('');
+  const [uploading, setUploading] = useState(false);
+  const [lightboxUrl, setLightboxUrl] = useState('');
+
   const [weightLogOpen, setWeightLogOpen] = useState(false);
   const [weightDate, setWeightDate] = useState(() => new Date().toISOString().slice(0, 16));
   const [weightValue, setWeightValue] = useState('');
@@ -423,6 +434,74 @@ export default function PatientDetailPage() {
       notes: physicalForm.notes || null,
     });
   };
+
+  const { data: progressPhotos, isLoading: photosLoading } = useQuery({
+    queryKey: ['progress-photos', id],
+    queryFn: () =>
+      api.get(`/nutritionists/me/patients/${id}/progress-photos`).then((r) => r.data),
+    enabled: !!patient && photosOpen,
+  });
+
+  const deletePhotoMutation = useMutation({
+    mutationFn: (photoId: string) =>
+      api.delete(`/nutritionists/me/patients/${id}/progress-photos/${photoId}`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['progress-photos', id] });
+      toast.success('Foto removida');
+    },
+    onError: () => toast.error('Erro ao remover foto'),
+  });
+
+  const handlePhotoFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setPhotoFile(file);
+    setPhotoPreview(URL.createObjectURL(file));
+  };
+
+  const handlePhotoSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!photoFile) { toast.error('Selecione uma foto'); return; }
+    setUploading(true);
+    try {
+      const form = new FormData();
+      form.append('file', photoFile);
+      const { data: uploaded } = await api.post('/uploads/progress-photo', form, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      await api.post(`/nutritionists/me/patients/${id}/progress-photos`, {
+        photoUrl: uploaded.url,
+        angle: photoAngle,
+        takenAt: new Date(photoDate).toISOString(),
+        weight: photoWeight ? parseFloat(photoWeight) : null,
+        notes: photoNotes || null,
+      });
+      qc.invalidateQueries({ queryKey: ['progress-photos', id] });
+      setPhotoFile(null);
+      setPhotoPreview('');
+      setPhotoAngle('Frente');
+      setPhotoDate(new Date().toISOString().slice(0, 16));
+      setPhotoWeight('');
+      setPhotoNotes('');
+      toast.success('Foto registrada com sucesso!');
+    } catch (e: any) {
+      const msg = e.response?.data?.message || e.message || 'Erro ao enviar foto';
+      toast.error(Array.isArray(msg) ? msg.join(', ') : msg);
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const photosByDate = progressPhotos
+    ? Object.entries(
+        progressPhotos.reduce((acc: any, p: any) => {
+          const key = new Date(p.takenAt).toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' });
+          if (!acc[key]) acc[key] = [];
+          acc[key].push(p);
+          return acc;
+        }, {}),
+      )
+    : [];
 
   const { data: weightLog, isLoading: weightLogLoading } = useQuery({
     queryKey: ['weight-log', id],
@@ -1476,6 +1555,156 @@ export default function PatientDetailPage() {
           </div>
         )}
       </motion.div>
+
+      {/* Fotos de progresso */}
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.252 }} className="glass-card">
+        <button type="button" onClick={() => setPhotosOpen((o) => !o)} className="w-full flex items-center justify-between">
+          <h2 className="font-semibold flex items-center gap-2">
+            <Camera className="w-4 h-4 text-violet-400" />
+            Fotos de Progresso
+            {progressPhotos && progressPhotos.length > 0 && (
+              <span className="text-xs px-2 py-0.5 rounded-full bg-violet-500/10 text-violet-400 ml-1">
+                {progressPhotos.length} foto{progressPhotos.length !== 1 ? 's' : ''}
+              </span>
+            )}
+          </h2>
+          {photosOpen ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
+        </button>
+
+        {photosOpen && (
+          <div className="mt-5 space-y-6">
+            {/* Formulário de upload */}
+            <form onSubmit={handlePhotoSubmit} className="space-y-4">
+              <h3 className="text-sm font-semibold flex items-center gap-2">
+                <Plus className="w-3.5 h-3.5 text-violet-400" />
+                Adicionar foto
+              </h3>
+
+              {/* Área de seleção */}
+              <label className={cn(
+                'flex flex-col items-center justify-center w-full h-40 rounded-xl border-2 border-dashed cursor-pointer transition-all',
+                photoPreview ? 'border-violet-500/50 p-1' : 'border-white/10 hover:border-violet-500/40 hover:bg-white/2',
+              )}>
+                {photoPreview ? (
+                  <img src={photoPreview} alt="preview" className="h-full w-full object-contain rounded-lg" />
+                ) : (
+                  <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                    <Camera className="w-8 h-8" />
+                    <span className="text-sm">Clique para selecionar foto</span>
+                    <span className="text-xs">JPEG, PNG ou WEBP · máx. 10MB</span>
+                  </div>
+                )}
+                <input type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={handlePhotoFileChange} />
+              </label>
+
+              {photoPreview && (
+                <button type="button" onClick={() => { setPhotoFile(null); setPhotoPreview(''); }}
+                  className="text-xs text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1">
+                  <X className="w-3 h-3" /> Remover foto
+                </button>
+              )}
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-sm font-medium mb-1.5 block">Ângulo *</label>
+                  <select value={photoAngle} onChange={(e) => setPhotoAngle(e.target.value)} className="input-field">
+                    {['Frente', 'Costas', 'Lateral esquerda', 'Lateral direita'].map((a) => (
+                      <option key={a} value={a}>{a}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-sm font-medium mb-1.5 block">Peso no dia (kg)</label>
+                  <input type="number" step="0.1" min="1" value={photoWeight}
+                    onChange={(e) => setPhotoWeight(e.target.value)} placeholder="70.5" className="input-field" />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-sm font-medium mb-1.5 block">Data</label>
+                <input type="datetime-local" value={photoDate} onChange={(e) => setPhotoDate(e.target.value)} className="input-field" />
+              </div>
+
+              <div>
+                <label className="text-sm font-medium mb-1.5 block">Observações</label>
+                <input type="text" value={photoNotes} onChange={(e) => setPhotoNotes(e.target.value)}
+                  placeholder="Ex: início do ciclo, 8 semanas de treino..." className="input-field" />
+              </div>
+
+              <button type="submit" disabled={uploading || !photoFile}
+                className="btn-primary w-full flex items-center justify-center gap-2 disabled:opacity-50">
+                <Camera className="w-4 h-4" />
+                {uploading ? 'Enviando...' : 'Salvar foto'}
+              </button>
+            </form>
+
+            {/* Galeria */}
+            {photosLoading ? (
+              <div className="grid grid-cols-3 gap-2">
+                {[...Array(3)].map((_, i) => <div key={i} className="aspect-square rounded-xl bg-white/5 animate-pulse" />)}
+              </div>
+            ) : photosByDate.length === 0 ? (
+              <div className="flex flex-col items-center gap-2 py-8 text-muted-foreground">
+                <ImageOff className="w-8 h-8" />
+                <span className="text-sm">Nenhuma foto registrada ainda</span>
+              </div>
+            ) : (
+              <div className="space-y-5">
+                {photosByDate.map(([date, photos]: any) => (
+                  <div key={date}>
+                    <p className="text-xs font-semibold text-violet-400 uppercase tracking-wide mb-3">{date}</p>
+                    <div className="grid grid-cols-2 gap-3">
+                      {photos.map((p: any) => (
+                        <div key={p.id} className="group relative rounded-xl overflow-hidden aspect-[3/4] bg-white/5">
+                          <img
+                            src={p.photoUrl}
+                            alt={p.angle}
+                            className="w-full h-full object-cover cursor-pointer transition-transform group-hover:scale-105"
+                            onClick={() => setLightboxUrl(p.photoUrl)}
+                          />
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
+                          <div className="absolute bottom-0 left-0 right-0 p-2 translate-y-full group-hover:translate-y-0 transition-transform">
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <span className="text-xs font-medium text-white">{p.angle}</span>
+                                {p.weight && <span className="text-xs text-white/70 ml-2">{p.weight} kg</span>}
+                              </div>
+                              <button
+                                type="button"
+                                onClick={(e) => { e.stopPropagation(); deletePhotoMutation.mutate(p.id); }}
+                                className="w-7 h-7 rounded-lg bg-red-500/80 flex items-center justify-center hover:bg-red-500 transition-colors pointer-events-auto"
+                              >
+                                <Trash2 className="w-3.5 h-3.5 text-white" />
+                              </button>
+                            </div>
+                            {p.notes && <p className="text-xs text-white/70 mt-0.5 line-clamp-1">{p.notes}</p>}
+                          </div>
+                          <div className="absolute top-2 left-2">
+                            <span className="text-xs px-1.5 py-0.5 rounded-md bg-black/50 text-white/80 backdrop-blur-sm">{p.angle}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </motion.div>
+
+      {/* Lightbox */}
+      {lightboxUrl && (
+        <div
+          className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4"
+          onClick={() => setLightboxUrl('')}
+        >
+          <button type="button" onClick={() => setLightboxUrl('')} className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/10 flex items-center justify-center hover:bg-white/20 transition-colors">
+            <X className="w-5 h-5 text-white" />
+          </button>
+          <img src={lightboxUrl} alt="Foto de progresso" className="max-h-[90vh] max-w-full object-contain rounded-xl" onClick={(e) => e.stopPropagation()} />
+        </div>
+      )}
 
       {/* Registro de peso diário */}
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.255 }} className="glass-card">

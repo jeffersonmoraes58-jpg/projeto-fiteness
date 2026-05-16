@@ -179,6 +179,39 @@ export class NutritionistsService {
     });
   }
 
+  async getProgressPhotos(userId: string, studentId: string) {
+    const n = await this.getNutritionist(userId);
+    const relation = await this.prisma.nutritionistPatient.findFirst({
+      where: { nutritionistId: n.id, studentId },
+    });
+    if (!relation) throw new NotFoundException('Paciente não encontrado');
+    return this.prisma.progressPhoto.findMany({
+      where: { studentId },
+      orderBy: { takenAt: 'desc' },
+    });
+  }
+
+  async addProgressPhoto(userId: string, studentId: string, data: any) {
+    const n = await this.getNutritionist(userId);
+    const relation = await this.prisma.nutritionistPatient.findFirst({
+      where: { nutritionistId: n.id, studentId },
+    });
+    if (!relation) throw new NotFoundException('Paciente não encontrado');
+    return this.prisma.progressPhoto.create({ data: { studentId, ...data } });
+  }
+
+  async deleteProgressPhoto(userId: string, studentId: string, photoId: string) {
+    const n = await this.getNutritionist(userId);
+    const relation = await this.prisma.nutritionistPatient.findFirst({
+      where: { nutritionistId: n.id, studentId },
+    });
+    if (!relation) throw new NotFoundException('Paciente não encontrado');
+    const photo = await this.prisma.progressPhoto.findFirst({ where: { id: photoId, studentId } });
+    if (!photo) throw new NotFoundException('Foto não encontrada');
+    await this.prisma.progressPhoto.delete({ where: { id: photoId } });
+    return { deleted: true, photoUrl: photo.photoUrl };
+  }
+
   async getDailyWeightLog(userId: string, studentId: string) {
     const n = await this.getNutritionist(userId);
     const relation = await this.prisma.nutritionistPatient.findFirst({
