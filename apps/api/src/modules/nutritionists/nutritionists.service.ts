@@ -179,6 +179,41 @@ export class NutritionistsService {
     });
   }
 
+  async getPatientConsultations(userId: string, studentId: string) {
+    const n = await this.getNutritionist(userId);
+    const relation = await this.prisma.nutritionistPatient.findFirst({
+      where: { nutritionistId: n.id, studentId },
+    });
+    if (!relation) throw new NotFoundException('Paciente não encontrado');
+    return this.prisma.nutritionalConsultation.findMany({
+      where: { nutritionistId: n.id, studentId },
+      orderBy: { scheduledAt: 'desc' },
+    });
+  }
+
+  async createPatientConsultation(userId: string, studentId: string, data: any) {
+    const n = await this.getNutritionist(userId);
+    const relation = await this.prisma.nutritionistPatient.findFirst({
+      where: { nutritionistId: n.id, studentId },
+    });
+    if (!relation) throw new NotFoundException('Paciente não encontrado');
+    return this.prisma.nutritionalConsultation.create({
+      data: { nutritionistId: n.id, studentId, ...data },
+    });
+  }
+
+  async updateConsultation(userId: string, consultationId: string, data: any) {
+    const n = await this.getNutritionist(userId);
+    const consultation = await this.prisma.nutritionalConsultation.findFirst({
+      where: { id: consultationId, nutritionistId: n.id },
+    });
+    if (!consultation) throw new NotFoundException('Consulta não encontrada');
+    return this.prisma.nutritionalConsultation.update({
+      where: { id: consultationId },
+      data,
+    });
+  }
+
   async getSupplementationPlans(userId: string, studentId: string) {
     const n = await this.getNutritionist(userId);
     const relation = await this.prisma.nutritionistPatient.findFirst({

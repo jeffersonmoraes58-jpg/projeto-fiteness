@@ -99,6 +99,24 @@ export class NutritionistsController {
     return this.service.createPhysicalAssessment(user.id, studentId, body);
   }
 
+  @Get('me/patients/:studentId/consultations')
+  @ApiOperation({ summary: 'Listar consultas do paciente' })
+  getPatientConsultations(@CurrentUser() user: any, @Param('studentId') studentId: string) {
+    return this.service.getPatientConsultations(user.id, studentId);
+  }
+
+  @Post('me/patients/:studentId/consultations')
+  @ApiOperation({ summary: 'Registrar consulta do paciente' })
+  createPatientConsultation(@CurrentUser() user: any, @Param('studentId') studentId: string, @Body() body: any) {
+    return this.service.createPatientConsultation(user.id, studentId, body);
+  }
+
+  @Patch('me/consultations/:consultationId')
+  @ApiOperation({ summary: 'Atualizar consulta' })
+  updateConsultation(@CurrentUser() user: any, @Param('consultationId') consultationId: string, @Body() body: any) {
+    return this.service.updateConsultation(user.id, consultationId, body);
+  }
+
   @Get('me/patients/:studentId/supplementation-plans')
   @ApiOperation({ summary: 'Listar planos de suplementação do paciente' })
   getSupplementationPlans(@CurrentUser() user: any, @Param('studentId') studentId: string) {

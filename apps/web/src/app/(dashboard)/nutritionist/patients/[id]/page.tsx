@@ -5,7 +5,7 @@ import { motion } from 'framer-motion';
 import {
   Users, ChevronLeft, Apple, Calendar, MessageCircle, UserCheck, Dumbbell,
   CheckSquare, Square, ClipboardList, ChevronDown, ChevronUp, Save, Scale,
-  Plus, History,
+  Plus, History, ClipboardCheck, X,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
@@ -85,6 +85,18 @@ const EMPTY_ASSESSMENT = {
   foodAllergies: '',
   observations: '',
 };
+
+const CONSULTATION_STATUS = {
+  upcoming: { label: 'Agendada', color: 'text-cyan-400', bg: 'bg-cyan-500/10' },
+  completed: { label: 'Realizada', color: 'text-emerald-400', bg: 'bg-emerald-500/10' },
+  missed: { label: 'Não realizada', color: 'text-red-400', bg: 'bg-red-500/10' },
+};
+
+function getConsultationStatus(c: any) {
+  if (c.completedAt) return 'completed';
+  if (new Date(c.scheduledAt) < new Date()) return 'missed';
+  return 'upcoming';
+}
 
 const TIMING_OPTIONS = [
   'Em jejum',
@@ -195,6 +207,14 @@ export default function PatientDetailPage() {
   const [physicalOpen, setPhysicalOpen] = useState(false);
   const [physicalForm, setPhysicalForm] = useState(EMPTY_PHYSICAL);
   const [showPhysicalHistory, setShowPhysicalHistory] = useState(false);
+
+  const [consultOpen, setConsultOpen] = useState(false);
+  const [consultScheduledAt, setConsultScheduledAt] = useState('');
+  const [consultNotes, setConsultNotes] = useState('');
+  const [consultNext, setConsultNext] = useState('');
+  const [completingId, setCompletingId] = useState<string | null>(null);
+  const [completeNotes, setCompleteNotes] = useState('');
+  const [completeNext, setCompleteNext] = useState('');
 
   const [suppOpen, setSuppOpen] = useState(false);
   const [suppPlanName, setSuppPlanName] = useState('');
@@ -384,6 +404,59 @@ export default function PatientDetailPage() {
       rightCalfCm: opt(physicalForm.rightCalfCm),
       leftCalfCm: opt(physicalForm.leftCalfCm),
       notes: physicalForm.notes || null,
+    });
+  };
+
+  const { data: consultations, isLoading: consultLoading } = useQuery({
+    queryKey: ['patient-consultations', id],
+    queryFn: () =>
+      api.get(`/nutritionists/me/patients/${id}/consultations`).then((r) => r.data),
+    enabled: !!patient && consultOpen,
+  });
+
+  const createConsultMutation = useMutation({
+    mutationFn: (data: any) =>
+      api.post(`/nutritionists/me/patients/${id}/consultations`, data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['patient-consultations', id] });
+      setConsultScheduledAt('');
+      setConsultNotes('');
+      setConsultNext('');
+      toast.success('Consulta agendada!');
+    },
+    onError: (e: any) => {
+      const msg = e.response?.data?.message || e.message || 'Erro ao agendar consulta';
+      toast.error(Array.isArray(msg) ? msg.join(', ') : msg);
+    },
+  });
+
+  const completeConsultMutation = useMutation({
+    mutationFn: ({ consultationId, notes, nextConsultation }: any) =>
+      api.patch(`/nutritionists/me/consultations/${consultationId}`, {
+        completedAt: new Date().toISOString(),
+        notes: notes || null,
+        nextConsultation: nextConsultation || null,
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['patient-consultations', id] });
+      setCompletingId(null);
+      setCompleteNotes('');
+      setCompleteNext('');
+      toast.success('Consulta registrada como realizada!');
+    },
+    onError: (e: any) => {
+      const msg = e.response?.data?.message || e.message || 'Erro ao atualizar consulta';
+      toast.error(Array.isArray(msg) ? msg.join(', ') : msg);
+    },
+  });
+
+  const handleConsultSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!consultScheduledAt) { toast.error('Informe a data e hora da consulta'); return; }
+    createConsultMutation.mutate({
+      scheduledAt: new Date(consultScheduledAt).toISOString(),
+      notes: consultNotes || null,
+      nextConsultation: consultNext ? new Date(consultNext).toISOString() : null,
     });
   };
 
@@ -1303,6 +1376,156 @@ export default function PatientDetailPage() {
                 )}
               </div>
             )}
+          </div>
+        )}
+      </motion.div>
+
+      {/* Registro de consulta nutricional */}
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.27 }} className="glass-card">
+        <button type="button" onClick={() => setConsultOpen((o) => !o)} className="w-full flex items-center justify-between">
+          <h2 className="font-semibold flex items-center gap-2">
+            <ClipboardCheck className="w-4 h-4 text-sky-400" />
+            Consultas Nutricionais
+            {consultations && consultations.length > 0 && (
+              <span className="text-xs px-2 py-0.5 rounded-full bg-sky-500/10 text-sky-400 ml-1">
+                {consultations.length} registro{consultations.length !== 1 ? 's' : ''}
+              </span>
+            )}
+          </h2>
+          {consultOpen ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
+        </button>
+
+        {consultOpen && (
+          <div className="mt-5 space-y-6">
+            {/* Histórico de consultas */}
+            {consultLoading ? (
+              <div className="space-y-2">{[...Array(2)].map((_, i) => <div key={i} className="h-16 rounded-xl bg-white/5 animate-pulse" />)}</div>
+            ) : consultations && consultations.length > 0 && (
+              <div className="space-y-3">
+                <p className="text-xs font-semibold text-sky-400 uppercase tracking-wide">Histórico</p>
+                {consultations.map((c: any) => {
+                  const status = getConsultationStatus(c);
+                  const s = CONSULTATION_STATUS[status];
+                  const isCompleting = completingId === c.id;
+                  return (
+                    <div key={c.id} className="glass rounded-xl overflow-hidden">
+                      <div className="p-4 flex items-start justify-between gap-3">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className={cn('text-xs px-2 py-0.5 rounded-full font-medium', s.bg, s.color)}>
+                              {s.label}
+                            </span>
+                            <span className="text-xs text-muted-foreground">
+                              {new Date(c.scheduledAt).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' })}
+                              {' '}
+                              {new Date(c.scheduledAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                          </div>
+                          {c.notes && <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{c.notes}</p>}
+                          {c.nextConsultation && (
+                            <p className="text-xs text-sky-400 mt-1">
+                              Próxima: {new Date(c.nextConsultation).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' })}
+                            </p>
+                          )}
+                        </div>
+                        {status !== 'completed' && (
+                          <button
+                            type="button"
+                            onClick={() => setCompletingId(isCompleting ? null : c.id)}
+                            className="text-xs px-3 py-1.5 rounded-lg bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 transition-colors flex-shrink-0"
+                          >
+                            {isCompleting ? <X className="w-3.5 h-3.5" /> : 'Concluir'}
+                          </button>
+                        )}
+                      </div>
+
+                      {isCompleting && (
+                        <div className="border-t border-white/5 p-4 space-y-3 bg-white/2">
+                          <p className="text-xs font-semibold text-emerald-400">Registrar como concluída</p>
+                          <div>
+                            <label className="text-sm font-medium mb-1.5 block">Anotações da consulta</label>
+                            <textarea
+                              value={completeNotes}
+                              onChange={(e) => setCompleteNotes(e.target.value)}
+                              placeholder="Resumo, orientações, observações clínicas..."
+                              rows={3}
+                              className="input-field resize-none"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-sm font-medium mb-1.5 block">Data da próxima consulta</label>
+                            <input
+                              type="datetime-local"
+                              value={completeNext}
+                              onChange={(e) => setCompleteNext(e.target.value)}
+                              className="input-field"
+                            />
+                          </div>
+                          <button
+                            type="button"
+                            disabled={completeConsultMutation.isPending}
+                            onClick={() => completeConsultMutation.mutate({ consultationId: c.id, notes: completeNotes, nextConsultation: completeNext })}
+                            className="btn-primary w-full flex items-center justify-center gap-2 disabled:opacity-50 text-sm"
+                          >
+                            <Save className="w-4 h-4" />
+                            {completeConsultMutation.isPending ? 'Salvando...' : 'Salvar e concluir'}
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Agendar nova consulta */}
+            <form onSubmit={handleConsultSubmit} className="space-y-4">
+              <h3 className="text-sm font-semibold flex items-center gap-2">
+                <Plus className="w-3.5 h-3.5 text-sky-400" />
+                Agendar consulta
+              </h3>
+
+              <div>
+                <label className="text-sm font-medium mb-1.5 block">Data e hora *</label>
+                <input
+                  type="datetime-local"
+                  value={consultScheduledAt}
+                  onChange={(e) => setConsultScheduledAt(e.target.value)}
+                  className="input-field"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="text-sm font-medium mb-1.5 block">Anotações prévias</label>
+                <textarea
+                  value={consultNotes}
+                  onChange={(e) => setConsultNotes(e.target.value)}
+                  placeholder="Objetivos da consulta, tópicos a abordar..."
+                  rows={2}
+                  className="input-field resize-none"
+                />
+              </div>
+
+              <div>
+                <label className="text-sm font-medium mb-1.5 block">Próxima consulta (opcional)</label>
+                <input
+                  type="datetime-local"
+                  value={consultNext}
+                  onChange={(e) => setConsultNext(e.target.value)}
+                  className="input-field"
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={createConsultMutation.isPending}
+                className="btn-primary w-full flex items-center justify-center gap-2 disabled:opacity-50"
+              >
+                <Calendar className="w-4 h-4" />
+                {createConsultMutation.isPending ? 'Agendando...' : 'Agendar consulta'}
+              </button>
+            </form>
           </div>
         )}
       </motion.div>
