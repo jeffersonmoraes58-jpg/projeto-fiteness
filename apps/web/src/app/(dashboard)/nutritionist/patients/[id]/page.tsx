@@ -6,7 +6,7 @@ import {
   Users, ChevronLeft, Apple, Calendar, MessageCircle, UserCheck, Dumbbell,
   CheckSquare, Square, ClipboardList, ChevronDown, ChevronUp, Save, Scale,
   Plus, History, ClipboardCheck, X, TrendingUp, TrendingDown, Minus, Activity,
-  Camera, Trash2, ImageOff,
+  Camera, Trash2, ImageOff, Target,
 } from 'lucide-react';
 import Link from 'next/link';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
@@ -86,6 +86,26 @@ const EMPTY_ASSESSMENT = {
   dietaryRestrictions: '',
   foodAllergies: '',
   observations: '',
+};
+
+const GOAL_TYPE_OPTIONS = [
+  { value: 'LOSE_WEIGHT', label: 'Perda de peso' },
+  { value: 'GAIN_MUSCLE', label: 'Ganho muscular' },
+  { value: 'MAINTAIN_WEIGHT', label: 'Manutenção' },
+  { value: 'IMPROVE_ENDURANCE', label: 'Resistência' },
+  { value: 'INCREASE_FLEXIBILITY', label: 'Flexibilidade' },
+  { value: 'ATHLETIC_PERFORMANCE', label: 'Performance atlética' },
+  { value: 'REHABILITATION', label: 'Reabilitação' },
+];
+
+const EMPTY_GOAL = {
+  type: 'LOSE_WEIGHT',
+  title: '',
+  description: '',
+  targetValue: '',
+  currentValue: '',
+  unit: '',
+  targetDate: '',
 };
 
 const EVOLUTION_METRICS = [
@@ -217,6 +237,11 @@ export default function PatientDetailPage() {
   const [physicalOpen, setPhysicalOpen] = useState(false);
   const [physicalForm, setPhysicalForm] = useState(EMPTY_PHYSICAL);
   const [showPhysicalHistory, setShowPhysicalHistory] = useState(false);
+
+  const [goalsOpen, setGoalsOpen] = useState(false);
+  const [goalForm, setGoalForm] = useState(EMPTY_GOAL);
+  const [editingProgress, setEditingProgress] = useState<string | null>(null);
+  const [progressValue, setProgressValue] = useState('');
 
   const [photosOpen, setPhotosOpen] = useState(false);
   const [photoFile, setPhotoFile] = useState<File | null>(null);
@@ -432,6 +457,65 @@ export default function PatientDetailPage() {
       rightCalfCm: opt(physicalForm.rightCalfCm),
       leftCalfCm: opt(physicalForm.leftCalfCm),
       notes: physicalForm.notes || null,
+    });
+  };
+
+  const { data: goals, isLoading: goalsLoading } = useQuery({
+    queryKey: ['patient-goals', id],
+    queryFn: () => api.get(`/nutritionists/me/patients/${id}/goals`).then((r) => r.data),
+    enabled: !!patient && goalsOpen,
+  });
+
+  const createGoalMutation = useMutation({
+    mutationFn: (data: any) => api.post(`/nutritionists/me/patients/${id}/goals`, data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['patient-goals', id] });
+      setGoalForm(EMPTY_GOAL);
+      toast.success('Meta criada!');
+    },
+    onError: (e: any) => {
+      const msg = e.response?.data?.message || e.message || 'Erro ao criar meta';
+      toast.error(Array.isArray(msg) ? msg.join(', ') : msg);
+    },
+  });
+
+  const updateGoalMutation = useMutation({
+    mutationFn: ({ goalId, ...data }: any) =>
+      api.patch(`/nutritionists/me/goals/${goalId}`, data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['patient-goals', id] });
+      setEditingProgress(null);
+      setProgressValue('');
+    },
+    onError: (e: any) => {
+      const msg = e.response?.data?.message || e.message || 'Erro ao atualizar meta';
+      toast.error(Array.isArray(msg) ? msg.join(', ') : msg);
+    },
+  });
+
+  const deleteGoalMutation = useMutation({
+    mutationFn: (goalId: string) => api.delete(`/nutritionists/me/goals/${goalId}`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['patient-goals', id] });
+      toast.success('Meta removida');
+    },
+    onError: () => toast.error('Erro ao remover meta'),
+  });
+
+  const setGoalField = (field: string, value: any) =>
+    setGoalForm((prev) => ({ ...prev, [field]: value }));
+
+  const handleGoalSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!goalForm.title.trim()) { toast.error('Informe o título da meta'); return; }
+    createGoalMutation.mutate({
+      type: goalForm.type,
+      title: goalForm.title.trim(),
+      description: goalForm.description || null,
+      targetValue: goalForm.targetValue ? parseFloat(goalForm.targetValue) : null,
+      currentValue: goalForm.currentValue ? parseFloat(goalForm.currentValue) : null,
+      unit: goalForm.unit || null,
+      targetDate: goalForm.targetDate ? new Date(goalForm.targetDate).toISOString() : null,
     });
   };
 
@@ -1552,6 +1636,224 @@ export default function PatientDetailPage() {
                 )}
               </div>
             )}
+          </div>
+        )}
+      </motion.div>
+
+      {/* Metas e objetivos */}
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.251 }} className="glass-card">
+        <button type="button" onClick={() => setGoalsOpen((o) => !o)} className="w-full flex items-center justify-between">
+          <h2 className="font-semibold flex items-center gap-2">
+            <Target className="w-4 h-4 text-amber-400" />
+            Metas e Objetivos
+            {goals && (
+              <span className="text-xs px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 ml-1">
+                {goals.filter((g: any) => !g.isCompleted).length} ativa{goals.filter((g: any) => !g.isCompleted).length !== 1 ? 's' : ''}
+              </span>
+            )}
+          </h2>
+          {goalsOpen ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
+        </button>
+
+        {goalsOpen && (
+          <div className="mt-5 space-y-6">
+            {/* Lista de metas */}
+            {goalsLoading ? (
+              <div className="space-y-2">{[...Array(2)].map((_, i) => <div key={i} className="h-16 rounded-xl bg-white/5 animate-pulse" />)}</div>
+            ) : goals && goals.length > 0 && (
+              <div className="space-y-3">
+                {/* Ativas */}
+                {goals.filter((g: any) => !g.isCompleted).length > 0 && (
+                  <div className="space-y-2">
+                    <p className="text-xs font-semibold text-amber-400 uppercase tracking-wide">Em andamento</p>
+                    {goals.filter((g: any) => !g.isCompleted).map((g: any) => {
+                      const pct = g.targetValue && g.currentValue != null
+                        ? Math.min(100, Math.round((g.currentValue / g.targetValue) * 100))
+                        : null;
+                      const isEditing = editingProgress === g.id;
+                      return (
+                        <div key={g.id} className="glass rounded-xl p-4 space-y-3 border border-amber-500/10">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="text-sm font-semibold">{g.title}</span>
+                                <span className="text-xs px-1.5 py-0.5 rounded-md bg-white/5 text-muted-foreground">
+                                  {GOAL_TYPE_OPTIONS.find((t) => t.value === g.type)?.label ?? g.type}
+                                </span>
+                              </div>
+                              {g.description && <p className="text-xs text-muted-foreground mt-0.5">{g.description}</p>}
+                              {g.targetDate && (
+                                <p className="text-xs text-amber-400/70 mt-0.5">
+                                  Prazo: {new Date(g.targetDate).toLocaleDateString('pt-BR')}
+                                </p>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-1.5 flex-shrink-0">
+                              <button
+                                type="button"
+                                onClick={() => updateGoalMutation.mutate({ goalId: g.id, isCompleted: true })}
+                                className="text-xs px-2 py-1 rounded-lg bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 transition-colors"
+                                title="Marcar como concluída"
+                              >✓</button>
+                              <button
+                                type="button"
+                                onClick={() => deleteGoalMutation.mutate(g.id)}
+                                className="text-xs px-2 py-1 rounded-lg bg-white/5 text-muted-foreground hover:bg-red-500/10 hover:text-red-400 transition-colors"
+                              ><Trash2 className="w-3 h-3" /></button>
+                            </div>
+                          </div>
+
+                          {/* Progresso */}
+                          {g.targetValue != null && (
+                            <div className="space-y-1.5">
+                              <div className="flex justify-between text-xs">
+                                <span className="text-muted-foreground">Progresso</span>
+                                <span className="font-medium">
+                                  {g.currentValue ?? 0}{g.unit ? ` ${g.unit}` : ''} / {g.targetValue}{g.unit ? ` ${g.unit}` : ''}
+                                  {pct != null && <span className="text-amber-400 ml-1">({pct}%)</span>}
+                                </span>
+                              </div>
+                              <div className="w-full h-1.5 bg-white/10 rounded-full overflow-hidden">
+                                <div
+                                  className="h-full rounded-full bg-gradient-to-r from-amber-500 to-yellow-400 transition-all"
+                                  style={{ width: `${pct ?? 0}%` }}
+                                />
+                              </div>
+                              {isEditing ? (
+                                <div className="flex gap-2 pt-1">
+                                  <input
+                                    type="number"
+                                    step="0.1"
+                                    value={progressValue}
+                                    onChange={(e) => setProgressValue(e.target.value)}
+                                    placeholder={`Valor atual (${g.unit || 'unidade'})`}
+                                    className="input-field text-sm flex-1"
+                                    autoFocus
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => updateGoalMutation.mutate({ goalId: g.id, currentValue: parseFloat(progressValue) })}
+                                    disabled={!progressValue || updateGoalMutation.isPending}
+                                    className="btn-primary text-xs px-3 disabled:opacity-50"
+                                  >Salvar</button>
+                                  <button type="button" onClick={() => setEditingProgress(null)} className="glass px-3 rounded-xl text-xs">✕</button>
+                                </div>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => { setEditingProgress(g.id); setProgressValue(String(g.currentValue ?? '')); }}
+                                  className="text-xs text-amber-400 hover:text-amber-300 transition-colors"
+                                >
+                                  Atualizar progresso
+                                </button>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* Concluídas */}
+                {goals.filter((g: any) => g.isCompleted).length > 0 && (
+                  <div className="space-y-2">
+                    <p className="text-xs font-semibold text-emerald-400 uppercase tracking-wide">Concluídas</p>
+                    {goals.filter((g: any) => g.isCompleted).map((g: any) => (
+                      <div key={g.id} className="glass rounded-xl p-3 flex items-center justify-between opacity-70 border border-emerald-500/10">
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm">✓</span>
+                            <span className="text-sm font-medium line-through text-muted-foreground">{g.title}</span>
+                          </div>
+                          {g.completedAt && (
+                            <p className="text-xs text-emerald-400/70 mt-0.5 ml-5">
+                              Concluída em {new Date(g.completedAt).toLocaleDateString('pt-BR')}
+                            </p>
+                          )}
+                        </div>
+                        <button type="button" onClick={() => deleteGoalMutation.mutate(g.id)}
+                          className="text-xs p-1.5 rounded-lg hover:bg-red-500/10 hover:text-red-400 text-muted-foreground transition-colors">
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Nova meta */}
+            <form onSubmit={handleGoalSubmit} className="space-y-4">
+              <h3 className="text-sm font-semibold flex items-center gap-2">
+                <Plus className="w-3.5 h-3.5 text-amber-400" />
+                Nova meta
+              </h3>
+
+              <div>
+                <label className="text-sm font-medium mb-1.5 block">Tipo *</label>
+                <select value={goalForm.type} onChange={(e) => setGoalField('type', e.target.value)} className="input-field">
+                  {GOAL_TYPE_OPTIONS.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
+                </select>
+              </div>
+
+              <div>
+                <label className="text-sm font-medium mb-1.5 block">Título *</label>
+                <input
+                  type="text"
+                  value={goalForm.title}
+                  onChange={(e) => setGoalField('title', e.target.value)}
+                  placeholder="Ex: Perder 5 kg em 3 meses"
+                  className="input-field"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="text-sm font-medium mb-1.5 block">Descrição</label>
+                <textarea
+                  value={goalForm.description}
+                  onChange={(e) => setGoalField('description', e.target.value)}
+                  placeholder="Detalhes, estratégia, motivação..."
+                  rows={2}
+                  className="input-field resize-none"
+                />
+              </div>
+
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label className="text-sm font-medium mb-1.5 block">Valor inicial</label>
+                  <input type="number" step="0.1" value={goalForm.currentValue}
+                    onChange={(e) => setGoalField('currentValue', e.target.value)}
+                    placeholder="0" className="input-field" />
+                </div>
+                <div>
+                  <label className="text-sm font-medium mb-1.5 block">Meta</label>
+                  <input type="number" step="0.1" value={goalForm.targetValue}
+                    onChange={(e) => setGoalField('targetValue', e.target.value)}
+                    placeholder="5" className="input-field" />
+                </div>
+                <div>
+                  <label className="text-sm font-medium mb-1.5 block">Unidade</label>
+                  <input type="text" value={goalForm.unit}
+                    onChange={(e) => setGoalField('unit', e.target.value)}
+                    placeholder="kg, %" className="input-field" />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-sm font-medium mb-1.5 block">Prazo</label>
+                <input type="date" value={goalForm.targetDate}
+                  onChange={(e) => setGoalField('targetDate', e.target.value)}
+                  className="input-field" />
+              </div>
+
+              <button type="submit" disabled={createGoalMutation.isPending}
+                className="btn-primary w-full flex items-center justify-center gap-2 disabled:opacity-50">
+                <Save className="w-4 h-4" />
+                {createGoalMutation.isPending ? 'Salvando...' : 'Criar meta'}
+              </button>
+            </form>
           </div>
         )}
       </motion.div>

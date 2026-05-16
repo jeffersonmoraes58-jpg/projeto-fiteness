@@ -179,6 +179,49 @@ export class NutritionistsService {
     });
   }
 
+  async getPatientGoals(userId: string, studentId: string) {
+    const n = await this.getNutritionist(userId);
+    const relation = await this.prisma.nutritionistPatient.findFirst({
+      where: { nutritionistId: n.id, studentId },
+    });
+    if (!relation) throw new NotFoundException('Paciente não encontrado');
+    return this.prisma.goal.findMany({
+      where: { studentId },
+      orderBy: [{ isCompleted: 'asc' }, { createdAt: 'desc' }],
+    });
+  }
+
+  async createPatientGoal(userId: string, studentId: string, data: any) {
+    const n = await this.getNutritionist(userId);
+    const relation = await this.prisma.nutritionistPatient.findFirst({
+      where: { nutritionistId: n.id, studentId },
+    });
+    if (!relation) throw new NotFoundException('Paciente não encontrado');
+    return this.prisma.goal.create({ data: { studentId, ...data } });
+  }
+
+  async updatePatientGoal(userId: string, goalId: string, data: any) {
+    const n = await this.getNutritionist(userId);
+    const goal = await this.prisma.goal.findFirst({
+      where: { id: goalId, student: { nutritionists: { some: { nutritionistId: n.id } } } },
+    });
+    if (!goal) throw new NotFoundException('Meta não encontrada');
+    const update: any = { ...data };
+    if (data.isCompleted && !goal.completedAt) update.completedAt = new Date();
+    if (data.isCompleted === false) update.completedAt = null;
+    return this.prisma.goal.update({ where: { id: goalId }, data: update });
+  }
+
+  async deletePatientGoal(userId: string, goalId: string) {
+    const n = await this.getNutritionist(userId);
+    const goal = await this.prisma.goal.findFirst({
+      where: { id: goalId, student: { nutritionists: { some: { nutritionistId: n.id } } } },
+    });
+    if (!goal) throw new NotFoundException('Meta não encontrada');
+    await this.prisma.goal.delete({ where: { id: goalId } });
+    return { deleted: true };
+  }
+
   async getProgressPhotos(userId: string, studentId: string) {
     const n = await this.getNutritionist(userId);
     const relation = await this.prisma.nutritionistPatient.findFirst({

@@ -99,6 +99,30 @@ export class NutritionistsController {
     return this.service.createPhysicalAssessment(user.id, studentId, body);
   }
 
+  @Get('me/patients/:studentId/goals')
+  @ApiOperation({ summary: 'Listar metas do paciente' })
+  getPatientGoals(@CurrentUser() user: any, @Param('studentId') studentId: string) {
+    return this.service.getPatientGoals(user.id, studentId);
+  }
+
+  @Post('me/patients/:studentId/goals')
+  @ApiOperation({ summary: 'Criar meta do paciente' })
+  createPatientGoal(@CurrentUser() user: any, @Param('studentId') studentId: string, @Body() body: any) {
+    return this.service.createPatientGoal(user.id, studentId, body);
+  }
+
+  @Patch('me/goals/:goalId')
+  @ApiOperation({ summary: 'Atualizar meta do paciente' })
+  updatePatientGoal(@CurrentUser() user: any, @Param('goalId') goalId: string, @Body() body: any) {
+    return this.service.updatePatientGoal(user.id, goalId, body);
+  }
+
+  @Delete('me/goals/:goalId')
+  @ApiOperation({ summary: 'Excluir meta do paciente' })
+  deletePatientGoal(@CurrentUser() user: any, @Param('goalId') goalId: string) {
+    return this.service.deletePatientGoal(user.id, goalId);
+  }
+
   @Get('me/patients/:studentId/progress-photos')
   @ApiOperation({ summary: 'Listar fotos de progresso do paciente' })
   getProgressPhotos(@CurrentUser() user: any, @Param('studentId') studentId: string) {
