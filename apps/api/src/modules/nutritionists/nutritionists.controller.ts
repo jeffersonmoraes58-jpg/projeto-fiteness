@@ -23,6 +23,12 @@ export class NutritionistsController {
     return this.service.getPatients(user.id, search);
   }
 
+  @Get('me/students/search')
+  @ApiOperation({ summary: 'Buscar alunos para adicionar como pacientes' })
+  searchStudents(@CurrentUser() user: any, @Query('search') search: string) {
+    return this.service.searchStudents(user.id, search || '');
+  }
+
   @Post('me/patients')
   @ApiOperation({ summary: 'Adicionar paciente' })
   addPatient(@CurrentUser() user: any, @Body() body: { studentUserId: string; monthlyFee?: number }) {

@@ -40,13 +40,37 @@ export class NutritionistsService {
       where: { nutritionistId: n.id, isActive: true },
       include: { student: { include: { user: { include: { profile: true } } } } },
     });
-    const results = relations.map((r) => ({ ...r.student, monthlyFee: r.monthlyFee, startedAt: r.startedAt }));
+    const results = relations.map((r) => ({ ...r.student, isActive: r.isActive, monthlyFee: r.monthlyFee, startedAt: r.startedAt }));
     if (!search) return results;
     const q = search.toLowerCase();
     return results.filter((s) => {
       const name = `${s.user?.profile?.firstName} ${s.user?.profile?.lastName} ${s.user?.email}`.toLowerCase();
       return name.includes(q);
     });
+  }
+
+  async searchStudents(userId: string, search: string) {
+    await this.getNutritionist(userId);
+    const q = search.trim();
+    const students = await this.prisma.student.findMany({
+      where: {
+        user: {
+          OR: [
+            { email: { contains: q, mode: 'insensitive' } },
+            { profile: { firstName: { contains: q, mode: 'insensitive' } } },
+            { profile: { lastName: { contains: q, mode: 'insensitive' } } },
+          ],
+        },
+      },
+      include: { user: { include: { profile: true } } },
+      take: 20,
+    });
+    return students.map((s) => ({
+      id: s.userId,
+      studentId: s.id,
+      email: s.user?.email,
+      profile: s.user?.profile,
+    }));
   }
 
   async addPatient(userId: string, studentUserId: string, monthlyFee?: number) {

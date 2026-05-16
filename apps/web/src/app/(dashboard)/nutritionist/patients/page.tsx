@@ -28,7 +28,7 @@ export default function NutritionistPatients() {
 
   const { data: patients, isLoading } = useQuery({
     queryKey: ['nutritionist-patients-list'],
-    queryFn: () => api.get('/nutritionists/me/patients').then((r) => r.data.data),
+    queryFn: () => api.get('/nutritionists/me/patients').then((r) => r.data),
   });
 
   const filtered = (patients || []).filter((p: any) => {
