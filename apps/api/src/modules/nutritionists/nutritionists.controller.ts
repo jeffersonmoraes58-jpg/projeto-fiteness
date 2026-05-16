@@ -99,6 +99,18 @@ export class NutritionistsController {
     return this.service.createPhysicalAssessment(user.id, studentId, body);
   }
 
+  @Get('me/patients/:studentId/weight-log')
+  @ApiOperation({ summary: 'Histórico de peso diário do paciente' })
+  getDailyWeightLog(@CurrentUser() user: any, @Param('studentId') studentId: string) {
+    return this.service.getDailyWeightLog(user.id, studentId);
+  }
+
+  @Post('me/patients/:studentId/weight-log')
+  @ApiOperation({ summary: 'Registrar peso diário do paciente' })
+  addDailyWeight(@CurrentUser() user: any, @Param('studentId') studentId: string, @Body() body: any) {
+    return this.service.addDailyWeight(user.id, studentId, body);
+  }
+
   @Get('me/patients/:studentId/evolution')
   @ApiOperation({ summary: 'Evolução do paciente ao longo do tempo' })
   getPatientEvolution(@CurrentUser() user: any, @Param('studentId') studentId: string) {

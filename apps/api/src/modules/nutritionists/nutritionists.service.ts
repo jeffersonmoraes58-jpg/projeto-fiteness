@@ -179,6 +179,30 @@ export class NutritionistsService {
     });
   }
 
+  async getDailyWeightLog(userId: string, studentId: string) {
+    const n = await this.getNutritionist(userId);
+    const relation = await this.prisma.nutritionistPatient.findFirst({
+      where: { nutritionistId: n.id, studentId },
+    });
+    if (!relation) throw new NotFoundException('Paciente não encontrado');
+    return this.prisma.bodyMeasurement.findMany({
+      where: { studentId },
+      orderBy: { measuredAt: 'desc' },
+      take: 90,
+    });
+  }
+
+  async addDailyWeight(userId: string, studentId: string, data: any) {
+    const n = await this.getNutritionist(userId);
+    const relation = await this.prisma.nutritionistPatient.findFirst({
+      where: { nutritionistId: n.id, studentId },
+    });
+    if (!relation) throw new NotFoundException('Paciente não encontrado');
+    return this.prisma.bodyMeasurement.create({
+      data: { studentId, ...data },
+    });
+  }
+
   async getPatientEvolution(userId: string, studentId: string) {
     const n = await this.getNutritionist(userId);
     const relation = await this.prisma.nutritionistPatient.findFirst({

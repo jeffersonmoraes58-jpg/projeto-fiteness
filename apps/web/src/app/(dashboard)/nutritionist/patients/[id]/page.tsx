@@ -5,7 +5,7 @@ import { motion } from 'framer-motion';
 import {
   Users, ChevronLeft, Apple, Calendar, MessageCircle, UserCheck, Dumbbell,
   CheckSquare, Square, ClipboardList, ChevronDown, ChevronUp, Save, Scale,
-  Plus, History, ClipboardCheck, X, TrendingUp, TrendingDown, Minus,
+  Plus, History, ClipboardCheck, X, TrendingUp, TrendingDown, Minus, Activity,
 } from 'lucide-react';
 import Link from 'next/link';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
@@ -217,6 +217,11 @@ export default function PatientDetailPage() {
   const [physicalForm, setPhysicalForm] = useState(EMPTY_PHYSICAL);
   const [showPhysicalHistory, setShowPhysicalHistory] = useState(false);
 
+  const [weightLogOpen, setWeightLogOpen] = useState(false);
+  const [weightDate, setWeightDate] = useState(() => new Date().toISOString().slice(0, 16));
+  const [weightValue, setWeightValue] = useState('');
+  const [weightNotes, setWeightNotes] = useState('');
+
   const [evolutionOpen, setEvolutionOpen] = useState(false);
   const [activeMetric, setActiveMetric] = useState('weight');
 
@@ -418,6 +423,56 @@ export default function PatientDetailPage() {
       notes: physicalForm.notes || null,
     });
   };
+
+  const { data: weightLog, isLoading: weightLogLoading } = useQuery({
+    queryKey: ['weight-log', id],
+    queryFn: () =>
+      api.get(`/nutritionists/me/patients/${id}/weight-log`).then((r) => r.data),
+    enabled: !!patient && weightLogOpen,
+  });
+
+  const addWeightMutation = useMutation({
+    mutationFn: (data: any) =>
+      api.post(`/nutritionists/me/patients/${id}/weight-log`, data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['weight-log', id] });
+      setWeightValue('');
+      setWeightNotes('');
+      toast.success('Peso registrado!');
+    },
+    onError: (e: any) => {
+      const msg = e.response?.data?.message || e.message || 'Erro ao registrar peso';
+      toast.error(Array.isArray(msg) ? msg.join(', ') : msg);
+    },
+  });
+
+  const handleWeightSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!weightValue) { toast.error('Informe o peso'); return; }
+    addWeightMutation.mutate({
+      weight: parseFloat(weightValue),
+      measuredAt: new Date(weightDate).toISOString(),
+      notes: weightNotes || null,
+    });
+  };
+
+  const weightChartData = weightLog
+    ? [...weightLog].reverse().map((w: any) => ({
+        date: new Date(w.measuredAt).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' }),
+        peso: w.weight,
+      }))
+    : [];
+
+  const weightStats = (() => {
+    if (!weightLog || weightLog.length === 0) return null;
+    const weights = weightLog.map((w: any) => w.weight).filter(Boolean);
+    const latest = weights[0];
+    const oldest = weights[weights.length - 1];
+    const diff = parseFloat((latest - oldest).toFixed(1));
+    const min = Math.min(...weights);
+    const max = Math.max(...weights);
+    return { latest, oldest, diff, min, max, count: weights.length };
+  })();
 
   const { data: evolution, isLoading: evolutionLoading } = useQuery({
     queryKey: ['patient-evolution', id],
@@ -1417,6 +1472,131 @@ export default function PatientDetailPage() {
                   </div>
                 )}
               </div>
+            )}
+          </div>
+        )}
+      </motion.div>
+
+      {/* Registro de peso diário */}
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.255 }} className="glass-card">
+        <button type="button" onClick={() => setWeightLogOpen((o) => !o)} className="w-full flex items-center justify-between">
+          <h2 className="font-semibold flex items-center gap-2">
+            <Activity className="w-4 h-4 text-rose-400" />
+            Registro de Peso Diário
+            {weightLog && weightLog.length > 0 && (
+              <span className="text-xs px-2 py-0.5 rounded-full bg-rose-500/10 text-rose-400 ml-1">
+                {weightLog.length} registro{weightLog.length !== 1 ? 's' : ''}
+              </span>
+            )}
+          </h2>
+          {weightLogOpen ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
+        </button>
+
+        {weightLogOpen && (
+          <div className="mt-5 space-y-5">
+            {/* Formulário de registro */}
+            <form onSubmit={handleWeightSubmit} className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-sm font-medium mb-1.5 block">Peso (kg) *</label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    min="1"
+                    value={weightValue}
+                    onChange={(e) => setWeightValue(e.target.value)}
+                    placeholder="70.5"
+                    className="input-field"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium mb-1.5 block">Data e hora</label>
+                  <input
+                    type="datetime-local"
+                    value={weightDate}
+                    onChange={(e) => setWeightDate(e.target.value)}
+                    className="input-field"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="text-sm font-medium mb-1.5 block">Observações</label>
+                <input
+                  type="text"
+                  value={weightNotes}
+                  onChange={(e) => setWeightNotes(e.target.value)}
+                  placeholder="Ex: em jejum, após treino..."
+                  className="input-field"
+                />
+              </div>
+              <button
+                type="submit"
+                disabled={addWeightMutation.isPending}
+                className="btn-primary w-full flex items-center justify-center gap-2 disabled:opacity-50"
+              >
+                <Save className="w-4 h-4" />
+                {addWeightMutation.isPending ? 'Registrando...' : 'Registrar peso'}
+              </button>
+            </form>
+
+            {/* Stats e gráfico */}
+            {weightLogLoading ? (
+              <div className="space-y-2">{[...Array(2)].map((_, i) => <div key={i} className="h-10 rounded-xl bg-white/5 animate-pulse" />)}</div>
+            ) : weightLog && weightLog.length > 0 && (
+              <>
+                {/* Cards de resumo */}
+                {weightStats && (
+                  <div className="grid grid-cols-4 gap-2 text-center">
+                    {[
+                      { label: 'Atual', value: `${weightStats.latest} kg`, color: 'text-rose-400' },
+                      { label: 'Variação', value: `${weightStats.diff > 0 ? '+' : ''}${weightStats.diff} kg`, color: weightStats.diff < 0 ? 'text-emerald-400' : weightStats.diff > 0 ? 'text-red-400' : 'text-muted-foreground' },
+                      { label: 'Mínimo', value: `${weightStats.min} kg`, color: 'text-emerald-400' },
+                      { label: 'Máximo', value: `${weightStats.max} kg`, color: 'text-orange-400' },
+                    ].map((s) => (
+                      <div key={s.label} className="glass rounded-xl p-3">
+                        <div className={cn('text-sm font-bold', s.color)}>{s.value}</div>
+                        <div className="text-xs text-muted-foreground mt-0.5">{s.label}</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Gráfico */}
+                {weightChartData.length >= 2 && (
+                  <div className="h-44">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={weightChartData} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
+                        <XAxis dataKey="date" tick={{ fontSize: 10, fill: '#9ca3af' }} />
+                        <YAxis tick={{ fontSize: 10, fill: '#9ca3af' }} domain={['auto', 'auto']} />
+                        <Tooltip
+                          contentStyle={{ backgroundColor: '#1a1a2e', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px', fontSize: '12px' }}
+                          formatter={(v: any) => [`${v} kg`, 'Peso']}
+                        />
+                        <Line type="monotone" dataKey="peso" stroke="#f43f5e" strokeWidth={2} dot={{ fill: '#f43f5e', r: 3 }} activeDot={{ r: 5 }} />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                )}
+
+                {/* Histórico recente */}
+                <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
+                  {weightLog.map((w: any) => (
+                    <div key={w.id} className="flex items-center justify-between glass rounded-lg px-3 py-2">
+                      <div className="flex items-center gap-3">
+                        <span className="text-sm font-semibold text-rose-400">{w.weight} kg</span>
+                        {w.notes && <span className="text-xs text-muted-foreground">{w.notes}</span>}
+                      </div>
+                      <span className="text-xs text-muted-foreground flex-shrink-0">
+                        {new Date(w.measuredAt).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}
+                        {' '}
+                        {new Date(w.measuredAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </>
             )}
           </div>
         )}
