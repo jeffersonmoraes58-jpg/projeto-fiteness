@@ -75,6 +75,18 @@ export class NutritionistsController {
     return this.service.upsertAnamnesis(user.id, studentId, body);
   }
 
+  @Get('me/patients/:studentId/nutritional-assessments')
+  @ApiOperation({ summary: 'Listar avaliações nutricionais do paciente' })
+  getNutritionalAssessments(@CurrentUser() user: any, @Param('studentId') studentId: string) {
+    return this.service.getNutritionalAssessments(user.id, studentId);
+  }
+
+  @Post('me/patients/:studentId/nutritional-assessments')
+  @ApiOperation({ summary: 'Criar avaliação nutricional do paciente' })
+  createNutritionalAssessment(@CurrentUser() user: any, @Param('studentId') studentId: string, @Body() body: any) {
+    return this.service.createNutritionalAssessment(user.id, studentId, body);
+  }
+
   @Patch('me')
   @ApiOperation({ summary: 'Atualizar perfil do nutricionista' })
   update(@CurrentUser() user: any, @Body() body: any) {

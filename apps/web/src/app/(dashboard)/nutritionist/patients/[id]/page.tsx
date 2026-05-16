@@ -4,7 +4,8 @@ import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import {
   Users, ChevronLeft, Apple, Calendar, MessageCircle, UserCheck, Dumbbell,
-  CheckSquare, Square, ClipboardList, ChevronDown, ChevronUp, Save,
+  CheckSquare, Square, ClipboardList, ChevronDown, ChevronUp, Save, Scale,
+  Plus, History,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
@@ -21,6 +22,68 @@ const GOAL_LABELS: Record<string, string> = {
   INCREASE_FLEXIBILITY: 'Flexibilidade',
   ATHLETIC_PERFORMANCE: 'Performance',
   REHABILITATION: 'Reabilitação',
+};
+
+const GENDER_OPTIONS = [
+  { value: 'MALE', label: 'Masculino' },
+  { value: 'FEMALE', label: 'Feminino' },
+  { value: 'OTHER', label: 'Outro' },
+  { value: 'PREFER_NOT_TO_SAY', label: 'Prefiro não informar' },
+];
+
+const ACTIVITY_OPTIONS = [
+  { value: 'SEDENTARY', label: 'Sedentário (sem exercício)', factor: 1.2 },
+  { value: 'LIGHTLY_ACTIVE', label: 'Levemente ativo (1-3x/semana)', factor: 1.375 },
+  { value: 'MODERATELY_ACTIVE', label: 'Moderadamente ativo (3-5x/semana)', factor: 1.55 },
+  { value: 'VERY_ACTIVE', label: 'Muito ativo (6-7x/semana)', factor: 1.725 },
+  { value: 'EXTRA_ACTIVE', label: 'Extremamente ativo (2x/dia)', factor: 1.9 },
+];
+
+const GOAL_OPTIONS = [
+  { value: 'LOSE_WEIGHT', label: 'Perda de peso', calAdjust: -500 },
+  { value: 'GAIN_MUSCLE', label: 'Ganho muscular', calAdjust: 300 },
+  { value: 'MAINTAIN_WEIGHT', label: 'Manutenção', calAdjust: 0 },
+  { value: 'IMPROVE_ENDURANCE', label: 'Resistência', calAdjust: 0 },
+  { value: 'INCREASE_FLEXIBILITY', label: 'Flexibilidade', calAdjust: 0 },
+  { value: 'ATHLETIC_PERFORMANCE', label: 'Performance atlética', calAdjust: 200 },
+  { value: 'REHABILITATION', label: 'Reabilitação', calAdjust: 0 },
+];
+
+function calcBmi(weight: number, heightM: number) {
+  return heightM > 0 ? weight / (heightM * heightM) : 0;
+}
+
+function calcTmb(weight: number, heightCm: number, age: number, gender: string) {
+  if (gender === 'FEMALE') return 447.593 + 9.247 * weight + 3.098 * heightCm - 4.33 * age;
+  return 88.362 + 13.397 * weight + 4.799 * heightCm - 5.677 * age;
+}
+
+function calcGet(tmb: number, activityLevel: string) {
+  const opt = ACTIVITY_OPTIONS.find((a) => a.value === activityLevel);
+  return tmb * (opt?.factor ?? 1.2);
+}
+
+function calcTargets(getVal: number, weight: number, goalType: string) {
+  const goal = GOAL_OPTIONS.find((g) => g.value === goalType);
+  const targetCal = getVal + (goal?.calAdjust ?? 0);
+  const protein = Math.round(weight * 1.8);
+  const fat = Math.round((targetCal * 0.25) / 9);
+  const carbs = Math.round((targetCal - protein * 4 - fat * 9) / 4);
+  const fiber = 30;
+  const water = Math.round(weight * 35);
+  return { protein, carbs, fat, fiber, water, targetCal };
+}
+
+const EMPTY_ASSESSMENT = {
+  weight: '',
+  height: '',
+  age: '',
+  gender: 'MALE',
+  activityLevel: 'MODERATELY_ACTIVE',
+  goal: 'MAINTAIN_WEIGHT',
+  dietaryRestrictions: '',
+  foodAllergies: '',
+  observations: '',
 };
 
 const DAYS = [
@@ -88,6 +151,10 @@ export default function PatientDetailPage() {
   const [anamnesisForm, setAnamnesisForm] = useState(EMPTY_ANAMNESIS);
   const [anamnesisLoaded, setAnamnesisLoaded] = useState(false);
 
+  const [assessmentOpen, setAssessmentOpen] = useState(false);
+  const [assessmentForm, setAssessmentForm] = useState(EMPTY_ASSESSMENT);
+  const [showHistory, setShowHistory] = useState(false);
+
   const { data: patients, isLoading } = useQuery({
     queryKey: ['nutritionist-patients'],
     queryFn: () => api.get('/nutritionists/me/patients').then((r) => r.data.data),
@@ -135,6 +202,76 @@ export default function PatientDetailPage() {
 
   const handleAnamnesisOpen = () => {
     setAnamnesisOpen((o) => !o);
+  };
+
+  const { data: assessments, isLoading: assessmentsLoading } = useQuery({
+    queryKey: ['nutritional-assessments', id],
+    queryFn: () =>
+      api.get(`/nutritionists/me/patients/${id}/nutritional-assessments`).then((r) => r.data),
+    enabled: !!patient && assessmentOpen,
+  });
+
+  const assessmentMutation = useMutation({
+    mutationFn: (data: any) =>
+      api.post(`/nutritionists/me/patients/${id}/nutritional-assessments`, data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['nutritional-assessments', id] });
+      setAssessmentForm(EMPTY_ASSESSMENT);
+      setShowHistory(true);
+      toast.success('Avaliação nutricional registrada!');
+    },
+    onError: (e: any) => {
+      const msg = e.response?.data?.message || e.message || 'Erro ao salvar avaliação';
+      toast.error(Array.isArray(msg) ? msg.join(', ') : msg);
+    },
+  });
+
+  const setAssField = (field: string, value: any) =>
+    setAssessmentForm((prev) => ({ ...prev, [field]: value }));
+
+  const derived = (() => {
+    const w = parseFloat(assessmentForm.weight);
+    const h = parseFloat(assessmentForm.height);
+    const a = parseInt(assessmentForm.age);
+    if (!w || !h || !a) return null;
+    const heightM = h / 100;
+    const bmi = calcBmi(w, heightM);
+    const tmb = calcTmb(w, h, a, assessmentForm.gender);
+    const get = calcGet(tmb, assessmentForm.activityLevel);
+    const targets = calcTargets(get, w, assessmentForm.goal);
+    return { bmi, tmb, get, ...targets };
+  })();
+
+  const handleAssessmentSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!derived) { toast.error('Preencha peso, altura e idade para calcular'); return; }
+    const w = parseFloat(assessmentForm.weight);
+    const h = parseFloat(assessmentForm.height);
+    const a = parseInt(assessmentForm.age);
+    const heightM = h / 100;
+    assessmentMutation.mutate({
+      weight: w,
+      height: heightM,
+      age: a,
+      gender: assessmentForm.gender,
+      activityLevel: assessmentForm.activityLevel,
+      goal: assessmentForm.goal,
+      bmi: parseFloat(derived.bmi.toFixed(2)),
+      tmb: parseFloat(derived.tmb.toFixed(2)),
+      get: parseFloat(derived.get.toFixed(2)),
+      proteinTarget: derived.protein,
+      carbsTarget: derived.carbs,
+      fatTarget: derived.fat,
+      fiberTarget: derived.fiber,
+      waterTarget: derived.water,
+      dietaryRestrictions: assessmentForm.dietaryRestrictions
+        ? assessmentForm.dietaryRestrictions.split(',').map((s) => s.trim()).filter(Boolean)
+        : [],
+      foodAllergies: assessmentForm.foodAllergies
+        ? assessmentForm.foodAllergies.split(',').map((s) => s.trim()).filter(Boolean)
+        : [],
+      observations: assessmentForm.observations || null,
+    });
   };
 
   const anamnesisMutation = useMutation({
@@ -506,6 +643,282 @@ export default function PatientDetailPage() {
               </>
             )}
           </form>
+        )}
+      </motion.div>
+
+      {/* Avaliação nutricional */}
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="glass-card">
+        <button
+          type="button"
+          onClick={() => setAssessmentOpen((o) => !o)}
+          className="w-full flex items-center justify-between"
+        >
+          <h2 className="font-semibold flex items-center gap-2">
+            <Scale className="w-4 h-4 text-purple-400" />
+            Avaliação Nutricional
+            {assessments && assessments.length > 0 && (
+              <span className="text-xs px-2 py-0.5 rounded-full bg-purple-500/10 text-purple-400 ml-1">
+                {assessments.length} registro{assessments.length > 1 ? 's' : ''}
+              </span>
+            )}
+          </h2>
+          {assessmentOpen ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
+        </button>
+
+        {assessmentOpen && (
+          <div className="mt-5 space-y-6">
+            {/* Formulário nova avaliação */}
+            <form onSubmit={handleAssessmentSubmit} className="space-y-5">
+              <h3 className="text-sm font-semibold flex items-center gap-2">
+                <Plus className="w-3.5 h-3.5 text-purple-400" />
+                Nova avaliação
+              </h3>
+
+              {/* Dados antropométricos */}
+              <div className="space-y-3">
+                <p className="text-xs font-semibold text-purple-400 uppercase tracking-wide">Dados Antropométricos</p>
+                <div className="grid grid-cols-3 gap-3">
+                  <div>
+                    <label className="text-sm font-medium mb-1.5 block">Peso (kg) *</label>
+                    <input
+                      type="number"
+                      step="0.1"
+                      min="1"
+                      value={assessmentForm.weight}
+                      onChange={(e) => setAssField('weight', e.target.value)}
+                      placeholder="70.5"
+                      className="input-field"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium mb-1.5 block">Altura (cm) *</label>
+                    <input
+                      type="number"
+                      step="0.1"
+                      min="1"
+                      value={assessmentForm.height}
+                      onChange={(e) => setAssField('height', e.target.value)}
+                      placeholder="170"
+                      className="input-field"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium mb-1.5 block">Idade *</label>
+                    <input
+                      type="number"
+                      min="1"
+                      max="120"
+                      value={assessmentForm.age}
+                      onChange={(e) => setAssField('age', e.target.value)}
+                      placeholder="30"
+                      className="input-field"
+                      required
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="text-sm font-medium mb-1.5 block">Sexo *</label>
+                  <select
+                    value={assessmentForm.gender}
+                    onChange={(e) => setAssField('gender', e.target.value)}
+                    className="input-field"
+                  >
+                    {GENDER_OPTIONS.map((g) => (
+                      <option key={g.value} value={g.value}>{g.label}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Perfil e objetivo */}
+              <div className="space-y-3">
+                <p className="text-xs font-semibold text-purple-400 uppercase tracking-wide">Perfil e Objetivo</p>
+                <div>
+                  <label className="text-sm font-medium mb-1.5 block">Nível de atividade *</label>
+                  <select
+                    value={assessmentForm.activityLevel}
+                    onChange={(e) => setAssField('activityLevel', e.target.value)}
+                    className="input-field"
+                  >
+                    {ACTIVITY_OPTIONS.map((a) => (
+                      <option key={a.value} value={a.value}>{a.label}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-sm font-medium mb-1.5 block">Objetivo *</label>
+                  <select
+                    value={assessmentForm.goal}
+                    onChange={(e) => setAssField('goal', e.target.value)}
+                    className="input-field"
+                  >
+                    {GOAL_OPTIONS.map((g) => (
+                      <option key={g.value} value={g.value}>{g.label}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Cálculos em tempo real */}
+              {derived && (
+                <div className="space-y-3">
+                  <p className="text-xs font-semibold text-purple-400 uppercase tracking-wide">Resultados Calculados</p>
+                  <div className="grid grid-cols-3 gap-3">
+                    <div className="glass rounded-xl p-3 text-center">
+                      <div className="text-lg font-bold text-purple-400">{derived.bmi.toFixed(1)}</div>
+                      <div className="text-xs text-muted-foreground">IMC</div>
+                      <div className="text-xs text-muted-foreground mt-0.5">
+                        {derived.bmi < 18.5 ? 'Abaixo' : derived.bmi < 25 ? 'Normal' : derived.bmi < 30 ? 'Sobrepeso' : 'Obeso'}
+                      </div>
+                    </div>
+                    <div className="glass rounded-xl p-3 text-center">
+                      <div className="text-lg font-bold text-cyan-400">{Math.round(derived.tmb)}</div>
+                      <div className="text-xs text-muted-foreground">TMB (kcal)</div>
+                    </div>
+                    <div className="glass rounded-xl p-3 text-center">
+                      <div className="text-lg font-bold text-emerald-400">{Math.round(derived.get)}</div>
+                      <div className="text-xs text-muted-foreground">GET (kcal)</div>
+                    </div>
+                  </div>
+                  <div className="glass rounded-xl p-4 space-y-2">
+                    <p className="text-xs font-semibold text-muted-foreground mb-3">
+                      Meta calórica: <span className="text-white font-bold">{Math.round(derived.targetCal)} kcal/dia</span>
+                    </p>
+                    {[
+                      { label: 'Proteína', value: derived.protein, unit: 'g', color: 'bg-red-500' },
+                      { label: 'Carboidratos', value: derived.carbs, unit: 'g', color: 'bg-yellow-500' },
+                      { label: 'Gorduras', value: derived.fat, unit: 'g', color: 'bg-orange-500' },
+                      { label: 'Fibras', value: derived.fiber, unit: 'g', color: 'bg-green-500' },
+                      { label: 'Água', value: derived.water, unit: 'ml', color: 'bg-blue-500' },
+                    ].map((m) => (
+                      <div key={m.label} className="flex items-center gap-3">
+                        <div className={cn('w-2 h-2 rounded-full flex-shrink-0', m.color)} />
+                        <span className="text-sm text-muted-foreground flex-1">{m.label}</span>
+                        <span className="text-sm font-semibold">{m.value} {m.unit}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Restrições e alergias */}
+              <div className="space-y-3">
+                <p className="text-xs font-semibold text-purple-400 uppercase tracking-wide">Restrições Alimentares</p>
+                <div>
+                  <label className="text-sm font-medium mb-1.5 block">Restrições alimentares</label>
+                  <input
+                    type="text"
+                    value={assessmentForm.dietaryRestrictions}
+                    onChange={(e) => setAssField('dietaryRestrictions', e.target.value)}
+                    placeholder="Ex: glúten, lactose (separar por vírgula)"
+                    className="input-field"
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium mb-1.5 block">Alergias alimentares</label>
+                  <input
+                    type="text"
+                    value={assessmentForm.foodAllergies}
+                    onChange={(e) => setAssField('foodAllergies', e.target.value)}
+                    placeholder="Ex: amendoim, camarão (separar por vírgula)"
+                    className="input-field"
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium mb-1.5 block">Observações</label>
+                  <textarea
+                    value={assessmentForm.observations}
+                    onChange={(e) => setAssField('observations', e.target.value)}
+                    placeholder="Observações adicionais..."
+                    rows={2}
+                    className="input-field resize-none"
+                  />
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                disabled={assessmentMutation.isPending || !derived}
+                className="btn-primary w-full flex items-center justify-center gap-2 disabled:opacity-50"
+              >
+                <Save className="w-4 h-4" />
+                {assessmentMutation.isPending ? 'Salvando...' : 'Registrar avaliação'}
+              </button>
+            </form>
+
+            {/* Histórico */}
+            {assessments && assessments.length > 0 && (
+              <div>
+                <button
+                  type="button"
+                  onClick={() => setShowHistory((h) => !h)}
+                  className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  <History className="w-4 h-4" />
+                  {showHistory ? 'Ocultar histórico' : `Ver histórico (${assessments.length})`}
+                </button>
+
+                {showHistory && (
+                  <div className="mt-3 space-y-3">
+                    {assessmentsLoading ? (
+                      <div className="h-16 rounded-xl bg-white/5 animate-pulse" />
+                    ) : assessments.map((a: any) => (
+                      <div key={a.id} className="glass rounded-xl p-4 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs text-muted-foreground">
+                            {new Date(a.assessedAt).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' })}
+                          </span>
+                          <span className="text-xs font-medium">
+                            {a.weight} kg · {(a.height * 100).toFixed(0)} cm · {a.age} anos
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-3 gap-2 text-center">
+                          <div>
+                            <div className="text-sm font-bold text-purple-400">{a.bmi?.toFixed(1)}</div>
+                            <div className="text-xs text-muted-foreground">IMC</div>
+                          </div>
+                          <div>
+                            <div className="text-sm font-bold text-cyan-400">{Math.round(a.tmb)}</div>
+                            <div className="text-xs text-muted-foreground">TMB</div>
+                          </div>
+                          <div>
+                            <div className="text-sm font-bold text-emerald-400">{Math.round(a.get)}</div>
+                            <div className="text-xs text-muted-foreground">GET</div>
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-5 gap-1 text-center text-xs">
+                          {[
+                            { label: 'Prot.', value: a.proteinTarget, unit: 'g' },
+                            { label: 'Carb.', value: a.carbsTarget, unit: 'g' },
+                            { label: 'Gord.', value: a.fatTarget, unit: 'g' },
+                            { label: 'Fibra', value: a.fiberTarget, unit: 'g' },
+                            { label: 'Água', value: a.waterTarget, unit: 'ml' },
+                          ].map((m) => (
+                            <div key={m.label} className="glass rounded-lg p-1.5">
+                              <div className="font-semibold">{m.value ?? '—'}</div>
+                              <div className="text-muted-foreground">{m.label}</div>
+                            </div>
+                          ))}
+                        </div>
+                        {(a.dietaryRestrictions?.length > 0 || a.foodAllergies?.length > 0) && (
+                          <div className="text-xs text-muted-foreground space-y-0.5">
+                            {a.dietaryRestrictions?.length > 0 && (
+                              <p>Restrições: {a.dietaryRestrictions.join(', ')}</p>
+                            )}
+                            {a.foodAllergies?.length > 0 && (
+                              <p>Alergias: {a.foodAllergies.join(', ')}</p>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         )}
       </motion.div>
 
