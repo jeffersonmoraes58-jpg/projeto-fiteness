@@ -99,6 +99,12 @@ export class NutritionistsController {
     return this.service.createPhysicalAssessment(user.id, studentId, body);
   }
 
+  @Get('me/patients/:studentId/evolution')
+  @ApiOperation({ summary: 'Evolução do paciente ao longo do tempo' })
+  getPatientEvolution(@CurrentUser() user: any, @Param('studentId') studentId: string) {
+    return this.service.getPatientEvolution(user.id, studentId);
+  }
+
   @Get('me/patients/:studentId/consultations')
   @ApiOperation({ summary: 'Listar consultas do paciente' })
   getPatientConsultations(@CurrentUser() user: any, @Param('studentId') studentId: string) {

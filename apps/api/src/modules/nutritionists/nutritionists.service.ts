@@ -179,6 +179,32 @@ export class NutritionistsService {
     });
   }
 
+  async getPatientEvolution(userId: string, studentId: string) {
+    const n = await this.getNutritionist(userId);
+    const relation = await this.prisma.nutritionistPatient.findFirst({
+      where: { nutritionistId: n.id, studentId },
+    });
+    if (!relation) throw new NotFoundException('Paciente não encontrado');
+    const [physical, nutritional] = await Promise.all([
+      this.prisma.physicalAssessment.findMany({
+        where: { studentId },
+        orderBy: { assessedAt: 'asc' },
+        select: {
+          assessedAt: true, weight: true, height: true, bmi: true,
+          bodyFatPercent: true, muscleMassKg: true, waterPercent: true,
+          waistCm: true, hipCm: true, abdomenCm: true,
+          rightArmCm: true, rightThighCm: true,
+        },
+      }),
+      this.prisma.nutritionalAssessment.findMany({
+        where: { studentId },
+        orderBy: { assessedAt: 'asc' },
+        select: { assessedAt: true, weight: true, bmi: true, get: true, tmb: true },
+      }),
+    ]);
+    return { physical, nutritional };
+  }
+
   async getPatientConsultations(userId: string, studentId: string) {
     const n = await this.getNutritionist(userId);
     const relation = await this.prisma.nutritionistPatient.findFirst({

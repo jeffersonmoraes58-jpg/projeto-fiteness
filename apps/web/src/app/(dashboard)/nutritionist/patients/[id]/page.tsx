@@ -5,9 +5,10 @@ import { motion } from 'framer-motion';
 import {
   Users, ChevronLeft, Apple, Calendar, MessageCircle, UserCheck, Dumbbell,
   CheckSquare, Square, ClipboardList, ChevronDown, ChevronUp, Save, Scale,
-  Plus, History, ClipboardCheck, X,
+  Plus, History, ClipboardCheck, X, TrendingUp, TrendingDown, Minus,
 } from 'lucide-react';
 import Link from 'next/link';
+import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 import { useParams } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
@@ -85,6 +86,14 @@ const EMPTY_ASSESSMENT = {
   foodAllergies: '',
   observations: '',
 };
+
+const EVOLUTION_METRICS = [
+  { key: 'weight', label: 'Peso (kg)', color: '#10b981' },
+  { key: 'bmi', label: 'IMC', color: '#8b5cf6' },
+  { key: 'bodyFatPercent', label: '% Gordura', color: '#f59e0b' },
+  { key: 'muscleMassKg', label: 'Músculo (kg)', color: '#3b82f6' },
+  { key: 'waistCm', label: 'Cintura (cm)', color: '#ef4444' },
+];
 
 const CONSULTATION_STATUS = {
   upcoming: { label: 'Agendada', color: 'text-cyan-400', bg: 'bg-cyan-500/10' },
@@ -207,6 +216,9 @@ export default function PatientDetailPage() {
   const [physicalOpen, setPhysicalOpen] = useState(false);
   const [physicalForm, setPhysicalForm] = useState(EMPTY_PHYSICAL);
   const [showPhysicalHistory, setShowPhysicalHistory] = useState(false);
+
+  const [evolutionOpen, setEvolutionOpen] = useState(false);
+  const [activeMetric, setActiveMetric] = useState('weight');
 
   const [consultOpen, setConsultOpen] = useState(false);
   const [consultScheduledAt, setConsultScheduledAt] = useState('');
@@ -406,6 +418,36 @@ export default function PatientDetailPage() {
       notes: physicalForm.notes || null,
     });
   };
+
+  const { data: evolution, isLoading: evolutionLoading } = useQuery({
+    queryKey: ['patient-evolution', id],
+    queryFn: () =>
+      api.get(`/nutritionists/me/patients/${id}/evolution`).then((r) => r.data),
+    enabled: !!patient && evolutionOpen,
+  });
+
+  const evolutionChartData = evolution?.physical?.map((p: any) => ({
+    date: new Date(p.assessedAt).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' }),
+    weight: p.weight,
+    bmi: p.bmi ? parseFloat(p.bmi.toFixed(1)) : null,
+    bodyFatPercent: p.bodyFatPercent,
+    muscleMassKg: p.muscleMassKg,
+    waistCm: p.waistCm,
+  })) ?? [];
+
+  const evolutionDelta = (() => {
+    const data = evolution?.physical;
+    if (!data || data.length < 2) return null;
+    const first = data[0];
+    const last = data[data.length - 1];
+    return EVOLUTION_METRICS.map(({ key, label }) => {
+      const f = first[key];
+      const l = last[key];
+      if (f == null || l == null) return null;
+      const diff = parseFloat((l - f).toFixed(1));
+      return { key, label, first: f, last: l, diff };
+    }).filter(Boolean);
+  })();
 
   const { data: consultations, isLoading: consultLoading } = useQuery({
     queryKey: ['patient-consultations', id],
@@ -1375,6 +1417,154 @@ export default function PatientDetailPage() {
                   </div>
                 )}
               </div>
+            )}
+          </div>
+        )}
+      </motion.div>
+
+      {/* Evolução do paciente */}
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.26 }} className="glass-card">
+        <button type="button" onClick={() => setEvolutionOpen((o) => !o)} className="w-full flex items-center justify-between">
+          <h2 className="font-semibold flex items-center gap-2">
+            <TrendingUp className="w-4 h-4 text-emerald-400" />
+            Evolução do Paciente
+            {evolutionChartData.length > 0 && (
+              <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 ml-1">
+                {evolutionChartData.length} avaliação{evolutionChartData.length !== 1 ? 'ões' : ''}
+              </span>
+            )}
+          </h2>
+          {evolutionOpen ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
+        </button>
+
+        {evolutionOpen && (
+          <div className="mt-5 space-y-5">
+            {evolutionLoading ? (
+              <div className="space-y-3">{[...Array(3)].map((_, i) => <div key={i} className="h-12 rounded-xl bg-white/5 animate-pulse" />)}</div>
+            ) : evolutionChartData.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground text-sm">
+                Nenhuma avaliação antropométrica registrada ainda.
+                <br />
+                <span className="text-xs">Registre avaliações acima para visualizar a evolução.</span>
+              </div>
+            ) : (
+              <>
+                {/* Seletor de métrica */}
+                <div className="flex flex-wrap gap-2">
+                  {EVOLUTION_METRICS.map((m) => {
+                    const hasData = evolutionChartData.some((d: any) => d[m.key] != null);
+                    if (!hasData) return null;
+                    return (
+                      <button
+                        key={m.key}
+                        type="button"
+                        onClick={() => setActiveMetric(m.key)}
+                        className={cn(
+                          'text-xs px-3 py-1.5 rounded-lg font-medium transition-all border',
+                          activeMetric === m.key
+                            ? 'text-white border-transparent'
+                            : 'glass border-transparent text-muted-foreground hover:bg-accent',
+                        )}
+                        style={activeMetric === m.key ? { backgroundColor: m.color + '33', borderColor: m.color + '66', color: m.color } : {}}
+                      >
+                        {m.label}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Gráfico */}
+                {(() => {
+                  const metric = EVOLUTION_METRICS.find((m) => m.key === activeMetric)!;
+                  const chartData = evolutionChartData.filter((d: any) => d[activeMetric] != null);
+                  if (chartData.length < 1) return <p className="text-sm text-muted-foreground text-center py-4">Sem dados para esta métrica.</p>;
+                  return (
+                    <div className="h-52">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <LineChart data={chartData} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
+                          <XAxis dataKey="date" tick={{ fontSize: 11, fill: '#9ca3af' }} />
+                          <YAxis tick={{ fontSize: 11, fill: '#9ca3af' }} domain={['auto', 'auto']} />
+                          <Tooltip
+                            contentStyle={{ backgroundColor: '#1a1a2e', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px', fontSize: '12px' }}
+                            labelStyle={{ color: '#e5e7eb' }}
+                          />
+                          <Line
+                            type="monotone"
+                            dataKey={activeMetric}
+                            name={metric.label}
+                            stroke={metric.color}
+                            strokeWidth={2}
+                            dot={{ fill: metric.color, r: 4 }}
+                            activeDot={{ r: 6 }}
+                          />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </div>
+                  );
+                })()}
+
+                {/* Delta primeira vs última */}
+                {evolutionDelta && evolutionDelta.length > 0 && (
+                  <div className="space-y-3">
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                      Comparativo: primeira → última avaliação
+                    </p>
+                    <div className="grid grid-cols-1 gap-2">
+                      {evolutionDelta.map((d: any) => {
+                        const improved = (d.key === 'bodyFatPercent' || d.key === 'waistCm') ? d.diff < 0 : d.diff > 0;
+                        const neutral = d.diff === 0;
+                        return (
+                          <div key={d.key} className="glass rounded-xl p-3 flex items-center justify-between">
+                            <span className="text-sm text-muted-foreground">{d.label}</span>
+                            <div className="flex items-center gap-3">
+                              <span className="text-xs text-muted-foreground">{d.first} → {d.last}</span>
+                              <div className={cn(
+                                'flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-lg',
+                                neutral ? 'bg-white/5 text-muted-foreground' : improved ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400',
+                              )}>
+                                {neutral ? <Minus className="w-3 h-3" /> : improved ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
+                                {d.diff > 0 ? '+' : ''}{d.diff}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Tabela histórica */}
+                <div className="space-y-2">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Histórico de avaliações</p>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs">
+                      <thead>
+                        <tr className="text-muted-foreground">
+                          <th className="text-left pb-2 font-medium">Data</th>
+                          <th className="text-right pb-2 font-medium">Peso</th>
+                          <th className="text-right pb-2 font-medium">IMC</th>
+                          <th className="text-right pb-2 font-medium">% Gord.</th>
+                          <th className="text-right pb-2 font-medium">Cintura</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-white/5">
+                        {evolution.physical.slice().reverse().map((p: any, i: number) => (
+                          <tr key={i} className="text-sm">
+                            <td className="py-2 text-muted-foreground">
+                              {new Date(p.assessedAt).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: '2-digit' })}
+                            </td>
+                            <td className="py-2 text-right font-medium">{p.weight} kg</td>
+                            <td className="py-2 text-right">{p.bmi?.toFixed(1) ?? '—'}</td>
+                            <td className="py-2 text-right">{p.bodyFatPercent != null ? `${p.bodyFatPercent}%` : '—'}</td>
+                            <td className="py-2 text-right">{p.waistCm != null ? `${p.waistCm} cm` : '—'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </>
             )}
           </div>
         )}
