@@ -367,6 +367,7 @@ model Nutritionist {
   foodDatabase FoodDatabase[]
   consultations NutritionalConsultation[]
   supplementationPlans SupplementationPlan[]
+  clinicalNotes ClinicalNote[]
 
   @@map("nutritionists")
 }
@@ -429,6 +430,7 @@ model Student {
   anamnesis             Anamnesis?
   nutritionalAssessments NutritionalAssessment[]
   supplementationPlans  SupplementationPlan[]
+  clinicalNotes         ClinicalNote[]
 
   @@map("students")
 }
@@ -852,6 +854,27 @@ model NutritionalConsultation {
   nutritionist Nutritionist @relation(fields: [nutritionistId], references: [id])
 
   @@map("nutritional_consultations")
+}
+
+// ================================================
+// CLINICAL NOTES
+// ================================================
+
+model ClinicalNote {
+  id             String   @id @default(cuid())
+  studentId      String
+  nutritionistId String
+  category       String   @default("GERAL")
+  title          String?
+  content        String
+  isPinned       Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  student      Student      @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  nutritionist Nutritionist @relation(fields: [nutritionistId], references: [id])
+
+  @@map("clinical_notes")
 }
 
 // ================================================

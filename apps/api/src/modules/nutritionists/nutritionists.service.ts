@@ -179,6 +179,48 @@ export class NutritionistsService {
     });
   }
 
+  async getClinicalNotes(userId: string, studentId: string) {
+    const n = await this.getNutritionist(userId);
+    const relation = await this.prisma.nutritionistPatient.findFirst({
+      where: { nutritionistId: n.id, studentId },
+    });
+    if (!relation) throw new NotFoundException('Paciente não encontrado');
+    return this.prisma.clinicalNote.findMany({
+      where: { studentId, nutritionistId: n.id },
+      orderBy: [{ isPinned: 'desc' }, { createdAt: 'desc' }],
+    });
+  }
+
+  async createClinicalNote(userId: string, studentId: string, data: any) {
+    const n = await this.getNutritionist(userId);
+    const relation = await this.prisma.nutritionistPatient.findFirst({
+      where: { nutritionistId: n.id, studentId },
+    });
+    if (!relation) throw new NotFoundException('Paciente não encontrado');
+    return this.prisma.clinicalNote.create({
+      data: { studentId, nutritionistId: n.id, ...data },
+    });
+  }
+
+  async updateClinicalNote(userId: string, noteId: string, data: any) {
+    const n = await this.getNutritionist(userId);
+    const note = await this.prisma.clinicalNote.findFirst({
+      where: { id: noteId, nutritionistId: n.id },
+    });
+    if (!note) throw new NotFoundException('Nota não encontrada');
+    return this.prisma.clinicalNote.update({ where: { id: noteId }, data });
+  }
+
+  async deleteClinicalNote(userId: string, noteId: string) {
+    const n = await this.getNutritionist(userId);
+    const note = await this.prisma.clinicalNote.findFirst({
+      where: { id: noteId, nutritionistId: n.id },
+    });
+    if (!note) throw new NotFoundException('Nota não encontrada');
+    await this.prisma.clinicalNote.delete({ where: { id: noteId } });
+    return { deleted: true };
+  }
+
   async getPatientDietHistory(userId: string, studentId: string) {
     const n = await this.getNutritionist(userId);
     const relation = await this.prisma.nutritionistPatient.findFirst({

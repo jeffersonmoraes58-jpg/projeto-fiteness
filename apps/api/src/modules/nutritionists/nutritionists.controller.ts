@@ -99,6 +99,30 @@ export class NutritionistsController {
     return this.service.createPhysicalAssessment(user.id, studentId, body);
   }
 
+  @Get('me/patients/:studentId/clinical-notes')
+  @ApiOperation({ summary: 'Listar notas clínicas do paciente' })
+  getClinicalNotes(@CurrentUser() user: any, @Param('studentId') studentId: string) {
+    return this.service.getClinicalNotes(user.id, studentId);
+  }
+
+  @Post('me/patients/:studentId/clinical-notes')
+  @ApiOperation({ summary: 'Criar nota clínica' })
+  createClinicalNote(@CurrentUser() user: any, @Param('studentId') studentId: string, @Body() body: any) {
+    return this.service.createClinicalNote(user.id, studentId, body);
+  }
+
+  @Patch('me/clinical-notes/:noteId')
+  @ApiOperation({ summary: 'Atualizar nota clínica' })
+  updateClinicalNote(@CurrentUser() user: any, @Param('noteId') noteId: string, @Body() body: any) {
+    return this.service.updateClinicalNote(user.id, noteId, body);
+  }
+
+  @Delete('me/clinical-notes/:noteId')
+  @ApiOperation({ summary: 'Excluir nota clínica' })
+  deleteClinicalNote(@CurrentUser() user: any, @Param('noteId') noteId: string) {
+    return this.service.deleteClinicalNote(user.id, noteId);
+  }
+
   @Get('me/patients/:studentId/diet-history')
   @ApiOperation({ summary: 'Histórico de dietas do paciente' })
   getPatientDietHistory(@CurrentUser() user: any, @Param('studentId') studentId: string) {

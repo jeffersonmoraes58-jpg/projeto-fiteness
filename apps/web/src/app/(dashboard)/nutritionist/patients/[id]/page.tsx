@@ -6,7 +6,7 @@ import {
   Users, ChevronLeft, Apple, Calendar, MessageCircle, UserCheck, Dumbbell,
   CheckSquare, Square, ClipboardList, ChevronDown, ChevronUp, Save, Scale,
   Plus, History, ClipboardCheck, X, TrendingUp, TrendingDown, Minus, Activity,
-  Camera, Trash2, ImageOff, Target, BookOpen,
+  Camera, Trash2, ImageOff, Target, BookOpen, FileText, Pin, PinOff, Pencil,
 } from 'lucide-react';
 import Link from 'next/link';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
@@ -87,6 +87,14 @@ const EMPTY_ASSESSMENT = {
   foodAllergies: '',
   observations: '',
 };
+
+const NOTE_CATEGORIES = [
+  { value: 'GERAL', label: 'Geral', color: 'text-slate-400', bg: 'bg-slate-500/10' },
+  { value: 'ALERTA', label: 'Alerta', color: 'text-red-400', bg: 'bg-red-500/10' },
+  { value: 'ACOMPANHAMENTO', label: 'Acompanhamento', color: 'text-cyan-400', bg: 'bg-cyan-500/10' },
+  { value: 'AVALIAÇÃO', label: 'Avaliação', color: 'text-purple-400', bg: 'bg-purple-500/10' },
+  { value: 'CONDUTA', label: 'Conduta', color: 'text-emerald-400', bg: 'bg-emerald-500/10' },
+];
 
 const GOAL_TYPE_OPTIONS = [
   { value: 'LOSE_WEIGHT', label: 'Perda de peso' },
@@ -237,6 +245,12 @@ export default function PatientDetailPage() {
   const [physicalOpen, setPhysicalOpen] = useState(false);
   const [physicalForm, setPhysicalForm] = useState(EMPTY_PHYSICAL);
   const [showPhysicalHistory, setShowPhysicalHistory] = useState(false);
+
+  const [notesOpen, setNotesOpen] = useState(false);
+  const [noteCategory, setNoteCategory] = useState('GERAL');
+  const [noteTitle, setNoteTitle] = useState('');
+  const [noteContent, setNoteContent] = useState('');
+  const [editingNote, setEditingNote] = useState<any | null>(null);
 
   const [dietHistoryOpen, setDietHistoryOpen] = useState(false);
   const [expandedPlanId, setExpandedPlanId] = useState<string | null>(null);
@@ -460,6 +474,57 @@ export default function PatientDetailPage() {
       rightCalfCm: opt(physicalForm.rightCalfCm),
       leftCalfCm: opt(physicalForm.leftCalfCm),
       notes: physicalForm.notes || null,
+    });
+  };
+
+  const { data: clinicalNotes, isLoading: notesLoading } = useQuery({
+    queryKey: ['clinical-notes', id],
+    queryFn: () => api.get(`/nutritionists/me/patients/${id}/clinical-notes`).then((r) => r.data),
+    enabled: !!patient && notesOpen,
+  });
+
+  const createNoteMutation = useMutation({
+    mutationFn: (data: any) => api.post(`/nutritionists/me/patients/${id}/clinical-notes`, data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['clinical-notes', id] });
+      setNoteCategory('GERAL');
+      setNoteTitle('');
+      setNoteContent('');
+      toast.success('Nota registrada!');
+    },
+    onError: (e: any) => {
+      toast.error(e.response?.data?.message || 'Erro ao salvar nota');
+    },
+  });
+
+  const updateNoteMutation = useMutation({
+    mutationFn: ({ noteId, ...data }: any) =>
+      api.patch(`/nutritionists/me/clinical-notes/${noteId}`, data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['clinical-notes', id] });
+      setEditingNote(null);
+    },
+    onError: (e: any) => {
+      toast.error(e.response?.data?.message || 'Erro ao atualizar nota');
+    },
+  });
+
+  const deleteNoteMutation = useMutation({
+    mutationFn: (noteId: string) => api.delete(`/nutritionists/me/clinical-notes/${noteId}`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['clinical-notes', id] });
+      toast.success('Nota removida');
+    },
+    onError: () => toast.error('Erro ao remover nota'),
+  });
+
+  const handleNoteSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!noteContent.trim()) { toast.error('O conteúdo da nota é obrigatório'); return; }
+    createNoteMutation.mutate({
+      category: noteCategory,
+      title: noteTitle.trim() || null,
+      content: noteContent.trim(),
     });
   };
 
@@ -1651,6 +1716,178 @@ export default function PatientDetailPage() {
                     ))}
                   </div>
                 )}
+              </div>
+            )}
+          </div>
+        )}
+      </motion.div>
+
+      {/* Notas e observações clínicas */}
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.249 }} className="glass-card">
+        <button type="button" onClick={() => setNotesOpen((o) => !o)} className="w-full flex items-center justify-between">
+          <h2 className="font-semibold flex items-center gap-2">
+            <FileText className="w-4 h-4 text-indigo-400" />
+            Notas e Observações Clínicas
+            {clinicalNotes && clinicalNotes.length > 0 && (
+              <span className="text-xs px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-400 ml-1">
+                {clinicalNotes.length} nota{clinicalNotes.length !== 1 ? 's' : ''}
+              </span>
+            )}
+          </h2>
+          {notesOpen ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
+        </button>
+
+        {notesOpen && (
+          <div className="mt-5 space-y-5">
+            {/* Formulário nova nota */}
+            <form onSubmit={handleNoteSubmit} className="space-y-3">
+              <h3 className="text-sm font-semibold flex items-center gap-2">
+                <Plus className="w-3.5 h-3.5 text-indigo-400" />
+                Nova nota
+              </h3>
+
+              {/* Categorias */}
+              <div className="flex flex-wrap gap-2">
+                {NOTE_CATEGORIES.map((c) => (
+                  <button
+                    key={c.value}
+                    type="button"
+                    onClick={() => setNoteCategory(c.value)}
+                    className={cn(
+                      'text-xs px-3 py-1.5 rounded-lg font-medium transition-all border',
+                      noteCategory === c.value
+                        ? `${c.bg} ${c.color} border-transparent`
+                        : 'glass border-transparent text-muted-foreground hover:bg-accent',
+                    )}
+                  >
+                    {c.label}
+                  </button>
+                ))}
+              </div>
+
+              <div>
+                <label className="text-sm font-medium mb-1.5 block">Título (opcional)</label>
+                <input
+                  type="text"
+                  value={noteTitle}
+                  onChange={(e) => setNoteTitle(e.target.value)}
+                  placeholder="Ex: Alteração no plano alimentar"
+                  className="input-field"
+                />
+              </div>
+
+              <div>
+                <label className="text-sm font-medium mb-1.5 block">Conteúdo *</label>
+                <textarea
+                  value={noteContent}
+                  onChange={(e) => setNoteContent(e.target.value)}
+                  placeholder="Descreva a observação clínica, conduta adotada, intercorrências..."
+                  rows={4}
+                  className="input-field resize-none"
+                  required
+                />
+              </div>
+
+              <button type="submit" disabled={createNoteMutation.isPending}
+                className="btn-primary w-full flex items-center justify-center gap-2 disabled:opacity-50">
+                <Save className="w-4 h-4" />
+                {createNoteMutation.isPending ? 'Salvando...' : 'Registrar nota'}
+              </button>
+            </form>
+
+            {/* Lista de notas */}
+            {notesLoading ? (
+              <div className="space-y-2">{[...Array(2)].map((_, i) => <div key={i} className="h-20 rounded-xl bg-white/5 animate-pulse" />)}</div>
+            ) : clinicalNotes && clinicalNotes.length > 0 && (
+              <div className="space-y-3">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Prontuário</p>
+                {clinicalNotes.map((note: any) => {
+                  const cat = NOTE_CATEGORIES.find((c) => c.value === note.category) ?? NOTE_CATEGORIES[0];
+                  const isEditing = editingNote?.id === note.id;
+                  return (
+                    <div key={note.id} className={cn(
+                      'glass rounded-xl border overflow-hidden',
+                      note.isPinned ? 'border-indigo-500/30' : 'border-white/5',
+                    )}>
+                      <div className="p-4">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap mb-1">
+                              {note.isPinned && <Pin className="w-3 h-3 text-indigo-400 flex-shrink-0" />}
+                              <span className={cn('text-xs px-2 py-0.5 rounded-full font-medium', cat.bg, cat.color)}>
+                                {cat.label}
+                              </span>
+                              <span className="text-xs text-muted-foreground">
+                                {new Date(note.createdAt).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' })}
+                                {' '}
+                                {new Date(note.createdAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                              </span>
+                              {note.updatedAt !== note.createdAt && (
+                                <span className="text-xs text-muted-foreground/50">(editada)</span>
+                              )}
+                            </div>
+                            {note.title && <p className="text-sm font-semibold mb-1">{note.title}</p>}
+                          </div>
+                          <div className="flex items-center gap-1 flex-shrink-0">
+                            <button
+                              type="button"
+                              onClick={() => updateNoteMutation.mutate({ noteId: note.id, isPinned: !note.isPinned })}
+                              className="p-1.5 rounded-lg hover:bg-white/5 transition-colors text-muted-foreground hover:text-indigo-400"
+                              title={note.isPinned ? 'Desafixar' : 'Fixar'}
+                            >
+                              {note.isPinned ? <PinOff className="w-3.5 h-3.5" /> : <Pin className="w-3.5 h-3.5" />}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setEditingNote(isEditing ? null : { ...note })}
+                              className="p-1.5 rounded-lg hover:bg-white/5 transition-colors text-muted-foreground hover:text-amber-400"
+                            >
+                              <Pencil className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => deleteNoteMutation.mutate(note.id)}
+                              className="p-1.5 rounded-lg hover:bg-red-500/10 transition-colors text-muted-foreground hover:text-red-400"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </div>
+
+                        {isEditing ? (
+                          <div className="mt-2 space-y-2">
+                            <input
+                              type="text"
+                              value={editingNote.title ?? ''}
+                              onChange={(e) => setEditingNote((n: any) => ({ ...n, title: e.target.value }))}
+                              placeholder="Título"
+                              className="input-field text-sm"
+                            />
+                            <textarea
+                              value={editingNote.content}
+                              onChange={(e) => setEditingNote((n: any) => ({ ...n, content: e.target.value }))}
+                              rows={3}
+                              className="input-field text-sm resize-none"
+                            />
+                            <div className="flex gap-2">
+                              <button
+                                type="button"
+                                onClick={() => updateNoteMutation.mutate({ noteId: note.id, title: editingNote.title || null, content: editingNote.content })}
+                                disabled={updateNoteMutation.isPending}
+                                className="btn-primary text-xs px-4 disabled:opacity-50"
+                              >
+                                {updateNoteMutation.isPending ? 'Salvando...' : 'Salvar'}
+                              </button>
+                              <button type="button" onClick={() => setEditingNote(null)} className="glass px-3 rounded-xl text-xs">Cancelar</button>
+                            </div>
+                          </div>
+                        ) : (
+                          <p className="text-sm text-muted-foreground whitespace-pre-wrap">{note.content}</p>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>
