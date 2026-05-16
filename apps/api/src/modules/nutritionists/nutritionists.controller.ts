@@ -99,6 +99,18 @@ export class NutritionistsController {
     return this.service.createPhysicalAssessment(user.id, studentId, body);
   }
 
+  @Get('me/patients/:studentId/diet-history')
+  @ApiOperation({ summary: 'Histórico de dietas do paciente' })
+  getPatientDietHistory(@CurrentUser() user: any, @Param('studentId') studentId: string) {
+    return this.service.getPatientDietHistory(user.id, studentId);
+  }
+
+  @Patch('me/diet-plans/:planId')
+  @ApiOperation({ summary: 'Atualizar plano de dieta (ativar/inativar, notas)' })
+  updateDietPlan(@CurrentUser() user: any, @Param('planId') planId: string, @Body() body: any) {
+    return this.service.updateDietPlan(user.id, planId, body);
+  }
+
   @Get('me/patients/:studentId/goals')
   @ApiOperation({ summary: 'Listar metas do paciente' })
   getPatientGoals(@CurrentUser() user: any, @Param('studentId') studentId: string) {

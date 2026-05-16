@@ -6,7 +6,7 @@ import {
   Users, ChevronLeft, Apple, Calendar, MessageCircle, UserCheck, Dumbbell,
   CheckSquare, Square, ClipboardList, ChevronDown, ChevronUp, Save, Scale,
   Plus, History, ClipboardCheck, X, TrendingUp, TrendingDown, Minus, Activity,
-  Camera, Trash2, ImageOff, Target,
+  Camera, Trash2, ImageOff, Target, BookOpen,
 } from 'lucide-react';
 import Link from 'next/link';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
@@ -238,6 +238,9 @@ export default function PatientDetailPage() {
   const [physicalForm, setPhysicalForm] = useState(EMPTY_PHYSICAL);
   const [showPhysicalHistory, setShowPhysicalHistory] = useState(false);
 
+  const [dietHistoryOpen, setDietHistoryOpen] = useState(false);
+  const [expandedPlanId, setExpandedPlanId] = useState<string | null>(null);
+
   const [goalsOpen, setGoalsOpen] = useState(false);
   const [goalForm, setGoalForm] = useState(EMPTY_GOAL);
   const [editingProgress, setEditingProgress] = useState<string | null>(null);
@@ -459,6 +462,20 @@ export default function PatientDetailPage() {
       notes: physicalForm.notes || null,
     });
   };
+
+  const { data: dietHistory, isLoading: dietHistoryLoading } = useQuery({
+    queryKey: ['patient-diet-history', id],
+    queryFn: () =>
+      api.get(`/nutritionists/me/patients/${id}/diet-history`).then((r) => r.data),
+    enabled: !!patient && dietHistoryOpen,
+  });
+
+  const toggleDietPlanMutation = useMutation({
+    mutationFn: ({ planId, isActive }: { planId: string; isActive: boolean }) =>
+      api.patch(`/nutritionists/me/diet-plans/${planId}`, { isActive }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['patient-diet-history', id] }),
+    onError: () => toast.error('Erro ao atualizar plano'),
+  });
 
   const { data: goals, isLoading: goalsLoading } = useQuery({
     queryKey: ['patient-goals', id],
@@ -1635,6 +1652,124 @@ export default function PatientDetailPage() {
                   </div>
                 )}
               </div>
+            )}
+          </div>
+        )}
+      </motion.div>
+
+      {/* Histórico de dietas */}
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.250 }} className="glass-card">
+        <button type="button" onClick={() => setDietHistoryOpen((o) => !o)} className="w-full flex items-center justify-between">
+          <h2 className="font-semibold flex items-center gap-2">
+            <BookOpen className="w-4 h-4 text-teal-400" />
+            Histórico de Dietas
+            {dietHistory && (
+              <span className="text-xs px-2 py-0.5 rounded-full bg-teal-500/10 text-teal-400 ml-1">
+                {dietHistory.length} plano{dietHistory.length !== 1 ? 's' : ''}
+              </span>
+            )}
+          </h2>
+          {dietHistoryOpen ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
+        </button>
+
+        {dietHistoryOpen && (
+          <div className="mt-5 space-y-3">
+            {dietHistoryLoading ? (
+              <div className="space-y-2">{[...Array(3)].map((_, i) => <div key={i} className="h-16 rounded-xl bg-white/5 animate-pulse" />)}</div>
+            ) : !dietHistory || dietHistory.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground text-sm">
+                Nenhuma dieta atribuída ainda.
+              </div>
+            ) : (
+              dietHistory.map((plan: any) => {
+                const expanded = expandedPlanId === plan.id;
+                return (
+                  <div key={plan.id} className={cn(
+                    'glass rounded-xl overflow-hidden border transition-all',
+                    plan.isActive ? 'border-teal-500/20' : 'border-white/5',
+                  )}>
+                    <button
+                      type="button"
+                      onClick={() => setExpandedPlanId(expanded ? null : plan.id)}
+                      className="w-full p-4 flex items-start justify-between text-left gap-3"
+                    >
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-sm font-semibold">{plan.diet.name}</span>
+                          <span className={cn(
+                            'text-xs px-1.5 py-0.5 rounded-full font-medium',
+                            plan.isActive ? 'bg-teal-500/10 text-teal-400' : 'bg-white/5 text-muted-foreground',
+                          )}>
+                            {plan.isActive ? 'Ativa' : 'Inativa'}
+                          </span>
+                        </div>
+                        <div className="text-xs text-muted-foreground mt-1 flex flex-wrap gap-x-3">
+                          <span>Início: {new Date(plan.startDate).toLocaleDateString('pt-BR')}</span>
+                          {plan.endDate && <span>Término: {new Date(plan.endDate).toLocaleDateString('pt-BR')}</span>}
+                          <span>{plan._count.mealLogs} registro{plan._count.mealLogs !== 1 ? 's' : ''} de refeição</span>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); toggleDietPlanMutation.mutate({ planId: plan.id, isActive: !plan.isActive }); }}
+                          className={cn(
+                            'text-xs px-2 py-1 rounded-lg transition-colors',
+                            plan.isActive
+                              ? 'bg-white/5 text-muted-foreground hover:bg-white/10'
+                              : 'bg-teal-500/10 text-teal-400 hover:bg-teal-500/20',
+                          )}
+                        >
+                          {plan.isActive ? 'Inativar' : 'Ativar'}
+                        </button>
+                        {expanded ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
+                      </div>
+                    </button>
+
+                    {expanded && (
+                      <div className="px-4 pb-4 border-t border-white/5 pt-3 space-y-3">
+                        {plan.diet.description && (
+                          <p className="text-sm text-muted-foreground">{plan.diet.description}</p>
+                        )}
+
+                        {/* Macros */}
+                        {plan.diet.totalCalories && (
+                          <div className="grid grid-cols-5 gap-2 text-center text-xs">
+                            {[
+                              { label: 'Calorias', value: plan.diet.totalCalories, unit: 'kcal', color: 'text-amber-400' },
+                              { label: 'Proteína', value: plan.diet.totalProtein, unit: 'g', color: 'text-red-400' },
+                              { label: 'Carbs', value: plan.diet.totalCarbs, unit: 'g', color: 'text-yellow-400' },
+                              { label: 'Gordura', value: plan.diet.totalFat, unit: 'g', color: 'text-orange-400' },
+                              { label: 'Fibras', value: plan.diet.totalFiber, unit: 'g', color: 'text-green-400' },
+                            ].map((m) => m.value != null && (
+                              <div key={m.label} className="glass rounded-lg p-2">
+                                <div className={cn('font-bold', m.color)}>{Math.round(m.value)}</div>
+                                <div className="text-muted-foreground">{m.label}</div>
+                                <div className="text-muted-foreground/60">{m.unit}</div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* Tags */}
+                        {plan.diet.tags?.length > 0 && (
+                          <div className="flex flex-wrap gap-1.5">
+                            {plan.diet.tags.map((tag: string) => (
+                              <span key={tag} className="text-xs px-2 py-0.5 rounded-full bg-white/5 text-muted-foreground">
+                                {tag}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+
+                        {plan.notes && (
+                          <p className="text-xs text-muted-foreground italic">{plan.notes}</p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })
             )}
           </div>
         )}
