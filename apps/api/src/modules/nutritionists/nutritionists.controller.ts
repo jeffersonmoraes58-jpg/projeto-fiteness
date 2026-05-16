@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Patch, Body, Param, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Put, Patch, Body, Param, Query, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { NutritionistsService } from './nutritionists.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -61,6 +61,18 @@ export class NutritionistsController {
   @ApiOperation({ summary: 'Relatórios dos últimos 30 dias' })
   getReports(@CurrentUser() user: any) {
     return this.service.getReports(user.id);
+  }
+
+  @Get('me/patients/:studentId/anamnesis')
+  @ApiOperation({ summary: 'Buscar anamnese do paciente' })
+  getAnamnesis(@CurrentUser() user: any, @Param('studentId') studentId: string) {
+    return this.service.getAnamnesis(user.id, studentId);
+  }
+
+  @Put('me/patients/:studentId/anamnesis')
+  @ApiOperation({ summary: 'Criar ou atualizar anamnese do paciente' })
+  upsertAnamnesis(@CurrentUser() user: any, @Param('studentId') studentId: string, @Body() body: any) {
+    return this.service.upsertAnamnesis(user.id, studentId, body);
   }
 
   @Patch('me')

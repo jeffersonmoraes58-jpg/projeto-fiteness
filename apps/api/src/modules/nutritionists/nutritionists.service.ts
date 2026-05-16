@@ -110,5 +110,27 @@ export class NutritionistsService {
     ]);
     return updated;
   }
+
+  async getAnamnesis(userId: string, studentId: string) {
+    const n = await this.getNutritionist(userId);
+    const relation = await this.prisma.nutritionistPatient.findFirst({
+      where: { nutritionistId: n.id, studentId },
+    });
+    if (!relation) throw new NotFoundException('Paciente não encontrado');
+    return this.prisma.anamnesis.findUnique({ where: { studentId } });
+  }
+
+  async upsertAnamnesis(userId: string, studentId: string, data: any) {
+    const n = await this.getNutritionist(userId);
+    const relation = await this.prisma.nutritionistPatient.findFirst({
+      where: { nutritionistId: n.id, studentId },
+    });
+    if (!relation) throw new NotFoundException('Paciente não encontrado');
+    return this.prisma.anamnesis.upsert({
+      where: { studentId },
+      update: { ...data, updatedAt: new Date() },
+      create: { studentId, ...data },
+    });
+  }
 }
 

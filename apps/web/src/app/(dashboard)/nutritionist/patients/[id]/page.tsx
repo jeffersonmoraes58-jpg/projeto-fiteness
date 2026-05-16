@@ -1,8 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Users, ChevronLeft, Apple, Calendar, MessageCircle, UserCheck, Dumbbell, CheckSquare, Square } from 'lucide-react';
+import {
+  Users, ChevronLeft, Apple, Calendar, MessageCircle, UserCheck, Dumbbell,
+  CheckSquare, Square, ClipboardList, ChevronDown, ChevronUp, Save,
+} from 'lucide-react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -30,16 +33,49 @@ const DAYS = [
   { label: 'Sáb', value: 6 },
 ];
 
+const EMPTY_ANAMNESIS = {
+  practicesExercise: false,
+  exerciseFrequency: '',
+  previousInjuries: '',
+  surgeries: '',
+  cardiovascularIssues: false,
+  bloodPressure: '',
+  cholesterol: '',
+  diabetes: false,
+  smoking: false,
+  alcohol: '',
+  sleepHours: '',
+  stressLevel: '',
+  mainGoal: '',
+  observations: '',
+};
+
+function BoolField({ label, value, onChange }: { label: string; value: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <div className="flex items-center justify-between">
+      <span className="text-sm font-medium">{label}</span>
+      <button
+        type="button"
+        onClick={() => onChange(!value)}
+        className={cn(
+          'w-12 h-6 rounded-full transition-colors relative',
+          value ? 'bg-emerald-500' : 'bg-white/10',
+        )}
+      >
+        <span className={cn('absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform', value ? 'translate-x-6' : 'translate-x-0.5')} />
+      </button>
+    </div>
+  );
+}
+
 export default function PatientDetailPage() {
   const { id } = useParams();
   const qc = useQueryClient();
 
-  // Diet assign state
   const [selectedDiet, setSelectedDiet] = useState('');
   const [dietError, setDietError] = useState('');
   const [dietSuccess, setDietSuccess] = useState(false);
 
-  // Workout assign state
   const [selectedWorkout, setSelectedWorkout] = useState('');
   const [dayOfWeek, setDayOfWeek] = useState<number[]>([]);
   const [startDate, setStartDate] = useState(() => new Date().toISOString().split('T')[0]);
@@ -47,6 +83,10 @@ export default function PatientDetailPage() {
   const [workoutNotes, setWorkoutNotes] = useState('');
   const [workoutError, setWorkoutError] = useState('');
   const [workoutSuccess, setWorkoutSuccess] = useState(false);
+
+  const [anamnesisOpen, setAnamnesisOpen] = useState(false);
+  const [anamnesisForm, setAnamnesisForm] = useState(EMPTY_ANAMNESIS);
+  const [anamnesisLoaded, setAnamnesisLoaded] = useState(false);
 
   const { data: patients, isLoading } = useQuery({
     queryKey: ['nutritionist-patients'],
@@ -64,6 +104,70 @@ export default function PatientDetailPage() {
   });
 
   const patient = patients?.find((p: any) => p.id === id);
+
+  const { data: anamnesis, isLoading: anamnesisLoading } = useQuery({
+    queryKey: ['anamnesis', id],
+    queryFn: () => api.get(`/nutritionists/me/patients/${id}/anamnesis`).then((r) => r.data),
+    enabled: !!patient && anamnesisOpen,
+  });
+
+  useEffect(() => {
+    if (anamnesis && !anamnesisLoaded) {
+      setAnamnesisForm({
+        practicesExercise: anamnesis.practicesExercise ?? false,
+        exerciseFrequency: anamnesis.exerciseFrequency ?? '',
+        previousInjuries: anamnesis.previousInjuries ?? '',
+        surgeries: anamnesis.surgeries ?? '',
+        cardiovascularIssues: anamnesis.cardiovascularIssues ?? false,
+        bloodPressure: anamnesis.bloodPressure ?? '',
+        cholesterol: anamnesis.cholesterol ?? '',
+        diabetes: anamnesis.diabetes ?? false,
+        smoking: anamnesis.smoking ?? false,
+        alcohol: anamnesis.alcohol ?? '',
+        sleepHours: anamnesis.sleepHours != null ? String(anamnesis.sleepHours) : '',
+        stressLevel: anamnesis.stressLevel != null ? String(anamnesis.stressLevel) : '',
+        mainGoal: anamnesis.mainGoal ?? '',
+        observations: anamnesis.observations ?? '',
+      });
+      setAnamnesisLoaded(true);
+    }
+  }, [anamnesis, anamnesisLoaded]);
+
+  const handleAnamnesisOpen = () => {
+    setAnamnesisOpen((o) => !o);
+  };
+
+  const anamnesisMutation = useMutation({
+    mutationFn: (data: any) => api.put(`/nutritionists/me/patients/${id}/anamnesis`, data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['anamnesis', id] });
+      toast.success('Anamnese salva com sucesso!');
+    },
+    onError: (e: any) => {
+      const msg = e.response?.data?.message || e.message || 'Erro ao salvar anamnese';
+      toast.error(Array.isArray(msg) ? msg.join(', ') : msg);
+    },
+  });
+
+  const handleAnamnesisSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    anamnesisMutation.mutate({
+      ...anamnesisForm,
+      sleepHours: anamnesisForm.sleepHours ? parseFloat(anamnesisForm.sleepHours) : null,
+      stressLevel: anamnesisForm.stressLevel ? parseInt(anamnesisForm.stressLevel) : null,
+      exerciseFrequency: anamnesisForm.exerciseFrequency || null,
+      previousInjuries: anamnesisForm.previousInjuries || null,
+      surgeries: anamnesisForm.surgeries || null,
+      bloodPressure: anamnesisForm.bloodPressure || null,
+      cholesterol: anamnesisForm.cholesterol || null,
+      alcohol: anamnesisForm.alcohol || null,
+      mainGoal: anamnesisForm.mainGoal || null,
+      observations: anamnesisForm.observations || null,
+    });
+  };
+
+  const setField = (field: string, value: any) =>
+    setAnamnesisForm((prev) => ({ ...prev, [field]: value }));
 
   const dietMutation = useMutation({
     mutationFn: (dietId: string) =>
@@ -211,6 +315,199 @@ export default function PatientDetailPage() {
           <p className="text-muted-foreground">{GOAL_LABELS[patient.goalType] || patient.goalType}</p>
         </motion.div>
       )}
+
+      {/* Anamnese nutricional */}
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }} className="glass-card">
+        <button
+          type="button"
+          onClick={handleAnamnesisOpen}
+          className="w-full flex items-center justify-between"
+        >
+          <h2 className="font-semibold flex items-center gap-2">
+            <ClipboardList className="w-4 h-4 text-cyan-400" />
+            Ficha de Anamnese Nutricional
+            {anamnesis && <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 ml-1">Preenchida</span>}
+          </h2>
+          {anamnesisOpen ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
+        </button>
+
+        {anamnesisOpen && (
+          <form onSubmit={handleAnamnesisSubmit} className="mt-5 space-y-6">
+            {anamnesisLoading ? (
+              <div className="space-y-3">
+                {[...Array(4)].map((_, i) => <div key={i} className="h-10 rounded-xl bg-white/5 animate-pulse" />)}
+              </div>
+            ) : (
+              <>
+                {/* Atividade física */}
+                <div className="space-y-3">
+                  <h3 className="text-sm font-semibold text-cyan-400 uppercase tracking-wide">Atividade Física</h3>
+                  <BoolField
+                    label="Pratica exercícios físicos?"
+                    value={anamnesisForm.practicesExercise}
+                    onChange={(v) => setField('practicesExercise', v)}
+                  />
+                  {anamnesisForm.practicesExercise && (
+                    <div>
+                      <label className="text-sm font-medium mb-1.5 block">Frequência / modalidade</label>
+                      <input
+                        type="text"
+                        value={anamnesisForm.exerciseFrequency}
+                        onChange={(e) => setField('exerciseFrequency', e.target.value)}
+                        placeholder="Ex: musculação 3x semana"
+                        className="input-field"
+                      />
+                    </div>
+                  )}
+                </div>
+
+                {/* Histórico clínico */}
+                <div className="space-y-3">
+                  <h3 className="text-sm font-semibold text-cyan-400 uppercase tracking-wide">Histórico Clínico</h3>
+                  <div>
+                    <label className="text-sm font-medium mb-1.5 block">Lesões anteriores</label>
+                    <textarea
+                      value={anamnesisForm.previousInjuries}
+                      onChange={(e) => setField('previousInjuries', e.target.value)}
+                      placeholder="Descreva lesões relevantes..."
+                      rows={2}
+                      className="input-field resize-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium mb-1.5 block">Cirurgias</label>
+                    <textarea
+                      value={anamnesisForm.surgeries}
+                      onChange={(e) => setField('surgeries', e.target.value)}
+                      placeholder="Descreva cirurgias realizadas..."
+                      rows={2}
+                      className="input-field resize-none"
+                    />
+                  </div>
+                </div>
+
+                {/* Saúde cardiovascular e metabólica */}
+                <div className="space-y-3">
+                  <h3 className="text-sm font-semibold text-cyan-400 uppercase tracking-wide">Saúde Cardiovascular e Metabólica</h3>
+                  <BoolField
+                    label="Problemas cardiovasculares?"
+                    value={anamnesisForm.cardiovascularIssues}
+                    onChange={(v) => setField('cardiovascularIssues', v)}
+                  />
+                  <BoolField
+                    label="Diabetes?"
+                    value={anamnesisForm.diabetes}
+                    onChange={(v) => setField('diabetes', v)}
+                  />
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-sm font-medium mb-1.5 block">Pressão arterial</label>
+                      <input
+                        type="text"
+                        value={anamnesisForm.bloodPressure}
+                        onChange={(e) => setField('bloodPressure', e.target.value)}
+                        placeholder="Ex: 120/80"
+                        className="input-field"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium mb-1.5 block">Colesterol</label>
+                      <input
+                        type="text"
+                        value={anamnesisForm.cholesterol}
+                        onChange={(e) => setField('cholesterol', e.target.value)}
+                        placeholder="Ex: 190 mg/dL"
+                        className="input-field"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Hábitos de vida */}
+                <div className="space-y-3">
+                  <h3 className="text-sm font-semibold text-cyan-400 uppercase tracking-wide">Hábitos de Vida</h3>
+                  <BoolField
+                    label="Fumante?"
+                    value={anamnesisForm.smoking}
+                    onChange={(v) => setField('smoking', v)}
+                  />
+                  <div>
+                    <label className="text-sm font-medium mb-1.5 block">Consumo de álcool</label>
+                    <input
+                      type="text"
+                      value={anamnesisForm.alcohol}
+                      onChange={(e) => setField('alcohol', e.target.value)}
+                      placeholder="Ex: socialmente, final de semana"
+                      className="input-field"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-sm font-medium mb-1.5 block">Horas de sono / dia</label>
+                      <input
+                        type="number"
+                        min={1}
+                        max={24}
+                        step={0.5}
+                        value={anamnesisForm.sleepHours}
+                        onChange={(e) => setField('sleepHours', e.target.value)}
+                        placeholder="Ex: 7.5"
+                        className="input-field"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium mb-1.5 block">Nível de estresse (1-10)</label>
+                      <input
+                        type="number"
+                        min={1}
+                        max={10}
+                        value={anamnesisForm.stressLevel}
+                        onChange={(e) => setField('stressLevel', e.target.value)}
+                        placeholder="Ex: 6"
+                        className="input-field"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Objetivo e observações */}
+                <div className="space-y-3">
+                  <h3 className="text-sm font-semibold text-cyan-400 uppercase tracking-wide">Objetivo e Observações</h3>
+                  <div>
+                    <label className="text-sm font-medium mb-1.5 block">Objetivo principal</label>
+                    <input
+                      type="text"
+                      value={anamnesisForm.mainGoal}
+                      onChange={(e) => setField('mainGoal', e.target.value)}
+                      placeholder="Ex: emagrecer 8 kg em 4 meses"
+                      className="input-field"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium mb-1.5 block">Observações adicionais</label>
+                    <textarea
+                      value={anamnesisForm.observations}
+                      onChange={(e) => setField('observations', e.target.value)}
+                      placeholder="Informações complementares relevantes..."
+                      rows={3}
+                      className="input-field resize-none"
+                    />
+                  </div>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={anamnesisMutation.isPending}
+                  className="btn-primary w-full flex items-center justify-center gap-2 disabled:opacity-50"
+                >
+                  <Save className="w-4 h-4" />
+                  {anamnesisMutation.isPending ? 'Salvando...' : 'Salvar anamnese'}
+                </button>
+              </>
+            )}
+          </form>
+        )}
+      </motion.div>
 
       {/* Assign diet */}
       <motion.form
