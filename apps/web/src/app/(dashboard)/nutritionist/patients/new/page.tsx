@@ -5,11 +5,12 @@ import { motion } from 'framer-motion';
 import { Users, ChevronLeft, Search, UserPlus } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 
 export default function NewPatientPage() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
   const [selected, setSelected] = useState<any>(null);
   const [monthlyFee, setMonthlyFee] = useState('');
@@ -23,7 +24,10 @@ export default function NewPatientPage() {
 
   const addMutation = useMutation({
     mutationFn: (data: any) => api.post('/nutritionists/me/patients', data),
-    onSuccess: () => router.push('/nutritionist/patients'),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['nutritionist-patients-list'] });
+      router.push('/nutritionist/patients');
+    },
     onError: (e: any) => setError(e.response?.data?.message || 'Erro ao adicionar paciente'),
   });
 
