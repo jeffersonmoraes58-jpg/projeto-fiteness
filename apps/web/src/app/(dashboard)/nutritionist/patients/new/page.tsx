@@ -17,7 +17,7 @@ export default function NewPatientPage() {
 
   const { data: results, isFetching } = useQuery({
     queryKey: ['user-search', search],
-    queryFn: () => api.get(`/nutritionists/me/students/search?search=${search}`).then((r) => r.data),
+    queryFn: () => api.get(`/nutritionists/me/students/search?search=${search}`).then((r) => r.data.data),
     enabled: search.length >= 2,
   });
 
