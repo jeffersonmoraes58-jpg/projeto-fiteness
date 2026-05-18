@@ -1,5 +1,6 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import * as bcrypt from 'bcryptjs';
 
 @Injectable()
 export class NutritionistsService {
@@ -71,6 +72,29 @@ export class NutritionistsService {
       email: s.user?.email,
       profile: s.user?.profile,
     }));
+  }
+
+  async createPatientUser(userId: string, data: { firstName: string; lastName: string; email: string; phone?: string; monthlyFee?: number }) {
+    const n = await this.getNutritionist(userId);
+    const existing = await this.prisma.user.findFirst({ where: { tenantId: n.user.tenantId, email: data.email } });
+    if (existing) throw new ConflictException('Já existe um usuário com este e-mail');
+    const tempPassword = `Fit@${Math.random().toString(36).slice(-6).toUpperCase()}1`;
+    const hashed = await bcrypt.hash(tempPassword, 12);
+    const newUser = await this.prisma.user.create({
+      data: {
+        tenantId: n.user.tenantId,
+        email: data.email,
+        password: hashed,
+        role: 'STUDENT',
+        profile: { create: { firstName: data.firstName, lastName: data.lastName, phone: data.phone } },
+        student: { create: {} },
+      },
+      include: { profile: true, student: true },
+    });
+    await this.prisma.nutritionistPatient.create({
+      data: { nutritionistId: n.id, studentId: newUser.student!.id, isActive: true, monthlyFee: data.monthlyFee },
+    });
+    return { ...newUser, tempPassword };
   }
 
   async addPatient(userId: string, studentUserId: string, monthlyFee?: number) {

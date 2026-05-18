@@ -29,8 +29,14 @@ export class NutritionistsController {
     return this.service.searchStudents(user.id, search || '');
   }
 
+  @Post('me/patients/create')
+  @ApiOperation({ summary: 'Criar novo paciente (cria conta de aluno)' })
+  createPatientUser(@CurrentUser() user: any, @Body() body: any) {
+    return this.service.createPatientUser(user.id, body);
+  }
+
   @Post('me/patients')
-  @ApiOperation({ summary: 'Adicionar paciente' })
+  @ApiOperation({ summary: 'Vincular paciente existente' })
   addPatient(@CurrentUser() user: any, @Body() body: { studentUserId: string; monthlyFee?: number }) {
     return this.service.addPatient(user.id, body.studentUserId, body.monthlyFee);
   }
