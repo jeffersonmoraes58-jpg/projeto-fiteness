@@ -7,6 +7,7 @@ import {
   CheckSquare, Square, ClipboardList, ChevronDown, ChevronUp, Save, Scale,
   Plus, History, ClipboardCheck, X, TrendingUp, TrendingDown, Minus, Activity,
   Camera, Trash2, ImageOff, Target, BookOpen, FileText, Pin, PinOff, Pencil,
+  Upload, FilePlus, ExternalLink,
 } from 'lucide-react';
 import Link from 'next/link';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
@@ -293,6 +294,13 @@ export default function PatientDetailPage() {
   const [suppObs, setSuppObs] = useState('');
   const [suppItems, setSuppItems] = useState([{ ...EMPTY_SUPPLEMENT_ITEM }]);
   const [expandedPlan, setExpandedPlan] = useState<string | null>(null);
+
+  const [examsOpen, setExamsOpen] = useState(false);
+  const [examFile, setExamFile] = useState<File | null>(null);
+  const [examTitle, setExamTitle] = useState('');
+  const [examDate, setExamDate] = useState(() => new Date().toISOString().split('T')[0]);
+  const [examNotes, setExamNotes] = useState('');
+  const [examUploading, setExamUploading] = useState(false);
 
   const { data: patients, isLoading } = useQuery({
     queryKey: ['nutritionist-patients'],
@@ -832,6 +840,48 @@ export default function PatientDetailPage() {
       api.patch(`/nutritionists/me/supplementation-plans/${planId}`, { isActive }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['supplementation-plans', id] }),
   });
+
+  const { data: exams, isLoading: examsLoading } = useQuery({
+    queryKey: ['patient-exams', id],
+    queryFn: () => api.get(`/nutritionists/me/patients/${id}/exams`).then((r) => r.data.data),
+    enabled: !!patient && examsOpen,
+  });
+
+  const deleteExamMutation = useMutation({
+    mutationFn: (examId: string) => api.delete(`/nutritionists/me/patients/${id}/exams/${examId}`),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['patient-exams', id] }); toast.success('Exame removido'); },
+  });
+
+  const handleExamUpload = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!examFile || !examTitle.trim()) { toast.error('Selecione um arquivo e informe o título'); return; }
+    setExamUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append('file', examFile);
+      const isPdf = examFile.type === 'application/pdf';
+      const uploadRes = await api.post(isPdf ? '/uploads/document' : '/uploads/progress-photo', fd, { headers: { 'Content-Type': 'multipart/form-data' } });
+      const { url, publicId } = uploadRes.data.data;
+      await api.post(`/nutritionists/me/patients/${id}/exams`, {
+        title: examTitle.trim(),
+        fileUrl: url,
+        publicId,
+        fileType: isPdf ? 'PDF' : 'IMAGE',
+        examDate: new Date(examDate).toISOString(),
+        notes: examNotes || null,
+      });
+      qc.invalidateQueries({ queryKey: ['patient-exams', id] });
+      setExamFile(null);
+      setExamTitle('');
+      setExamNotes('');
+      setExamDate(new Date().toISOString().split('T')[0]);
+      toast.success('Exame enviado com sucesso!');
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Erro ao enviar exame');
+    } finally {
+      setExamUploading(false);
+    }
+  };
 
   const addSuppItem = () => setSuppItems((prev) => [...prev, { ...EMPTY_SUPPLEMENT_ITEM }]);
   const removeSuppItem = (i: number) => setSuppItems((prev) => prev.filter((_, idx) => idx !== i));
@@ -3104,6 +3154,125 @@ export default function PatientDetailPage() {
           {workoutMutation.isPending ? 'Atribuindo...' : 'Atribuir treino'}
         </button>
       </motion.form>
+
+      {/* Exames */}
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.295 }} className="glass-card">
+        <button type="button" onClick={() => setExamsOpen((o) => !o)} className="w-full flex items-center justify-between">
+          <h2 className="font-semibold flex items-center gap-2">
+            <FilePlus className="w-4 h-4 text-indigo-400" />
+            Exames e Documentos
+            {exams && exams.length > 0 && (
+              <span className="text-xs px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-400 ml-1">
+                {exams.length} arquivo{exams.length !== 1 ? 's' : ''}
+              </span>
+            )}
+          </h2>
+          {examsOpen ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
+        </button>
+
+        {examsOpen && (
+          <div className="mt-5 space-y-5">
+            {/* Upload form */}
+            <form onSubmit={handleExamUpload} className="space-y-4">
+              <h3 className="text-sm font-semibold flex items-center gap-2">
+                <Upload className="w-3.5 h-3.5 text-indigo-400" />
+                Enviar exame ou documento
+              </h3>
+
+              <div>
+                <label className="text-sm font-medium mb-1.5 block">Título *</label>
+                <input value={examTitle} onChange={(e) => setExamTitle(e.target.value)} placeholder="Ex: Hemograma completo, Bioimpedância..." className="input-field" />
+              </div>
+
+              <div>
+                <label className="text-sm font-medium mb-1.5 block">Arquivo (PDF ou imagem) *</label>
+                <label className={cn(
+                  'flex items-center gap-3 w-full p-4 rounded-xl border-2 border-dashed cursor-pointer transition-all',
+                  examFile ? 'border-indigo-500/50 bg-indigo-500/5' : 'border-white/10 hover:border-indigo-500/40 hover:bg-white/2',
+                )}>
+                  <Upload className="w-5 h-5 text-muted-foreground flex-shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    {examFile ? (
+                      <div>
+                        <p className="text-sm font-medium truncate">{examFile.name}</p>
+                        <p className="text-xs text-muted-foreground">{(examFile.size / 1024 / 1024).toFixed(1)} MB</p>
+                      </div>
+                    ) : (
+                      <div>
+                        <p className="text-sm text-muted-foreground">Clique para selecionar</p>
+                        <p className="text-xs text-muted-foreground">PDF, JPEG, PNG · máx. 10MB</p>
+                      </div>
+                    )}
+                  </div>
+                  {examFile && (
+                    <button type="button" onClick={(e) => { e.preventDefault(); setExamFile(null); }} className="flex-shrink-0">
+                      <X className="w-4 h-4 text-muted-foreground hover:text-foreground" />
+                    </button>
+                  )}
+                  <input type="file" accept=".pdf,image/jpeg,image/png,image/webp" className="hidden"
+                    onChange={(e) => setExamFile(e.target.files?.[0] || null)} />
+                </label>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-sm font-medium mb-1.5 block">Data do exame</label>
+                  <input type="date" value={examDate} onChange={(e) => setExamDate(e.target.value)} className="input-field" />
+                </div>
+                <div>
+                  <label className="text-sm font-medium mb-1.5 block">Observações</label>
+                  <input value={examNotes} onChange={(e) => setExamNotes(e.target.value)} placeholder="Opcional..." className="input-field" />
+                </div>
+              </div>
+
+              <button type="submit" disabled={examUploading || !examFile || !examTitle.trim()}
+                className="btn-primary w-full flex items-center justify-center gap-2 disabled:opacity-50">
+                <Upload className="w-4 h-4" />
+                {examUploading ? 'Enviando...' : 'Enviar exame'}
+              </button>
+            </form>
+
+            {/* Lista de exames */}
+            {examsLoading ? (
+              <div className="space-y-2">{[...Array(2)].map((_, i) => <div key={i} className="h-14 rounded-xl bg-white/5 animate-pulse" />)}</div>
+            ) : !exams || exams.length === 0 ? (
+              <div className="flex flex-col items-center gap-2 py-6 text-muted-foreground">
+                <FilePlus className="w-8 h-8" />
+                <span className="text-sm">Nenhum exame enviado ainda</span>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <p className="text-xs font-semibold text-indigo-400 uppercase tracking-wide">Histórico de exames</p>
+                {exams.map((exam: any) => (
+                  <div key={exam.id} className="glass rounded-xl p-3 flex items-center gap-3">
+                    <div className={cn('w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0',
+                      exam.fileType === 'PDF' ? 'bg-red-500/10' : 'bg-blue-500/10')}>
+                      <FileText className={cn('w-4 h-4', exam.fileType === 'PDF' ? 'text-red-400' : 'text-blue-400')} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">{exam.title}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {new Date(exam.examDate).toLocaleDateString('pt-BR')}
+                        {exam.notes && ` · ${exam.notes}`}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <a href={exam.fileUrl} target="_blank" rel="noopener noreferrer"
+                        className="w-7 h-7 rounded-lg hover:bg-accent flex items-center justify-center transition-all">
+                        <ExternalLink className="w-3.5 h-3.5 text-muted-foreground" />
+                      </a>
+                      <button type="button" onClick={() => deleteExamMutation.mutate(exam.id)}
+                        className="w-7 h-7 rounded-lg hover:bg-red-500/10 flex items-center justify-center transition-all">
+                        <Trash2 className="w-3.5 h-3.5 text-red-400" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </motion.div>
 
       {/* Quick actions */}
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }} className="glass-card">

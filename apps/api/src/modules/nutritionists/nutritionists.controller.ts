@@ -243,6 +243,24 @@ export class NutritionistsController {
     return this.service.updateSupplementationPlan(user.id, planId, body);
   }
 
+  @Get('me/patients/:studentId/exams')
+  @ApiOperation({ summary: 'Listar exames do paciente' })
+  getPatientExams(@CurrentUser() user: any, @Param('studentId') studentId: string) {
+    return this.service.getPatientExams(user.id, studentId);
+  }
+
+  @Post('me/patients/:studentId/exams')
+  @ApiOperation({ summary: 'Registrar exame do paciente' })
+  addPatientExam(@CurrentUser() user: any, @Param('studentId') studentId: string, @Body() body: any) {
+    return this.service.addPatientExam(user.id, studentId, body);
+  }
+
+  @Delete('me/patients/:studentId/exams/:examId')
+  @ApiOperation({ summary: 'Excluir exame do paciente' })
+  deletePatientExam(@CurrentUser() user: any, @Param('studentId') studentId: string, @Param('examId') examId: string) {
+    return this.service.deletePatientExam(user.id, studentId, examId);
+  }
+
   @Patch('me')
   @ApiOperation({ summary: 'Atualizar perfil do nutricionista' })
   update(@CurrentUser() user: any, @Body() body: any) {

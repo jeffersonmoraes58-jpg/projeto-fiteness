@@ -149,6 +149,29 @@ export class NutritionistsService {
     return { summary: { totalPatients, activePatients, consultationsLast30Days: consultations } };
   }
 
+  async getPatientExams(userId: string, studentId: string) {
+    const n = await this.getNutritionist(userId);
+    const relation = await this.prisma.nutritionistPatient.findFirst({ where: { nutritionistId: n.id, studentId } });
+    if (!relation) throw new NotFoundException('Paciente não encontrado');
+    return this.prisma.patientExam.findMany({
+      where: { studentId, nutritionistId: n.id },
+      orderBy: { examDate: 'desc' },
+    });
+  }
+
+  async addPatientExam(userId: string, studentId: string, data: any) {
+    const n = await this.getNutritionist(userId);
+    const relation = await this.prisma.nutritionistPatient.findFirst({ where: { nutritionistId: n.id, studentId } });
+    if (!relation) throw new NotFoundException('Paciente não encontrado');
+    return this.prisma.patientExam.create({ data: { studentId, nutritionistId: n.id, ...data } });
+  }
+
+  async deletePatientExam(userId: string, studentId: string, examId: string) {
+    const n = await this.getNutritionist(userId);
+    await this.prisma.patientExam.deleteMany({ where: { id: examId, studentId, nutritionistId: n.id } });
+    return { deleted: true };
+  }
+
   async update(userId: string, data: any) {
     const n = await this.getNutritionist(userId);
     const { profile, ...nData } = data;
