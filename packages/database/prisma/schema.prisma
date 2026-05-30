@@ -344,6 +344,7 @@ model Trainer {
   assessments     PhysicalAssessment[]
   pricing         TrainerPricing?
   studentBillings StudentBilling[]
+  challenges      Challenge[]
 
   @@map("trainers")
 }
@@ -451,6 +452,7 @@ model Student {
   physicalAssessments   PhysicalAssessment[]
   goals                 Goal[]
   challenges            StudentChallenge[]
+  lessonProgress        LessonProgress[]
   achievements          Achievement[]
   habits                Habit[]
   anamnesis             Anamnesis?
@@ -1010,13 +1012,18 @@ model Challenge {
   duration    Int
   targetValue Float?
   points      Int      @default(100)
+  price       Float    @default(0)
+  coverUrl    String?
   badgeUrl    String?
   startDate   DateTime
   endDate     DateTime
   isActive    Boolean  @default(true)
+  trainerId   String?
   createdAt   DateTime @default(now())
 
+  trainer      Trainer?          @relation(fields: [trainerId], references: [id], onDelete: SetNull)
   participants StudentChallenge[]
+  lessons      ChallengeLesson[]
 
   @@map("challenges")
 }
@@ -1029,12 +1036,63 @@ model StudentChallenge {
   progress    Float    @default(0)
   isCompleted Boolean  @default(false)
   completedAt DateTime?
+  isPaid      Boolean  @default(false)
+  paymentId   String?
 
   student   Student   @relation(fields: [studentId], references: [id])
   challenge Challenge @relation(fields: [challengeId], references: [id])
 
   @@unique([studentId, challengeId])
   @@map("student_challenges")
+}
+
+model ChallengeLesson {
+  id           String   @id @default(cuid())
+  challengeId  String
+  title        String
+  description  String?
+  order        Int      @default(0)
+  type         String   @default("video")
+  contentUrl   String?
+  thumbnailUrl String?
+  duration     Int?
+  isFree       Boolean  @default(false)
+  createdAt    DateTime @default(now())
+
+  challenge   Challenge          @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+  attachments LessonAttachment[]
+  progress    LessonProgress[]
+
+  @@map("challenge_lessons")
+}
+
+model LessonAttachment {
+  id       String @id @default(cuid())
+  lessonId String
+  name     String
+  url      String
+  type     String
+  size     Int?
+
+  lesson ChallengeLesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+
+  @@map("lesson_attachments")
+}
+
+model LessonProgress {
+  id          String    @id @default(cuid())
+  studentId   String
+  lessonId    String
+  progress    Float     @default(0)
+  isCompleted Boolean   @default(false)
+  completedAt DateTime?
+  updatedAt   DateTime  @updatedAt
+
+  student Student         @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  lesson  ChallengeLesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+
+  @@unique([studentId, lessonId])
+  @@map("lesson_progress")
 }
 
 model Achievement {

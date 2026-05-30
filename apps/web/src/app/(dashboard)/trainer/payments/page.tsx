@@ -121,7 +121,9 @@ export default function TrainerPayments() {
 
   const arr = Array.isArray(billings) ? billings : [];
   const studentsArr = Array.isArray(students) ? students : [];
-  const billedUserIds = new Set(arr.map((b: any) => b.studentUserId));
+  const billedUserIds = new Set(
+    arr.filter((b: any) => b.status !== 'CANCELLED').map((b: any) => b.studentUserId),
+  );
   const unbilledStudents = studentsArr.filter((s: any) => !billedUserIds.has(s.userId));
   const active  = arr.filter((b: any) => b.status === 'ACTIVE');
   const pending = arr.filter((b: any) => b.status === 'PENDING');
@@ -248,6 +250,13 @@ export default function TrainerPayments() {
                       </div>
                     </div>
                     <div className="flex items-center gap-1.5 flex-shrink-0">
+                      {b.status === 'CANCELLED' && (
+                        <button
+                          onClick={() => { setSubscribeModal({ userId: b.studentUserId, name: b.studentName }); setSubscribeDueDate(defaultDueDate()); }}
+                          className="text-xs px-2.5 py-1.5 rounded-lg bg-primary/20 text-primary hover:bg-primary/30 transition-all flex items-center gap-1">
+                          <Plus className="w-3 h-3" /> Nova cobrança
+                        </button>
+                      )}
                       {(b.latestInvoice?.status === 'PENDING' || b.latestInvoice?.status === 'OVERDUE') && (
                         <button onClick={() => markPaidMut.mutate(b.latestInvoice.id)}
                           disabled={markPaidMut.isPending}

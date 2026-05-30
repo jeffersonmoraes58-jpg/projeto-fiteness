@@ -19,6 +19,7 @@ const navByRole: Record<string, NavItem[]> = {
     { icon: Users, label: 'Alunos', href: '/trainer/students' },
     { icon: Dumbbell, label: 'Treinos', href: '/trainer/workouts' },
     { icon: Activity, label: 'Exercícios', href: '/trainer/exercises' },
+    { icon: Trophy, label: 'Desafios', href: '/trainer/challenges' },
     { icon: Calendar, label: 'Agenda', href: '/trainer/schedule' },
     { icon: MessageCircle, label: 'Chat', href: '/trainer/chat', badge: 3 },
     { icon: BarChart3, label: 'Relatórios', href: '/trainer/reports' },

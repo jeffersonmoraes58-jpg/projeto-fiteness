@@ -2,7 +2,7 @@ import { Injectable, BadRequestException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { v2 as cloudinary, UploadApiResponse } from 'cloudinary';
 
-export type UploadFolder = 'avatars' | 'progress-photos' | 'documents';
+export type UploadFolder = 'avatars' | 'progress-photos' | 'documents' | 'challenge-covers' | 'lesson-content' | 'lesson-attachments';
 
 @Injectable()
 export class UploadsService {
@@ -21,6 +21,14 @@ export class UploadsService {
   ): Promise<{ url: string; publicId: string }> {
     const result = await this.uploadToCloudinary(buffer, folder);
     return { url: result.secure_url, publicId: result.public_id };
+  }
+
+  async uploadFileRaw(
+    buffer: Buffer,
+    originalname: string,
+    folder: UploadFolder,
+  ): Promise<UploadApiResponse> {
+    return this.uploadToCloudinary(buffer, folder);
   }
 
   async deleteFile(publicId: string): Promise<void> {

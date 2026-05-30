@@ -3,7 +3,7 @@
 import { motion } from 'framer-motion';
 import {
   Users, Dumbbell, TrendingUp, DollarSign,
-  Activity, Calendar, MessageCircle, Star,
+  Activity, Calendar, MessageCircle, Star, Trophy,
   ArrowUpRight, Plus, ChevronRight,
 } from 'lucide-react';
 import Link from 'next/link';
@@ -102,6 +102,7 @@ export default function TrainerDashboard() {
               {[
                 { label: 'Criar treino', icon: Dumbbell, href: '/trainer/workouts/new', color: 'text-purple-400' },
                 { label: 'Adicionar aluno', icon: Users, href: '/trainer/students/new', color: 'text-cyan-400' },
+                { label: 'Desafios', icon: Trophy, href: '/trainer/challenges', color: 'text-yellow-400' },
                 { label: 'Agendar aula', icon: Calendar, href: '/trainer/schedule', color: 'text-emerald-400' },
                 { label: 'Ver mensagens', icon: MessageCircle, href: '/trainer/chat', color: 'text-orange-400' },
                 { label: 'Relatórios', icon: TrendingUp, href: '/trainer/reports', color: 'text-pink-400' },
