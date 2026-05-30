@@ -46,6 +46,7 @@ const navByRole: Record<string, NavItem[]> = {
     { icon: Trophy, label: 'Conquistas', href: '/student/achievements' },
     { icon: Star, label: 'Desafios', href: '/student/challenges' },
     { icon: MessageCircle, label: 'Chat', href: '/student/chat', badge: 1 },
+    { icon: CreditCard, label: 'Pagamentos', href: '/student/billing' },
     { icon: Settings, label: 'Perfil', href: '/student/profile' },
   ],
   ADMIN: [

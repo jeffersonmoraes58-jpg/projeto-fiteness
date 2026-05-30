@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import * as bcrypt from 'bcryptjs';
 
@@ -136,6 +136,23 @@ export class NutritionistsService {
   async addFood(userId: string, data: any) {
     const n = await this.getNutritionist(userId);
     return this.prisma.foodDatabase.create({ data: { nutritionistId: n.id, ...data } });
+  }
+
+  async updateFood(userId: string, foodId: string, data: any) {
+    const n = await this.getNutritionist(userId);
+    const food = await this.prisma.foodDatabase.findUnique({ where: { id: foodId } });
+    if (!food) throw new NotFoundException('Alimento não encontrado');
+    if (food.nutritionistId !== n.id) throw new ForbiddenException('Sem permissão para editar este alimento');
+    return this.prisma.foodDatabase.update({ where: { id: foodId }, data });
+  }
+
+  async deleteFood(userId: string, foodId: string) {
+    const n = await this.getNutritionist(userId);
+    const food = await this.prisma.foodDatabase.findUnique({ where: { id: foodId } });
+    if (!food) throw new NotFoundException('Alimento não encontrado');
+    if (food.nutritionistId !== n.id) throw new ForbiddenException('Sem permissão para excluir este alimento');
+    await this.prisma.foodDatabase.delete({ where: { id: foodId } });
+    return { deleted: true };
   }
 
   async getReports(userId: string) {

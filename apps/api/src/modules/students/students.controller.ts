@@ -41,6 +41,18 @@ export class StudentsController {
     return this.service.getDietPlan(user.id);
   }
 
+  @Post('me/meal-logs')
+  @ApiOperation({ summary: 'Registrar refeição concluída' })
+  logMeal(@CurrentUser() user: any, @Body() body: any) {
+    return this.service.logMeal(user.id, body);
+  }
+
+  @Get('me/meal-logs/today')
+  @ApiOperation({ summary: 'Logs de refeição de hoje' })
+  getMealLogsToday(@CurrentUser() user: any) {
+    return this.service.getMealLogsToday(user.id);
+  }
+
   @Post('me/water')
   @ApiOperation({ summary: 'Registrar consumo de água' })
   logWater(@CurrentUser() user: any, @Body() body: { amount: number }) {

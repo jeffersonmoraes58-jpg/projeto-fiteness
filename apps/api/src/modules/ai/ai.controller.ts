@@ -39,9 +39,9 @@ export class AiController {
   @ApiOperation({ summary: 'Chat com assistente fitness IA' })
   chat(
     @CurrentUser('id') userId: string,
-    @Body() body: { message: string; history?: any[] },
+    @Body() body: { message: string; history?: any[]; context?: string },
   ) {
-    return this.aiService.chatWithAssistant(userId, body.message, body.history);
+    return this.aiService.chatWithAssistant(userId, body.message, body.history, body.context);
   }
 
   @Post('analyze-photo')

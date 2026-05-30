@@ -63,27 +63,55 @@ CREATE TABLE IF NOT EXISTS "patient_exams" (
     CONSTRAINT "patient_exams_pkey" PRIMARY KEY ("id")
 );
 
--- AddForeignKey clinical_notes
-ALTER TABLE "clinical_notes" ADD CONSTRAINT "clinical_notes_studentId_fkey"
-    FOREIGN KEY ("studentId") REFERENCES "students"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+-- AddForeignKey clinical_notes (idempotent)
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'clinical_notes_studentId_fkey') THEN
+    ALTER TABLE "clinical_notes" ADD CONSTRAINT "clinical_notes_studentId_fkey"
+      FOREIGN KEY ("studentId") REFERENCES "students"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+  END IF;
+END $$;
 
-ALTER TABLE "clinical_notes" ADD CONSTRAINT "clinical_notes_nutritionistId_fkey"
-    FOREIGN KEY ("nutritionistId") REFERENCES "nutritionists"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'clinical_notes_nutritionistId_fkey') THEN
+    ALTER TABLE "clinical_notes" ADD CONSTRAINT "clinical_notes_nutritionistId_fkey"
+      FOREIGN KEY ("nutritionistId") REFERENCES "nutritionists"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+  END IF;
+END $$;
 
--- AddForeignKey supplementation_plans
-ALTER TABLE "supplementation_plans" ADD CONSTRAINT "supplementation_plans_studentId_fkey"
-    FOREIGN KEY ("studentId") REFERENCES "students"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+-- AddForeignKey supplementation_plans (idempotent)
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'supplementation_plans_studentId_fkey') THEN
+    ALTER TABLE "supplementation_plans" ADD CONSTRAINT "supplementation_plans_studentId_fkey"
+      FOREIGN KEY ("studentId") REFERENCES "students"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+  END IF;
+END $$;
 
-ALTER TABLE "supplementation_plans" ADD CONSTRAINT "supplementation_plans_nutritionistId_fkey"
-    FOREIGN KEY ("nutritionistId") REFERENCES "nutritionists"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'supplementation_plans_nutritionistId_fkey') THEN
+    ALTER TABLE "supplementation_plans" ADD CONSTRAINT "supplementation_plans_nutritionistId_fkey"
+      FOREIGN KEY ("nutritionistId") REFERENCES "nutritionists"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+  END IF;
+END $$;
 
--- AddForeignKey supplementation_plan_items
-ALTER TABLE "supplementation_plan_items" ADD CONSTRAINT "supplementation_plan_items_planId_fkey"
-    FOREIGN KEY ("planId") REFERENCES "supplementation_plans"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+-- AddForeignKey supplementation_plan_items (idempotent)
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'supplementation_plan_items_planId_fkey') THEN
+    ALTER TABLE "supplementation_plan_items" ADD CONSTRAINT "supplementation_plan_items_planId_fkey"
+      FOREIGN KEY ("planId") REFERENCES "supplementation_plans"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+  END IF;
+END $$;
 
--- AddForeignKey patient_exams
-ALTER TABLE "patient_exams" ADD CONSTRAINT "patient_exams_studentId_fkey"
-    FOREIGN KEY ("studentId") REFERENCES "students"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+-- AddForeignKey patient_exams (idempotent)
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'patient_exams_studentId_fkey') THEN
+    ALTER TABLE "patient_exams" ADD CONSTRAINT "patient_exams_studentId_fkey"
+      FOREIGN KEY ("studentId") REFERENCES "students"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+  END IF;
+END $$;
 
-ALTER TABLE "patient_exams" ADD CONSTRAINT "patient_exams_nutritionistId_fkey"
-    FOREIGN KEY ("nutritionistId") REFERENCES "nutritionists"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'patient_exams_nutritionistId_fkey') THEN
+    ALTER TABLE "patient_exams" ADD CONSTRAINT "patient_exams_nutritionistId_fkey"
+      FOREIGN KEY ("nutritionistId") REFERENCES "nutritionists"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+  END IF;
+END $$;

@@ -24,7 +24,7 @@ export class DietsService {
     const n = await this.getNutritionist(userId);
     const diet = await this.prisma.diet.findUnique({
       where: { id },
-      include: { meals: { include: { foods: true }, orderBy: { order: 'asc' } } },
+      include: { meals: { include: { foods: { include: { food: true } } }, orderBy: { order: 'asc' } } },
     });
     if (!diet) throw new NotFoundException('Dieta não encontrada');
     if (diet.nutritionistId !== n.id) throw new ForbiddenException();
@@ -78,11 +78,24 @@ export class DietsService {
               carbs: m.carbs ?? null,
               fat: m.fat ?? null,
               notes: m.notes ?? null,
+              ...(m.foods?.length > 0 && {
+                foods: {
+                  create: m.foods.map((f: any) => ({
+                    foodId: f.foodId,
+                    quantity: f.quantity,
+                    unit: f.unit ?? 'g',
+                    calories: f.calories,
+                    protein: f.protein,
+                    carbs: f.carbs,
+                    fat: f.fat,
+                  })),
+                },
+              }),
             })),
           },
         }),
       },
-      include: { meals: { include: { foods: true }, orderBy: { order: 'asc' } } },
+      include: { meals: { include: { foods: { include: { food: true } } }, orderBy: { order: 'asc' } } },
     });
   }
 

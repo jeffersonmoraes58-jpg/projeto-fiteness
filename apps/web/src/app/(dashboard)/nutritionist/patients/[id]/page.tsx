@@ -223,6 +223,8 @@ export default function PatientDetailPage() {
   const { id } = useParams();
   const qc = useQueryClient();
 
+  const [activeTab, setActiveTab] = useState<'overview' | 'avaliacoes' | 'evolucao' | 'planos' | 'prontuario'>('overview');
+
   const [selectedDiet, setSelectedDiet] = useState('');
   const [dietError, setDietError] = useState('');
   const [dietSuccess, setDietSuccess] = useState(false);
@@ -321,7 +323,7 @@ export default function PatientDetailPage() {
 
   const { data: anamnesis, isLoading: anamnesisLoading } = useQuery({
     queryKey: ['anamnesis', id],
-    queryFn: () => api.get(`/nutritionists/me/patients/${id}/anamnesis`).then((r) => r.data),
+    queryFn: () => api.get(`/nutritionists/me/patients/${id}/anamnesis`).then((r) => r.data?.data ?? r.data),
     enabled: !!patient && anamnesisOpen,
   });
 
@@ -354,7 +356,7 @@ export default function PatientDetailPage() {
   const { data: assessments, isLoading: assessmentsLoading } = useQuery({
     queryKey: ['nutritional-assessments', id],
     queryFn: () =>
-      api.get(`/nutritionists/me/patients/${id}/nutritional-assessments`).then((r) => r.data),
+      api.get(`/nutritionists/me/patients/${id}/nutritional-assessments`).then((r) => r.data?.data ?? r.data),
     enabled: !!patient && assessmentOpen,
   });
 
@@ -424,7 +426,7 @@ export default function PatientDetailPage() {
   const { data: physicalAssessments, isLoading: physicalLoading } = useQuery({
     queryKey: ['physical-assessments', id],
     queryFn: () =>
-      api.get(`/nutritionists/me/patients/${id}/physical-assessments`).then((r) => r.data),
+      api.get(`/nutritionists/me/patients/${id}/physical-assessments`).then((r) => r.data?.data ?? r.data),
     enabled: !!patient && physicalOpen,
   });
 
@@ -487,7 +489,7 @@ export default function PatientDetailPage() {
 
   const { data: clinicalNotes, isLoading: notesLoading } = useQuery({
     queryKey: ['clinical-notes', id],
-    queryFn: () => api.get(`/nutritionists/me/patients/${id}/clinical-notes`).then((r) => r.data),
+    queryFn: () => api.get(`/nutritionists/me/patients/${id}/clinical-notes`).then((r) => r.data?.data ?? r.data),
     enabled: !!patient && notesOpen,
   });
 
@@ -539,7 +541,7 @@ export default function PatientDetailPage() {
   const { data: dietHistory, isLoading: dietHistoryLoading } = useQuery({
     queryKey: ['patient-diet-history', id],
     queryFn: () =>
-      api.get(`/nutritionists/me/patients/${id}/diet-history`).then((r) => r.data),
+      api.get(`/nutritionists/me/patients/${id}/diet-history`).then((r) => r.data?.data ?? r.data),
     enabled: !!patient && dietHistoryOpen,
   });
 
@@ -552,7 +554,7 @@ export default function PatientDetailPage() {
 
   const { data: goals, isLoading: goalsLoading } = useQuery({
     queryKey: ['patient-goals', id],
-    queryFn: () => api.get(`/nutritionists/me/patients/${id}/goals`).then((r) => r.data),
+    queryFn: () => api.get(`/nutritionists/me/patients/${id}/goals`).then((r) => r.data?.data ?? r.data),
     enabled: !!patient && goalsOpen,
   });
 
@@ -612,7 +614,7 @@ export default function PatientDetailPage() {
   const { data: progressPhotos, isLoading: photosLoading } = useQuery({
     queryKey: ['progress-photos', id],
     queryFn: () =>
-      api.get(`/nutritionists/me/patients/${id}/progress-photos`).then((r) => r.data),
+      api.get(`/nutritionists/me/patients/${id}/progress-photos`).then((r) => r.data?.data ?? r.data),
     enabled: !!patient && photosOpen,
   });
 
@@ -680,7 +682,7 @@ export default function PatientDetailPage() {
   const { data: weightLog, isLoading: weightLogLoading } = useQuery({
     queryKey: ['weight-log', id],
     queryFn: () =>
-      api.get(`/nutritionists/me/patients/${id}/weight-log`).then((r) => r.data),
+      api.get(`/nutritionists/me/patients/${id}/weight-log`).then((r) => r.data?.data ?? r.data),
     enabled: !!patient && weightLogOpen,
   });
 
@@ -730,7 +732,7 @@ export default function PatientDetailPage() {
   const { data: evolution, isLoading: evolutionLoading } = useQuery({
     queryKey: ['patient-evolution', id],
     queryFn: () =>
-      api.get(`/nutritionists/me/patients/${id}/evolution`).then((r) => r.data),
+      api.get(`/nutritionists/me/patients/${id}/evolution`).then((r) => r.data?.data ?? r.data),
     enabled: !!patient && evolutionOpen,
   });
 
@@ -760,7 +762,7 @@ export default function PatientDetailPage() {
   const { data: consultations, isLoading: consultLoading } = useQuery({
     queryKey: ['patient-consultations', id],
     queryFn: () =>
-      api.get(`/nutritionists/me/patients/${id}/consultations`).then((r) => r.data),
+      api.get(`/nutritionists/me/patients/${id}/consultations`).then((r) => r.data?.data ?? r.data),
     enabled: !!patient && consultOpen,
   });
 
@@ -813,7 +815,7 @@ export default function PatientDetailPage() {
   const { data: suppPlans, isLoading: suppLoading } = useQuery({
     queryKey: ['supplementation-plans', id],
     queryFn: () =>
-      api.get(`/nutritionists/me/patients/${id}/supplementation-plans`).then((r) => r.data),
+      api.get(`/nutritionists/me/patients/${id}/supplementation-plans`).then((r) => r.data?.data ?? r.data),
     enabled: !!patient && suppOpen,
   });
 
@@ -1037,6 +1039,31 @@ export default function PatientDetailPage() {
         <h1 className="text-2xl font-bold">Perfil do Paciente</h1>
       </div>
 
+      {/* Tab navigation */}
+      <div className="glass rounded-2xl p-1 flex gap-1 overflow-x-auto">
+        {([
+          { key: 'overview', label: 'Visão Geral' },
+          { key: 'avaliacoes', label: 'Avaliações' },
+          { key: 'evolucao', label: 'Evolução' },
+          { key: 'planos', label: 'Planos' },
+          { key: 'prontuario', label: 'Prontuário' },
+        ] as const).map((tab) => (
+          <button
+            key={tab.key}
+            type="button"
+            onClick={() => setActiveTab(tab.key)}
+            className={cn(
+              'flex-1 py-2 px-3 rounded-xl text-sm font-medium whitespace-nowrap transition-all',
+              activeTab === tab.key
+                ? 'bg-primary text-primary-foreground shadow'
+                : 'text-muted-foreground hover:bg-accent',
+            )}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
       {/* Profile card */}
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="glass-card">
         <div className="flex items-center gap-4 mb-6">
@@ -1086,6 +1113,9 @@ export default function PatientDetailPage() {
           <p className="text-muted-foreground">{GOAL_LABELS[patient.goalType] || patient.goalType}</p>
         </motion.div>
       )}
+
+      {/* ===== Tab: Visão Geral ===== */}
+      {activeTab === 'overview' && (<>
 
       {/* Anamnese nutricional */}
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }} className="glass-card">
@@ -1279,6 +1309,31 @@ export default function PatientDetailPage() {
           </form>
         )}
       </motion.div>
+
+      {/* Quick actions (Visão Geral) */}
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }} className="glass-card">
+        <h2 className="font-semibold mb-4">Ações rápidas</h2>
+        <div className="grid grid-cols-2 gap-3">
+          <Link href="/nutritionist/diets/new" className="glass rounded-xl p-4 flex items-center gap-3 hover:bg-accent transition-all">
+            <Apple className="w-5 h-5 text-emerald-400" />
+            <div>
+              <div className="text-sm font-medium">Nova dieta</div>
+              <div className="text-xs text-muted-foreground">Criar plano alimentar</div>
+            </div>
+          </Link>
+          <Link href="/nutritionist/schedule" className="glass rounded-xl p-4 flex items-center gap-3 hover:bg-accent transition-all">
+            <Calendar className="w-5 h-5 text-cyan-400" />
+            <div>
+              <div className="text-sm font-medium">Agendar consulta</div>
+              <div className="text-xs text-muted-foreground">Marcar sessão</div>
+            </div>
+          </Link>
+        </div>
+      </motion.div>
+
+      </>)}
+      {/* ===== Tab: Avaliações ===== */}
+      {activeTab === 'avaliacoes' && (<>
 
       {/* Avaliação nutricional */}
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="glass-card">
@@ -1772,6 +1827,10 @@ export default function PatientDetailPage() {
         )}
       </motion.div>
 
+      </>)}
+      {/* ===== Tab: Prontuário ===== */}
+      {activeTab === 'prontuario' && (<>
+
       {/* Notas e observações clínicas */}
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.249 }} className="glass-card">
         <button type="button" onClick={() => setNotesOpen((o) => !o)} className="w-full flex items-center justify-between">
@@ -1944,6 +2003,10 @@ export default function PatientDetailPage() {
         )}
       </motion.div>
 
+      </>)}
+      {/* ===== Tab: Planos (part 1 – diet history) ===== */}
+      {activeTab === 'planos' && (<>
+
       {/* Histórico de dietas */}
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.250 }} className="glass-card">
         <button type="button" onClick={() => setDietHistoryOpen((o) => !o)} className="w-full flex items-center justify-between">
@@ -2061,6 +2124,10 @@ export default function PatientDetailPage() {
           </div>
         )}
       </motion.div>
+
+      </>)}
+      {/* ===== Tab: Evolução ===== */}
+      {activeTab === 'evolucao' && (<>
 
       {/* Metas e objetivos */}
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.251 }} className="glass-card">
@@ -2703,6 +2770,10 @@ export default function PatientDetailPage() {
         )}
       </motion.div>
 
+      </>)}
+      {/* ===== Tab: Avaliações (part 2 – consultations) ===== */}
+      {activeTab === 'avaliacoes' && (<>
+
       {/* Registro de consulta nutricional */}
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.27 }} className="glass-card">
         <button type="button" onClick={() => setConsultOpen((o) => !o)} className="w-full flex items-center justify-between">
@@ -2852,6 +2923,10 @@ export default function PatientDetailPage() {
           </div>
         )}
       </motion.div>
+
+      </>)}
+      {/* ===== Tab: Planos (part 2 – supp/assign/exams) ===== */}
+      {activeTab === 'planos' && (<>
 
       {/* Plano de suplementação */}
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.28 }} className="glass-card">
@@ -3274,26 +3349,7 @@ export default function PatientDetailPage() {
         )}
       </motion.div>
 
-      {/* Quick actions */}
-      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }} className="glass-card">
-        <h2 className="font-semibold mb-4">Ações rápidas</h2>
-        <div className="grid grid-cols-2 gap-3">
-          <Link href="/nutritionist/diets/new" className="glass rounded-xl p-4 flex items-center gap-3 hover:bg-accent transition-all">
-            <Apple className="w-5 h-5 text-emerald-400" />
-            <div>
-              <div className="text-sm font-medium">Nova dieta</div>
-              <div className="text-xs text-muted-foreground">Criar plano alimentar</div>
-            </div>
-          </Link>
-          <Link href="/nutritionist/schedule" className="glass rounded-xl p-4 flex items-center gap-3 hover:bg-accent transition-all">
-            <Calendar className="w-5 h-5 text-cyan-400" />
-            <div>
-              <div className="text-sm font-medium">Agendar consulta</div>
-              <div className="text-xs text-muted-foreground">Marcar sessão</div>
-            </div>
-          </Link>
-        </div>
-      </motion.div>
+      </>)}
     </div>
   );
 }

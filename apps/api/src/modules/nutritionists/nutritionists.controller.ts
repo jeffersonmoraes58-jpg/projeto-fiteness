@@ -69,6 +69,18 @@ export class NutritionistsController {
     return this.service.addFood(user.id, body);
   }
 
+  @Patch('me/foods/:foodId')
+  @ApiOperation({ summary: 'Editar alimento da base' })
+  updateFood(@CurrentUser() user: any, @Param('foodId') foodId: string, @Body() body: any) {
+    return this.service.updateFood(user.id, foodId, body);
+  }
+
+  @Delete('me/foods/:foodId')
+  @ApiOperation({ summary: 'Excluir alimento da base' })
+  deleteFood(@CurrentUser() user: any, @Param('foodId') foodId: string) {
+    return this.service.deleteFood(user.id, foodId);
+  }
+
   @Get('me/reports')
   @ApiOperation({ summary: 'Relatórios dos últimos 30 dias' })
   getReports(@CurrentUser() user: any) {

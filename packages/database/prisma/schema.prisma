@@ -154,6 +154,26 @@ enum CheckInStatus {
   PARTIAL
 }
 
+enum BillingInterval {
+  MONTHLY
+  ANNUAL
+}
+
+enum StudentBillingStatus {
+  PENDING
+  ACTIVE
+  OVERDUE
+  SUSPENDED
+  CANCELLED
+}
+
+enum InvoiceStatus {
+  PENDING
+  PAID
+  OVERDUE
+  CANCELLED
+}
+
 // ================================================
 // TENANT (Multi-tenant / White-label)
 // ================================================
@@ -322,6 +342,8 @@ model Trainer {
   exercises       Exercise[]
   appointments    Appointment[]
   assessments     PhysicalAssessment[]
+  pricing         TrainerPricing?
+  studentBillings StudentBilling[]
 
   @@map("trainers")
 }
@@ -436,6 +458,7 @@ model Student {
   supplementationPlans  SupplementationPlan[]
   clinicalNotes         ClinicalNote[]
   patientExams          PatientExam[]
+  billings              StudentBilling[]
 
   @@map("students")
 }
@@ -708,6 +731,7 @@ model FoodDatabase {
   sodium         Float?
   sugar          Float?
   saturatedFat   Float?
+  category       String   @default("outros")
   isPublic       Boolean  @default(false)
   barcode        String?
   createdAt      DateTime @default(now())
@@ -808,6 +832,7 @@ model MealLog {
   fat        Float    @default(0)
   notes      String?
   photoUrl   String?
+  mood       String?
 
   student  Student  @relation(fields: [studentId], references: [id])
   dietPlan DietPlan? @relation(fields: [dietPlanId], references: [id])
@@ -1191,6 +1216,64 @@ model Coupon {
   createdAt    DateTime @default(now())
 
   @@map("coupons")
+}
+
+// ================================================
+// BILLING (Trainer → Student)
+// ================================================
+
+model TrainerPricing {
+  id             String   @id @default(cuid())
+  trainerId      String   @unique
+  monthlyPrice   Float?
+  annualPrice    Float?
+  mpAccessToken  String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  trainer Trainer @relation(fields: [trainerId], references: [id], onDelete: Cascade)
+
+  @@map("trainer_pricing")
+}
+
+model StudentBilling {
+  id          String               @id @default(cuid())
+  studentId   String
+  trainerId   String
+  interval    BillingInterval      @default(MONTHLY)
+  amount      Float
+  status      StudentBillingStatus @default(PENDING)
+  startDate   DateTime             @default(now())
+  nextDueDate DateTime
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+
+  student  Student   @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  trainer  Trainer   @relation(fields: [trainerId], references: [id])
+  invoices Invoice[]
+
+  @@unique([studentId, trainerId])
+  @@map("student_billings")
+}
+
+model Invoice {
+  id              String        @id @default(cuid())
+  billingId       String
+  amount          Float
+  status          InvoiceStatus @default(PENDING)
+  dueDate         DateTime
+  paidAt          DateTime?
+  description     String?
+  mpPaymentId     String?
+  pixQrCode       String?
+  pixQrCodeBase64 String?
+  pixExpiresAt    DateTime?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  billing StudentBilling @relation(fields: [billingId], references: [id], onDelete: Cascade)
+
+  @@map("invoices")
 }
 
 // ================================================

@@ -104,12 +104,21 @@ export class TrainersService {
 
   async getPayments(userId: string) {
     const trainer = await this.getTrainer(userId);
-    const students = await this.prisma.trainerStudent.findMany({
-      where: { trainerId: trainer.id, isActive: true },
+    const allStudents = await this.prisma.trainerStudent.findMany({
+      where: { trainerId: trainer.id },
       include: { student: { include: { user: { include: { profile: true } } } } },
+      orderBy: { createdAt: 'desc' },
     });
-    const mrr = students.reduce((s, r) => s + (r.monthlyFee || 0), 0);
-    return { mrr, students };
+    const active = allStudents.filter((s) => s.isActive);
+    const mrr = active.reduce((sum, s) => sum + (s.monthlyFee || 0), 0);
+    const fees = allStudents.map((s) => ({
+      id: s.id,
+      studentName: `${s.student.user.profile?.firstName ?? ''} ${s.student.user.profile?.lastName ?? ''}`.trim() || s.student.user.email,
+      amount: s.monthlyFee ?? 0,
+      isActive: s.isActive,
+      since: s.createdAt,
+    }));
+    return { mrr, activeCount: active.length, totalCount: allStudents.length, fees };
   }
 
   async update(userId: string, data: any) {

@@ -136,6 +136,90 @@ export default function StudentWorkout() {
 
   const closeVideo = useCallback(() => setVideoModal(null), []);
 
+  function downloadWorkoutPDF() {
+    if (!workoutPlans?.length) { toast.error('Nenhum plano de treino carregado'); return; }
+
+    const date = new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' });
+
+    const dayBlocks = workoutPlans.map((plan: any) => {
+      const days = (plan.dayOfWeek ?? []).map((d: number) => DAYS[d]).join(', ');
+      const exercises = (plan.workout?.exercises ?? []).map((ex: any, i: number) => `
+        <tr>
+          <td style="padding:8px 12px;font-size:13px;color:#111827;">${i + 1}. ${ex.exercise?.name ?? '—'}</td>
+          <td style="padding:8px 8px;text-align:center;font-size:13px;color:#374151;">${ex.sets}</td>
+          <td style="padding:8px 8px;text-align:center;font-size:13px;color:#374151;">${ex.reps ?? '—'}</td>
+          <td style="padding:8px 8px;text-align:center;font-size:13px;color:#374151;">${ex.weight ? ex.weight + ' kg' : '—'}</td>
+          <td style="padding:8px 8px;text-align:center;font-size:13px;color:#374151;">${ex.restSeconds ? ex.restSeconds + 's' : '—'}</td>
+          <td style="padding:8px 12px;font-size:12px;color:#6b7280;">${ex.exercise?.muscleGroup ?? '—'}</td>
+        </tr>
+        ${ex.notes ? `<tr><td colspan="6" style="padding:0 12px 8px 28px;font-size:11px;color:#9ca3af;font-style:italic;">Obs: ${ex.notes}</td></tr>` : ''}
+      `).join('');
+
+      return `
+        <div class="plan-block">
+          <div class="plan-header">
+            <span class="plan-title">${plan.workout?.name ?? 'Treino'}</span>
+            <span class="plan-meta">${days} • ${plan.workout?.duration ?? 45} min • ${plan.workout?.exercises?.length ?? 0} exercícios</span>
+          </div>
+          ${plan.division ? `<div class="division">${plan.division}</div>` : ''}
+          <table>
+            <thead><tr>
+              <th style="text-align:left;">Exercício</th>
+              <th>Séries</th><th>Reps</th><th>Carga</th><th>Descanso</th><th style="text-align:left;">Músculo</th>
+            </tr></thead>
+            <tbody>${exercises || '<tr><td colspan="6" style="padding:8px 12px;color:#9ca3af;font-size:12px;">Nenhum exercício cadastrado</td></tr>'}</tbody>
+          </table>
+        </div>`;
+    }).join('');
+
+    const html = `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">
+    <title>Plano de Treino — FitSaaS</title>
+    <style>
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      body { font-family: 'Segoe UI', Arial, sans-serif; color: #111827; background: #fff; padding: 32px; }
+      @media print {
+        body { padding: 16px; }
+        button { display: none !important; }
+        .plan-block { page-break-inside: avoid; }
+        @page { margin: 16mm 12mm; }
+      }
+      .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 28px; border-bottom: 2px solid #7c3aed; padding-bottom: 16px; }
+      .logo { font-size: 22px; font-weight: 700; color: #7c3aed; }
+      .subtitle { font-size: 12px; color: #6b7280; margin-top: 2px; }
+      .date { font-size: 12px; color: #6b7280; margin-top: 4px; text-align: right; }
+      .plan-block { margin-bottom: 28px; border: 1px solid #e5e7eb; border-radius: 12px; overflow: hidden; }
+      .plan-header { background: #7c3aed; color: white; padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; }
+      .plan-title { font-size: 15px; font-weight: 600; }
+      .plan-meta { font-size: 12px; opacity: .8; }
+      .division { padding: 6px 16px; background: #f5f3ff; font-size: 12px; color: #7c3aed; font-weight: 500; }
+      table { width: 100%; border-collapse: collapse; }
+      thead th { background: #f9fafb; color: #6b7280; padding: 8px 12px; font-size: 11px; font-weight: 600; text-align: center; border-bottom: 1px solid #e5e7eb; }
+      thead th:first-child { text-align: left; }
+      tbody tr:nth-child(odd) { background: #fafafa; }
+      tbody tr:hover { background: #f5f3ff; }
+      .footer { margin-top: 24px; text-align: center; font-size: 11px; color: #9ca3af; border-top: 1px solid #e5e7eb; padding-top: 12px; }
+      .print-btn { position: fixed; bottom: 24px; right: 24px; background: #7c3aed; color: white; border: none; padding: 12px 20px; border-radius: 10px; font-size: 14px; font-weight: 600; cursor: pointer; box-shadow: 0 4px 12px rgba(124,58,237,.4); }
+      .print-btn:hover { background: #6d28d9; }
+    </style></head><body>
+    <div class="header">
+      <div>
+        <div class="logo">FitSaaS</div>
+        <div class="subtitle">Plano de Treino</div>
+      </div>
+      <div class="date">Emitido em ${date}</div>
+    </div>
+    ${dayBlocks}
+    <div class="footer">Gerado pelo FitSaaS · Siga sempre as orientações do seu personal trainer</div>
+    <button class="print-btn" onclick="window.print()">⬇ Salvar PDF</button>
+    </body></html>`;
+
+    const w = window.open('', '_blank', 'width=960,height=720');
+    if (!w) { toast.error('Permita pop-ups para gerar o PDF'); return; }
+    w.document.write(html);
+    w.document.close();
+    w.focus();
+  }
+
   return (
     <>
       {videoModal && (
@@ -165,9 +249,21 @@ export default function StudentWorkout() {
             <h1 className="text-2xl font-bold">Meu Treino</h1>
             <p className="text-muted-foreground text-sm mt-1">Selecione o dia e execute</p>
           </div>
-          <button className="glass rounded-xl p-2 hover:bg-accent transition-all">
-            <Filter className="w-4 h-4" />
-          </button>
+          <div className="flex items-center gap-2">
+            {workoutPlans?.length > 0 && (
+              <button
+                onClick={downloadWorkoutPDF}
+                className="btn-secondary flex items-center gap-2 text-sm py-2 px-3"
+                title="Baixar treino em PDF"
+              >
+                <Download className="w-4 h-4" />
+                PDF
+              </button>
+            )}
+            <button className="glass rounded-xl p-2 hover:bg-accent transition-all">
+              <Filter className="w-4 h-4" />
+            </button>
+          </div>
         </div>
 
         {/* Day selector */}

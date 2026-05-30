@@ -169,14 +169,20 @@ export class AiService {
     return JSON.parse(response.choices[0].message.content || '{}');
   }
 
-  async chatWithAssistant(userId: string, message: string, chatHistory: any[] = []) {
-    const systemPrompt = `
-      Você é um assistente fitness inteligente da plataforma FitSaaS.
-      Ajude com perguntas sobre treinos, nutrição, saúde e bem-estar.
-      Seja preciso, motivador e baseie suas respostas em evidências científicas.
-      Responda sempre em português brasileiro.
-      Se a pergunta for sobre condições médicas sérias, recomende consultar um profissional de saúde.
-    `;
+  async chatWithAssistant(userId: string, message: string, chatHistory: any[] = [], context?: string) {
+    const basePrompt = `Você é um assistente de nutrição especializado da plataforma FitSaaS.
+Responda sempre em português brasileiro de forma clara e baseada em evidências científicas.
+Se a pergunta envolver condição médica grave, oriente consultar um profissional de saúde.`;
+
+    const systemPrompt = context
+      ? `${basePrompt}
+
+ATENÇÃO: As configurações abaixo foram definidas pelo nutricionista responsável e DEVEM ser seguidas rigorosamente em TODAS as respostas, sem exceção. Ignore essas regras somente se houver risco de saúde iminente.
+
+${context}
+
+Resumo do que foi configurado acima: adapte 100% das suas respostas ao perfil, tom e foco definidos. Não responda de forma genérica — seja específico para o contexto configurado.`
+      : basePrompt;
 
     const messages = [
       { role: 'system' as const, content: systemPrompt },
@@ -187,7 +193,7 @@ export class AiService {
     const response = await this.openai.chat.completions.create({
       model: this.config.get('OPENAI_MODEL', 'gpt-4o'),
       messages,
-      max_tokens: 500,
+      max_tokens: 1200,
     });
 
     return {

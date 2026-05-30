@@ -23,6 +23,7 @@ import { AiModule } from './modules/ai/ai.module';
 import { AdminModule } from './modules/admin/admin.module';
 import { TenantsModule } from './modules/tenants/tenants.module';
 import { UploadsModule } from './modules/uploads/uploads.module';
+import { BillingModule } from './modules/billing/billing.module';
 
 @Module({
   imports: [
@@ -68,6 +69,7 @@ import { UploadsModule } from './modules/uploads/uploads.module';
     AdminModule,
     TenantsModule,
     UploadsModule,
+    BillingModule,
   ],
 })
 export class AppModule {}

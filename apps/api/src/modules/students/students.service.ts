@@ -34,7 +34,7 @@ export class StudentsService {
       }),
       this.prisma.dietPlan.findFirst({
         where: { studentId: student.id, isActive: true },
-        include: { diet: { include: { meals: { include: { foods: true } } } } },
+        include: { diet: { include: { meals: { include: { foods: { include: { food: true } } } } } } },
       }),
     ]);
 
@@ -167,10 +167,41 @@ export class StudentsService {
       include: {
         diet: {
           include: {
-            meals: { include: { foods: true }, orderBy: { order: 'asc' } },
+            meals: { include: { foods: { include: { food: true } } }, orderBy: { order: 'asc' } },
           },
         },
       },
+    });
+  }
+
+  async logMeal(userId: string, data: any) {
+    const student = await this.getStudent(userId);
+    const dietPlan = await this.prisma.dietPlan.findFirst({
+      where: { studentId: student.id, isActive: true },
+    });
+    return this.prisma.mealLog.create({
+      data: {
+        studentId: student.id,
+        dietPlanId: dietPlan?.id ?? null,
+        mealType: data.mealType,
+        calories: data.calories ?? 0,
+        protein: data.protein ?? 0,
+        carbs: data.carbs ?? 0,
+        fat: data.fat ?? 0,
+        mood: data.mood ?? null,
+        notes: data.notes ?? null,
+        photoUrl: data.photoUrl ?? null,
+      },
+    });
+  }
+
+  async getMealLogsToday(userId: string) {
+    const student = await this.getStudent(userId);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return this.prisma.mealLog.findMany({
+      where: { studentId: student.id, loggedAt: { gte: today } },
+      orderBy: { loggedAt: 'desc' },
     });
   }
 
