@@ -140,11 +140,14 @@ jobs:
             set -e
             cd /opt/fitsaas
 
-            # Pull latest images
+            # Update repo so docker-compose.prod.yml is current
+            git pull origin master
+
+            # Pull latest images from ghcr.io
             echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
             docker compose -f docker-compose.prod.yml pull api web
 
-            # Rolling restart (migrations run inside api entrypoint)
+            # Rolling restart
             docker compose -f docker-compose.prod.yml up -d --no-deps api web nginx
 
             # Cleanup old images
