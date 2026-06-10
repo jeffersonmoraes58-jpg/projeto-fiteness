@@ -70,6 +70,9 @@ services:
       SMTP_PASS: ${SMTP_PASS}
       SMTP_FROM: ${SMTP_FROM}
       MP_ACCESS_TOKEN: ${MP_ACCESS_TOKEN}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-disabled}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-disabled}
+      GOOGLE_CALLBACK_URL: ${GOOGLE_CALLBACK_URL:-disabled}
     depends_on:
       postgres:
         condition: service_healthy
