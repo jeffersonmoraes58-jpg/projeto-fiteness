@@ -80,7 +80,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 512M
+          memory: 300M
 
   web:
     build:
@@ -109,7 +109,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 512M
+          memory: 300M
 
   nginx:
     image: nginx:1.25-alpine
