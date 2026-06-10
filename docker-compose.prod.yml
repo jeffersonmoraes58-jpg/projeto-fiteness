@@ -43,7 +43,7 @@ services:
     build:
       context: .
       dockerfile: apps/api/Dockerfile
-    image: fitsaas-api:${IMAGE_TAG:-latest}
+    image: ghcr.io/jeffersonmoraes58-jpg/fitsaas-api:${IMAGE_TAG:-latest}
     container_name: fitsaas-api
     restart: always
     ports:
@@ -91,7 +91,7 @@ services:
         NEXT_PUBLIC_APP_URL: ${APP_URL}
         NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: ${NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY}
         NEXT_PUBLIC_SOCKET_URL: ${APP_URL}
-    image: fitsaas-web:${IMAGE_TAG:-latest}
+    image: ghcr.io/jeffersonmoraes58-jpg/fitsaas-web:${IMAGE_TAG:-latest}
     container_name: fitsaas-web
     restart: always
     ports:
