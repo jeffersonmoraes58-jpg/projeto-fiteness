@@ -81,7 +81,7 @@ export default function AdminSubscriptions() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="page-header">
         <div>
           <h1 className="text-2xl font-bold">Assinaturas</h1>
           <p className="text-muted-foreground text-sm mt-1">{subs.length} tenants cadastrados</p>

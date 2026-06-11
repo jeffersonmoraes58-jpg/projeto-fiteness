@@ -244,7 +244,7 @@ export default function StudentWorkout() {
 
       <div className="space-y-6 max-w-2xl mx-auto">
         {/* Header */}
-        <div className="flex items-center justify-between">
+        <div className="page-header">
           <div>
             <h1 className="text-2xl font-bold">Meu Treino</h1>
             <p className="text-muted-foreground text-sm mt-1">Selecione o dia e execute</p>

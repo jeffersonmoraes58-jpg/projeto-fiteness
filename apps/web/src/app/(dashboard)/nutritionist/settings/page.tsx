@@ -71,7 +71,7 @@ export default function NutritionistSettings() {
 
   return (
     <div className="space-y-6 max-w-2xl mx-auto">
-      <div className="flex items-center justify-between">
+      <div className="page-header">
         <h1 className="text-2xl font-bold">Configurações</h1>
         {!editing ? (
           <button onClick={() => {

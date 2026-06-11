@@ -390,14 +390,14 @@ export default function StudentProgress() {
 
       <div className="space-y-6">
         {/* Header */}
-        <div className="flex items-center justify-between">
+        <div className="page-header">
           <div>
             <h1 className="text-2xl font-bold">Minha Evolução</h1>
             <p className="text-muted-foreground text-sm mt-1">Acompanhe seu progresso ao longo do tempo</p>
           </div>
           <button
             onClick={() => setShowModal(true)}
-            className="btn-primary flex items-center gap-2 text-sm py-2"
+            className="btn-primary flex items-center gap-2 text-sm py-2 self-start sm:self-auto"
           >
             <Plus className="w-4 h-4" />
             Nova medição

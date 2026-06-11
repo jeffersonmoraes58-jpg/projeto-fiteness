@@ -65,7 +65,7 @@ export default function AdminTenants() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="page-header">
         <div>
           <h1 className="text-2xl font-bold">Academias & Estúdios</h1>
           <p className="text-muted-foreground text-sm mt-1">{total} tenants cadastrados na plataforma</p>

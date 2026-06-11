@@ -71,7 +71,7 @@ export default function AdminDashboard() {
   return (
     <div className="space-y-8">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="page-header">
         <div>
           <h1 className="text-2xl font-bold">Painel Administrativo</h1>
           <p className="text-muted-foreground text-sm mt-1">
