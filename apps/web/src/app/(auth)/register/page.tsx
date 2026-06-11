@@ -261,8 +261,16 @@ export default function RegisterPage() {
 
                   {needsTenantId && (
                     <div>
-                      <label className="text-xs text-muted-foreground mb-1 block">ID do Studio (fornecido pelo proprietário)</label>
-                      <input {...register('tenantId')} placeholder="ex: abc123-def456" className="input-field" />
+                      <label className="text-xs text-muted-foreground mb-1 block">Código do Studio *</label>
+                      <input
+                        {...register('tenantId')}
+                        placeholder="Cole aqui o código do seu studio"
+                        className="input-field"
+                        autoComplete="off"
+                      />
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Solicite esse código ao proprietário do studio ou academia.
+                      </p>
                       {errors.tenantId && <p className="text-xs text-destructive mt-1">{errors.tenantId.message}</p>}
                     </div>
                   )}
