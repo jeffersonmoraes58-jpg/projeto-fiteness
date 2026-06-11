@@ -1,13 +1,23 @@
 'use client';
 
 import { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Users, ChevronLeft, Search, UserPlus, UserCheck } from 'lucide-react';
+import { ChevronLeft, Search, UserPlus, UserCheck, Info } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
-type Mode = 'search' | 'create';
+import { cn } from '@/lib/utils';
+import { motion, AnimatePresence } from 'framer-motion';
+
+type Mode = 'create' | 'search';
+
+const GRUPOS = ['Online', 'Presencial', 'Híbrido', 'Domiciliar'];
+const GENEROS = ['Masculino', 'Feminino', 'Outro', 'Prefiro não dizer'];
+
+function generatePassword(len = 10) {
+  const chars = 'ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#';
+  return Array.from({ length: len }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+}
 
 function getTenantId(): string | undefined {
   try {
@@ -24,23 +34,48 @@ function getTenantId(): string | undefined {
   return undefined;
 }
 
+function FormField({ label, required, children, hint }: {
+  label: string; required?: boolean; children: React.ReactNode; hint?: string;
+}) {
+  return (
+    <div className="space-y-1.5">
+      <label className="text-sm font-medium text-foreground">
+        {label}{required && <span className="text-red-400 ml-0.5">*</span>}
+      </label>
+      {children}
+      {hint && (
+        <p className="text-xs text-primary flex items-start gap-1.5">
+          <Info className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
+          {hint}
+        </p>
+      )}
+    </div>
+  );
+}
+
 export default function NewStudentPage() {
   const router = useRouter();
-  const [mode, setMode] = useState<Mode>('search');
+  const [mode, setMode] = useState<Mode>('create');
   const [error, setError] = useState('');
 
-  // -- Search mode state --
+  // Create form
+  const [nomeCompleto, setNomeCompleto] = useState('');
+  const [email, setEmail] = useState('');
+  const [grupo, setGrupo] = useState('Online');
+  const [dataNascimento, setDataNascimento] = useState('');
+  const [whatsapp, setWhatsapp] = useState('');
+  const [genero, setGenero] = useState('Masculino');
+  const [enviarAcesso, setEnviarAcesso] = useState('Sim');
+  const [enviarAnamnese, setEnviarAnamnese] = useState('Não');
+  const [anamnese, setAnamnese] = useState('');
+  const [bloquearInadimplentes, setBloquearInadimplentes] = useState('Não');
+  const [mensalidade, setMensalidade] = useState('');
+  const [anamneseError, setAnamneseError] = useState(false);
+
+  // Search form
   const [search, setSearch] = useState('');
   const [selected, setSelected] = useState<any>(null);
-  const [monthlyFee, setMonthlyFee] = useState('');
-
-  // -- Create mode state --
-  const [firstName, setFirstName] = useState('');
-  const [lastName, setLastName] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [phone, setPhone] = useState('');
-  const [createFee, setCreateFee] = useState('');
+  const [searchFee, setSearchFee] = useState('');
 
   const { data: results, isFetching } = useQuery({
     queryKey: ['user-search', search],
@@ -52,19 +87,23 @@ export default function NewStudentPage() {
   const linkMutation = useMutation({
     mutationFn: (data: any) => api.post('/trainers/me/students', data),
     onSuccess: () => router.push('/trainer/students'),
-    onError: (e: any) => setError(e.message || e.response?.data?.message || 'Erro ao adicionar aluno'),
+    onError: (e: any) => setError(e.response?.data?.message || e.message || 'Erro ao adicionar aluno'),
   });
 
   const createMutation = useMutation({
     mutationFn: async (data: any) => {
       const tenantId = getTenantId();
       if (!tenantId) throw new Error('Sessão inválida. Faça login novamente.');
+      const parts = data.nomeCompleto.trim().split(' ');
+      const firstName = parts[0];
+      const lastName = parts.slice(1).join(' ') || '-';
+      const password = generatePassword();
       const reg = await api.post('/auth/register', {
-        firstName: data.firstName,
-        lastName: data.lastName,
+        firstName,
+        lastName,
         email: data.email,
-        password: data.password,
-        phone: data.phone || undefined,
+        password,
+        phone: data.whatsapp ? `+55${data.whatsapp.replace(/\D/g, '')}` : undefined,
         role: 'STUDENT',
         tenantId,
       });
@@ -72,95 +111,237 @@ export default function NewStudentPage() {
       if (!newUserId) throw new Error('Usuário criado mas ID não retornado');
       await api.post('/trainers/me/students', {
         studentUserId: newUserId,
-        monthlyFee: data.monthlyFee ? Number(data.monthlyFee) : undefined,
+        monthlyFee: data.mensalidade ? Number(data.mensalidade) : undefined,
+        goalType: data.grupo,
       });
     },
     onSuccess: () => router.push('/trainer/students'),
-    onError: (e: any) => setError(e.message || 'Erro ao criar aluno'),
+    onError: (e: any) => setError(e.response?.data?.message || e.message || 'Erro ao criar aluno'),
   });
-
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selected) { setError('Selecione um aluno'); return; }
-    setError('');
-    linkMutation.mutate({
-      studentUserId: selected.id,
-      monthlyFee: monthlyFee ? Number(monthlyFee) : undefined,
-    });
-  };
 
   const handleCreate = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!firstName.trim() || !lastName.trim()) { setError('Nome e sobrenome são obrigatórios'); return; }
+    setAnamneseError(false);
+    if (!nomeCompleto.trim()) { setError('Nome completo é obrigatório'); return; }
     if (!email.trim()) { setError('E-mail é obrigatório'); return; }
-    if (password.length < 8) { setError('Senha deve ter ao menos 8 caracteres'); return; }
+    if (enviarAnamnese === 'Sim' && !anamnese) { setAnamneseError(true); setError('Escolha a anamnese a enviar'); return; }
     setError('');
-    createMutation.mutate({ firstName, lastName, email, password, phone, monthlyFee: createFee });
+    createMutation.mutate({ nomeCompleto, email, grupo, dataNascimento, whatsapp, genero, enviarAcesso, enviarAnamnese, anamnese, bloquearInadimplentes, mensalidade });
+  };
+
+  const handleLink = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selected) { setError('Selecione um aluno'); return; }
+    setError('');
+    linkMutation.mutate({ studentUserId: selected.id, monthlyFee: searchFee ? Number(searchFee) : undefined });
   };
 
   return (
     <div className="max-w-xl mx-auto space-y-6">
+      {/* Header */}
       <div className="flex items-center gap-3">
         <Link
           href="/trainer/students"
-          className="w-9 h-9 rounded-xl glass flex items-center justify-center hover:bg-accent transition-all"
+          className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
         >
           <ChevronLeft className="w-4 h-4" />
+          Voltar
         </Link>
-        <div>
-          <h1 className="text-2xl font-bold">Adicionar Aluno</h1>
-          <p className="text-muted-foreground text-sm">Vincule um aluno existente ou crie uma conta nova</p>
-        </div>
       </div>
+      <h1 className="text-2xl font-bold">Adicionar novo aluno</h1>
 
       {/* Mode tabs */}
       <div className="glass rounded-2xl p-1 flex gap-1">
         <button
-          onClick={() => { setMode('search'); setError(''); }}
-          className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-medium transition-all ${
-            mode === 'search' ? 'bg-primary text-primary-foreground' : 'hover:bg-accent text-muted-foreground'
-          }`}
-        >
-          <Search className="w-4 h-4" />
-          Buscar existente
-        </button>
-        <button
+          type="button"
           onClick={() => { setMode('create'); setError(''); }}
-          className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-medium transition-all ${
-            mode === 'create' ? 'bg-primary text-primary-foreground' : 'hover:bg-accent text-muted-foreground'
-          }`}
+          className={cn(
+            'flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-medium transition-all',
+            mode === 'create' ? 'bg-primary text-primary-foreground' : 'hover:bg-accent text-muted-foreground',
+          )}
         >
           <UserPlus className="w-4 h-4" />
           Criar novo
         </button>
+        <button
+          type="button"
+          onClick={() => { setMode('search'); setError(''); }}
+          className={cn(
+            'flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-medium transition-all',
+            mode === 'search' ? 'bg-primary text-primary-foreground' : 'hover:bg-accent text-muted-foreground',
+          )}
+        >
+          <Search className="w-4 h-4" />
+          Buscar existente
+        </button>
       </div>
 
       <AnimatePresence mode="wait">
-        {mode === 'search' ? (
+        {mode === 'create' ? (
           <motion.form
-            key="search"
-            initial={{ opacity: 0, x: -10 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -10 }}
-            onSubmit={handleSearch}
-            className="space-y-6"
+            key="create"
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 8 }}
+            onSubmit={handleCreate}
           >
             <div className="glass-card space-y-4">
-              <h2 className="font-semibold flex items-center gap-2">
-                <Users className="w-4 h-4 text-cyan-400" />
-                Buscar por nome ou e-mail
-              </h2>
-
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <FormField label="Nome completo" required>
                 <input
                   type="text"
-                  value={search}
-                  onChange={(e) => { setSearch(e.target.value); setSelected(null); }}
-                  placeholder="Ex: Pedro ou student@demo.com..."
-                  className="input-field pl-9"
+                  value={nomeCompleto}
+                  onChange={(e) => setNomeCompleto(e.target.value)}
+                  placeholder="Ex: João Silva"
+                  className="input-field"
+                  required
                 />
-              </div>
+              </FormField>
+
+              <FormField label="E-mail" required>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="aluno@email.com"
+                  className="input-field"
+                  required
+                />
+              </FormField>
+
+              <FormField label="Selecione um grupo">
+                <select value={grupo} onChange={(e) => setGrupo(e.target.value)} className="input-field bg-background">
+                  {GRUPOS.map((g) => <option key={g} value={g}>{g}</option>)}
+                </select>
+              </FormField>
+
+              <FormField label="Data de nascimento">
+                <input
+                  type="date"
+                  value={dataNascimento}
+                  onChange={(e) => setDataNascimento(e.target.value)}
+                  className="input-field"
+                />
+              </FormField>
+
+              <FormField label="WhatsApp">
+                <div className="flex items-center input-field !p-0 overflow-hidden gap-0">
+                  <div className="flex items-center gap-1.5 px-3 py-2.5 border-r border-border text-sm text-muted-foreground flex-shrink-0 bg-muted/50 select-none">
+                    <span>🇧🇷</span>
+                    <span>+55</span>
+                  </div>
+                  <input
+                    type="tel"
+                    value={whatsapp}
+                    onChange={(e) => setWhatsapp(e.target.value)}
+                    placeholder="(11) 99999-9999"
+                    className="flex-1 bg-transparent px-3 py-2.5 text-sm outline-none"
+                  />
+                </div>
+              </FormField>
+
+              <FormField label="Gênero">
+                <select value={genero} onChange={(e) => setGenero(e.target.value)} className="input-field bg-background">
+                  {GENEROS.map((g) => <option key={g} value={g}>{g}</option>)}
+                </select>
+              </FormField>
+
+              <FormField label="Mensalidade (R$)">
+                <input
+                  type="number"
+                  value={mensalidade}
+                  onChange={(e) => setMensalidade(e.target.value)}
+                  placeholder="Ex: 150"
+                  className="input-field"
+                  min={0}
+                />
+              </FormField>
+
+              <FormField label="Enviar informações de acesso ao aluno">
+                <select value={enviarAcesso} onChange={(e) => setEnviarAcesso(e.target.value)} className="input-field bg-background">
+                  <option value="Sim">Sim</option>
+                  <option value="Não">Não</option>
+                </select>
+              </FormField>
+
+              <FormField label="Enviar anamnese">
+                <select value={enviarAnamnese} onChange={(e) => { setEnviarAnamnese(e.target.value); setAnamnese(''); setAnamneseError(false); }} className="input-field bg-background">
+                  <option value="Sim">Sim</option>
+                  <option value="Não">Não</option>
+                </select>
+              </FormField>
+
+              <AnimatePresence>
+                {enviarAnamnese === 'Sim' && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className="overflow-hidden"
+                  >
+                    <FormField label="Escolha a anamnese" required>
+                      <select
+                        value={anamnese}
+                        onChange={(e) => { setAnamnese(e.target.value); setAnamneseError(false); }}
+                        className={cn('input-field bg-background', anamneseError && 'border-red-500/50 focus:ring-red-500/30')}
+                      >
+                        <option value="">Selecione</option>
+                        <option value="geral">Anamnese Geral</option>
+                        <option value="fitness">Anamnese Fitness</option>
+                        <option value="nutricional">Anamnese Nutricional</option>
+                        <option value="saude">Anamnese de Saúde</option>
+                      </select>
+                      {anamneseError && (
+                        <p className="text-xs text-red-400 mt-1">Esse campo é obrigatório</p>
+                      )}
+                    </FormField>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              <FormField
+                label="Bloquear acesso de inadimplentes"
+                hint="Esse bloqueio irá acontecer apenas se você utilizar o app para receber desse aluno"
+              >
+                <select value={bloquearInadimplentes} onChange={(e) => setBloquearInadimplentes(e.target.value)} className="input-field bg-background">
+                  <option value="Sim">Sim</option>
+                  <option value="Não">Não</option>
+                </select>
+              </FormField>
+            </div>
+
+            {error && (
+              <div className="mt-4 glass rounded-xl p-3 border border-red-500/20 text-red-400 text-sm">{error}</div>
+            )}
+
+            <button
+              type="submit"
+              disabled={createMutation.isPending}
+              className="btn-primary w-full mt-4 flex items-center justify-center gap-2 disabled:opacity-50"
+            >
+              {createMutation.isPending ? 'Salvando...' : 'Salvar'}
+            </button>
+          </motion.form>
+        ) : (
+          <motion.form
+            key="search"
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 8 }}
+            onSubmit={handleLink}
+          >
+            <div className="glass-card space-y-4">
+              <FormField label="Buscar por nome ou e-mail">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <input
+                    type="text"
+                    value={search}
+                    onChange={(e) => { setSearch(e.target.value); setSelected(null); }}
+                    placeholder="Ex: Pedro ou pedro@email.com"
+                    className="input-field pl-9"
+                  />
+                </div>
+              </FormField>
 
               {search.length >= 2 && (
                 <div className="space-y-1">
@@ -172,176 +353,55 @@ export default function NewStudentPage() {
                         key={user.id}
                         type="button"
                         onClick={() => setSelected(user)}
-                        className={`w-full flex items-center gap-3 p-3 rounded-xl transition-all text-left ${
-                          selected?.id === user.id
-                            ? 'bg-primary/10 border border-primary/30'
-                            : 'hover:bg-accent'
-                        }`}
+                        className={cn(
+                          'w-full flex items-center gap-3 p-3 rounded-xl transition-all text-left',
+                          selected?.id === user.id ? 'bg-primary/10 border border-primary/30' : 'hover:bg-accent',
+                        )}
                       >
                         <div className="w-9 h-9 rounded-full bg-gradient-to-br from-cyan-600 to-blue-600 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
                           {user.profile?.firstName?.[0]}{user.profile?.lastName?.[0]}
                         </div>
                         <div className="flex-1 min-w-0">
-                          <div className="text-sm font-medium">
-                            {user.profile?.firstName} {user.profile?.lastName}
-                          </div>
+                          <div className="text-sm font-medium">{user.profile?.firstName} {user.profile?.lastName}</div>
                           <div className="text-xs text-muted-foreground">{user.email}</div>
                         </div>
-                        {selected?.id === user.id && (
-                          <UserCheck className="w-4 h-4 text-primary" />
-                        )}
+                        {selected?.id === user.id && <UserCheck className="w-4 h-4 text-primary" />}
                       </button>
                     ))
                   ) : (
                     <div className="glass rounded-xl p-4 text-center text-sm text-muted-foreground">
-                      Nenhum aluno encontrado. Use a aba "Criar novo" para cadastrar.
+                      Nenhum aluno encontrado. Use "Criar novo" para cadastrar.
                     </div>
                   )}
                 </div>
               )}
 
-              {search.length < 2 && (
-                <p className="text-xs text-muted-foreground">Digite pelo menos 2 caracteres para buscar</p>
-              )}
-            </div>
-
-            {selected && (
-              <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="glass-card space-y-3">
-                <h2 className="font-semibold">Mensalidade</h2>
-                <div>
-                  <label className="text-sm font-medium mb-1.5 block">Valor (R$) — opcional</label>
+              {selected && (
+                <FormField label="Mensalidade (R$)">
                   <input
                     type="number"
-                    value={monthlyFee}
-                    onChange={(e) => setMonthlyFee(e.target.value)}
+                    value={searchFee}
+                    onChange={(e) => setSearchFee(e.target.value)}
                     placeholder="Ex: 150"
                     className="input-field"
                     min={0}
                   />
-                </div>
-              </motion.div>
-            )}
-
-            {error && (
-              <div className="glass rounded-xl p-4 border border-red-500/20 text-red-400 text-sm">{error}</div>
-            )}
-
-            <div className="flex gap-3">
-              <Link href="/trainer/students" className="btn-secondary flex-1 text-center">Cancelar</Link>
-              <button
-                type="submit"
-                disabled={!selected || linkMutation.isPending}
-                className="btn-primary flex-1 flex items-center justify-center gap-2 disabled:opacity-50"
-              >
-                <UserPlus className="w-4 h-4" />
-                {linkMutation.isPending ? 'Adicionando...' : 'Adicionar aluno'}
-              </button>
-            </div>
-          </motion.form>
-        ) : (
-          <motion.form
-            key="create"
-            initial={{ opacity: 0, x: 10 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: 10 }}
-            onSubmit={handleCreate}
-            className="space-y-6"
-          >
-            <div className="glass-card space-y-4">
-              <h2 className="font-semibold flex items-center gap-2">
-                <UserPlus className="w-4 h-4 text-cyan-400" />
-                Dados do novo aluno
-              </h2>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-sm font-medium mb-1.5 block">Nome *</label>
-                  <input
-                    type="text"
-                    value={firstName}
-                    onChange={(e) => setFirstName(e.target.value)}
-                    placeholder="Ex: João"
-                    className="input-field"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="text-sm font-medium mb-1.5 block">Sobrenome *</label>
-                  <input
-                    type="text"
-                    value={lastName}
-                    onChange={(e) => setLastName(e.target.value)}
-                    placeholder="Ex: Silva"
-                    className="input-field"
-                    required
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="text-sm font-medium mb-1.5 block">E-mail *</label>
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="aluno@email.com"
-                  className="input-field"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="text-sm font-medium mb-1.5 block">Senha provisória *</label>
-                <input
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Mín. 8 caracteres"
-                  className="input-field"
-                  minLength={8}
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="text-sm font-medium mb-1.5 block">Telefone</label>
-                <input
-                  type="tel"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  placeholder="(11) 99999-9999"
-                  className="input-field"
-                />
-              </div>
-
-              <div>
-                <label className="text-sm font-medium mb-1.5 block">Mensalidade (R$)</label>
-                <input
-                  type="number"
-                  value={createFee}
-                  onChange={(e) => setCreateFee(e.target.value)}
-                  placeholder="Ex: 150"
-                  className="input-field"
-                  min={0}
-                />
-              </div>
+                </FormField>
+              )}
             </div>
 
             {error && (
-              <div className="glass rounded-xl p-4 border border-red-500/20 text-red-400 text-sm">{error}</div>
+              <div className="mt-4 glass rounded-xl p-3 border border-red-500/20 text-red-400 text-sm">{error}</div>
             )}
 
-            <div className="flex gap-3">
-              <Link href="/trainer/students" className="btn-secondary flex-1 text-center">Cancelar</Link>
-              <button
-                type="submit"
-                disabled={createMutation.isPending}
-                className="btn-primary flex-1 flex items-center justify-center gap-2 disabled:opacity-50"
-              >
-                <UserPlus className="w-4 h-4" />
-                {createMutation.isPending ? 'Criando...' : 'Criar e vincular'}
-              </button>
-            </div>
+            <button
+              type="submit"
+              disabled={!selected || linkMutation.isPending}
+              className="btn-primary w-full mt-4 flex items-center justify-center gap-2 disabled:opacity-50"
+            >
+              <UserPlus className="w-4 h-4" />
+              {linkMutation.isPending ? 'Adicionando...' : 'Adicionar aluno'}
+            </button>
           </motion.form>
         )}
       </AnimatePresence>

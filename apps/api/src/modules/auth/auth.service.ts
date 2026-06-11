@@ -37,6 +37,11 @@ export class AuthService {
       });
       await this.prisma.tenantSubscription.create({ data: { tenantId: tenant.id } });
       tenantId = tenant.id;
+    } else {
+      const tenantExists = await this.prisma.tenant.findUnique({ where: { id: tenantId } });
+      if (!tenantExists) {
+        throw new BadRequestException('ID do Studio não encontrado. Verifique o código com o proprietário do studio.');
+      }
     }
 
     const existingUser = await this.prisma.user.findFirst({
