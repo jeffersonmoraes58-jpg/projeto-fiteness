@@ -78,8 +78,12 @@ export default function RegisterPage() {
     resolver: zodResolver(step2Schema),
   });
 
+  const [trainerMode, setTrainerMode] = useState<'own' | 'studio'>('own');
+
   const isStudioOwner = selectedRole === 'STUDIO_OWNER';
-  const needsTenantId = selectedRole === 'TRAINER' || selectedRole === 'NUTRITIONIST' || selectedRole === 'STUDENT';
+  const isTrainerOrNutri = selectedRole === 'TRAINER' || selectedRole === 'NUTRITIONIST';
+  const needsTenantId = selectedRole === 'STUDENT' || (isTrainerOrNutri && trainerMode === 'studio');
+  const needsWorkspaceName = isStudioOwner || (isTrainerOrNutri && trainerMode === 'own');
 
   const onSubmit = async (data: Step2Data) => {
     try {
@@ -90,7 +94,7 @@ export default function RegisterPage() {
         lastName: data.lastName,
         phone: data.phone || undefined,
         role: selectedRole,
-        ...(isStudioOwner ? { studioName: data.studioName } : { tenantId: data.tenantId }),
+        ...(needsWorkspaceName ? { studioName: data.studioName } : { tenantId: data.tenantId }),
       });
       toast.success('Conta criada com sucesso!');
       router.push('/dashboard');
@@ -251,10 +255,46 @@ export default function RegisterPage() {
                     <input {...register('phone')} type="tel" placeholder="(11) 99999-9999" className="input-field" autoComplete="tel" />
                   </div>
 
-                  {isStudioOwner && (
+                  {isTrainerOrNutri && (
                     <div>
-                      <label className="text-xs text-muted-foreground mb-1 block">Nome do Studio / Academia</label>
-                      <input {...register('studioName')} placeholder="Studio FitPro" className="input-field" />
+                      <label className="text-xs text-muted-foreground mb-1.5 block">Você trabalha como...</label>
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setTrainerMode('own')}
+                          className={cn(
+                            'p-3 rounded-xl border-2 text-sm font-medium text-left transition-all',
+                            trainerMode === 'own' ? 'border-primary bg-primary/5 text-foreground' : 'border-border text-muted-foreground hover:bg-accent',
+                          )}
+                        >
+                          <div className="font-semibold mb-0.5">Autônomo</div>
+                          <div className="text-xs font-normal opacity-70">Crio meu próprio espaço</div>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setTrainerMode('studio')}
+                          className={cn(
+                            'p-3 rounded-xl border-2 text-sm font-medium text-left transition-all',
+                            trainerMode === 'studio' ? 'border-primary bg-primary/5 text-foreground' : 'border-border text-muted-foreground hover:bg-accent',
+                          )}
+                        >
+                          <div className="font-semibold mb-0.5">Em um Studio</div>
+                          <div className="text-xs font-normal opacity-70">Tenho código do studio</div>
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {needsWorkspaceName && (
+                    <div>
+                      <label className="text-xs text-muted-foreground mb-1 block">
+                        {isStudioOwner ? 'Nome do Studio / Academia' : 'Nome do seu espaço de trabalho'}
+                      </label>
+                      <input
+                        {...register('studioName')}
+                        placeholder={isStudioOwner ? 'Studio FitPro' : 'Ex: Personal João Silva'}
+                        className="input-field"
+                      />
                       {errors.studioName && <p className="text-xs text-destructive mt-1">{errors.studioName.message}</p>}
                     </div>
                   )}
@@ -264,7 +304,7 @@ export default function RegisterPage() {
                       <label className="text-xs text-muted-foreground mb-1 block">Código do Studio *</label>
                       <input
                         {...register('tenantId')}
-                        placeholder="Cole aqui o código do seu studio"
+                        placeholder="Cole aqui o código do studio"
                         className="input-field"
                         autoComplete="off"
                       />
