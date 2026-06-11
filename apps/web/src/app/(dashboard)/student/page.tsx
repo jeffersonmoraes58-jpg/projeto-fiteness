@@ -77,7 +77,7 @@ export default function StudentDashboard() {
   return (
     <div className="space-y-8">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="page-header">
         <div>
           <h1 className="text-2xl font-bold">
             Olá, {firstName}! 👋

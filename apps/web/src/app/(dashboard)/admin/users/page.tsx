@@ -80,7 +80,7 @@ export default function AdminUsers() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="page-header">
         <div>
           <h1 className="text-2xl font-bold">Usuários</h1>
           <p className="text-muted-foreground text-sm mt-1">{total.toLocaleString('pt-BR')} usuários na plataforma</p>

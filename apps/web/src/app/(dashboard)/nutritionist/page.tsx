@@ -41,7 +41,7 @@ export default function NutritionistDashboard() {
   return (
     <div className="space-y-8">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="page-header">
         <div>
           <h1 className="text-2xl font-bold">Olá, {firstName}!</h1>
           <p className="text-muted-foreground text-sm mt-1">
