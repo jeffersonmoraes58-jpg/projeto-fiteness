@@ -133,7 +133,7 @@ export default function TrainerChallenges() {
       </div>
 
       {/* Summary */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {[
           { label: 'Total', value: arr.length, icon: Trophy, color: 'from-purple-600 to-indigo-600' },
           { label: 'Ativos', value: arr.filter((c: any) => c.isActive).length, icon: Zap, color: 'from-emerald-600 to-teal-600' },

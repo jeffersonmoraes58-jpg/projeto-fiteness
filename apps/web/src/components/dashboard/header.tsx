@@ -74,8 +74,8 @@ export function DashboardHeader() {
   const hasUnread = unreadCount > 0;
 
   return (
-    <header className="h-16 border-b border-border/50 px-6 flex items-center justify-between bg-background/80 backdrop-blur-xl sticky top-0 z-20">
-      <div className="flex-1 max-w-md">
+    <header className="h-16 border-b border-border/50 pl-16 pr-4 lg:px-6 flex items-center justify-between bg-background/80 backdrop-blur-xl sticky top-0 z-20">
+      <div className="hidden sm:block flex-1 max-w-md">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <input
@@ -115,7 +115,7 @@ export function DashboardHeader() {
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: 8, scale: 0.95 }}
                 transition={{ duration: 0.15 }}
-                className="absolute right-0 top-12 w-80 bg-card border border-border rounded-2xl shadow-2xl z-50 overflow-hidden"
+                className="absolute right-0 top-12 w-80 max-w-[calc(100vw-2rem)] bg-card border border-border rounded-2xl shadow-2xl z-50 overflow-hidden"
               >
                 {/* Header */}
                 <div className="flex items-center justify-between px-4 py-3 border-b border-border/50">

@@ -74,12 +74,12 @@ export default function TrainerExercises() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="page-header">
         <div>
           <h1 className="text-2xl font-bold">Exercícios</h1>
           <p className="text-muted-foreground text-sm mt-1">{exercises?.length ?? 0} exercícios disponíveis</p>
         </div>
-        <button onClick={() => setShowForm(!showForm)} className="btn-primary flex items-center gap-2 text-sm py-2">
+        <button onClick={() => setShowForm(!showForm)} className="btn-primary flex items-center gap-2 text-sm py-2 self-start sm:self-auto">
           <Plus className="w-4 h-4" />
           Novo exercício
         </button>

@@ -58,7 +58,7 @@ export default function StudentAchievements() {
       </div>
 
       {/* Summary */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {[
           { label: 'Desbloqueadas', value: earned?.length ?? 0, icon: Trophy, color: 'from-yellow-500 to-orange-500' },
           { label: 'Pontos ganhos', value: stats?.stats?.points ?? totalPoints, icon: Star, color: 'from-purple-500 to-indigo-500' },
