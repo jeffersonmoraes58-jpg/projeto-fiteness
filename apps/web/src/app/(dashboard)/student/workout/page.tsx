@@ -173,7 +173,7 @@ export default function StudentWorkout() {
     }).join('');
 
     const html = `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">
-    <title>Plano de Treino — FitSaaS</title>
+    <title>Plano de Treino — Fitlynutri</title>
     <style>
       * { box-sizing: border-box; margin: 0; padding: 0; }
       body { font-family: 'Segoe UI', Arial, sans-serif; color: #111827; background: #fff; padding: 32px; }
@@ -203,13 +203,13 @@ export default function StudentWorkout() {
     </style></head><body>
     <div class="header">
       <div>
-        <div class="logo">FitSaaS</div>
+        <div class="logo">Fitlynutri</div>
         <div class="subtitle">Plano de Treino</div>
       </div>
       <div class="date">Emitido em ${date}</div>
     </div>
     ${dayBlocks}
-    <div class="footer">Gerado pelo FitSaaS · Siga sempre as orientações do seu personal trainer</div>
+    <div class="footer">Gerado pelo Fitlynutri · Siga sempre as orientações do seu personal trainer</div>
     <button class="print-btn" onclick="window.print()">⬇ Salvar PDF</button>
     </body></html>`;
 
@@ -781,7 +781,7 @@ function generateWorkoutCard({ workoutName, dateStr, startStr, endStr, durationS
   // App name
   ctx.fillStyle = 'rgba(255,255,255,0.35)';
   ctx.font = '500 36px system-ui,sans-serif';
-  ctx.textAlign = 'center'; ctx.fillText('FitSaaS', W / 2, 85);
+  ctx.textAlign = 'center'; ctx.fillText('Fitlynutri', W / 2, 85);
 
   // Green circle with checkmark
   ctx.fillStyle = '#059669';
@@ -855,7 +855,7 @@ function generateWorkoutCard({ workoutName, dateStr, startStr, endStr, durationS
 
   // Watermark
   ctx.fillStyle = 'rgba(255,255,255,0.16)'; ctx.font = '24px system-ui,sans-serif';
-  ctx.textAlign = 'center'; ctx.fillText('Gerado com FitSaaS', W / 2, H - 38);
+  ctx.textAlign = 'center'; ctx.fillText('Gerado com Fitlynutri', W / 2, H - 38);
 
   return canvas.toDataURL('image/png');
 }

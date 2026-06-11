@@ -67,7 +67,7 @@ export function LandingCTA() {
               transition={{ delay: 0.2 }}
               className="text-muted-foreground text-lg max-w-xl mx-auto mb-10"
             >
-              Junte-se a milhares de profissionais que já usam o FitSaaS para crescer.
+              Junte-se a milhares de profissionais que já usam o Fitlynutri para crescer.
               Comece grátis hoje — sem complicações.
             </motion.p>
 

@@ -242,7 +242,7 @@ function AddPhotoModal({ onClose }: { onClose: () => void }) {
     if (!file) { setError('Selecione uma foto'); return; }
     setUploading(true);
     try {
-      const storage = typeof window !== 'undefined' ? localStorage.getItem('fitsaas-auth') : null;
+      const storage = typeof window !== 'undefined' ? localStorage.getItem('fitlynutri-auth') : null;
       const token = storage ? JSON.parse(storage).state?.accessToken : null;
       const form = new FormData();
       form.append('file', file);

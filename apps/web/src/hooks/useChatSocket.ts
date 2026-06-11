@@ -6,7 +6,7 @@ import { io, Socket } from 'socket.io-client';
 function getToken(): string | null {
   if (typeof window === 'undefined') return null;
   try {
-    const storage = localStorage.getItem('fitsaas-auth');
+    const storage = localStorage.getItem('fitlynutri-auth');
     if (!storage) return null;
     const { state } = JSON.parse(storage);
     return state?.accessToken ?? null;

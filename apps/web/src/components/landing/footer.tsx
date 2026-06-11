@@ -50,7 +50,7 @@ export function LandingFooter() {
               <div className="w-8 h-8 bg-gradient-brand rounded-lg flex items-center justify-center">
                 <Dumbbell className="w-4 h-4 text-white" />
               </div>
-              <span className="gradient-text">FitSaaS</span>
+              <span className="gradient-text">Fitlynutri</span>
             </Link>
             <p className="text-sm text-muted-foreground max-w-xs leading-relaxed mb-6">
               A plataforma SaaS mais completa para personal trainers, nutricionistas e academias do Brasil.
@@ -89,7 +89,7 @@ export function LandingFooter() {
         {/* Bottom bar */}
         <div className="border-t border-border/50 pt-8 flex flex-col md:flex-row items-center justify-between gap-4">
           <p className="text-sm text-muted-foreground">
-            © {new Date().getFullYear()} FitSaaS. Todos os direitos reservados.
+            © {new Date().getFullYear()} Fitlynutri. Todos os direitos reservados.
           </p>
           <div className="flex items-center gap-4">
             <p className="text-sm text-muted-foreground">

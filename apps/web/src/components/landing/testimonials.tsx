@@ -10,7 +10,7 @@ const testimonials = [
     location: 'São Paulo, SP',
     avatar: 'RM',
     rating: 5,
-    text: 'O FitSaaS transformou meu negócio. Antes eu usava planilhas e WhatsApp, agora tenho tudo integrado. Minha produtividade triplicou e consigo acompanhar mais alunos com menos esforço.',
+    text: 'O Fitlynutri transformou meu negócio. Antes eu usava planilhas e WhatsApp, agora tenho tudo integrado. Minha produtividade triplicou e consigo acompanhar mais alunos com menos esforço.',
   },
   {
     name: 'Carla Oliveira',
@@ -26,7 +26,7 @@ const testimonials = [
     location: 'Belo Horizonte, MG',
     avatar: 'FL',
     rating: 5,
-    text: 'Migramos de um software desatualizado para o FitSaaS e a diferença foi enorme. O white-label nos deu uma identidade profissional e os alunos engajaram muito mais com a gamificação.',
+    text: 'Migramos de um software desatualizado para o Fitlynutri e a diferença foi enorme. O white-label nos deu uma identidade profissional e os alunos engajaram muito mais com a gamificação.',
   },
   {
     name: 'Marcus Silva',
@@ -50,7 +50,7 @@ const testimonials = [
     location: 'São Paulo, SP',
     avatar: 'MA',
     rating: 5,
-    text: 'Com 5 unidades e 200 funcionários, precisávamos de uma solução robusta. O FitSaaS Enterprise atendeu tudo: multi-tenant, domínio próprio e suporte dedicado. Recomendo muito.',
+    text: 'Com 5 unidades e 200 funcionários, precisávamos de uma solução robusta. O Fitlynutri Enterprise atendeu tudo: multi-tenant, domínio próprio e suporte dedicado. Recomendo muito.',
   },
 ];
 
@@ -69,7 +69,7 @@ export function LandingTestimonials() {
             <span className="gradient-text"> recomenda</span>
           </h2>
           <p className="text-muted-foreground text-lg max-w-xl mx-auto">
-            Mais de 2.800 profissionais de fitness confiam no FitSaaS para gerenciar seus negócios.
+            Mais de 2.800 profissionais de fitness confiam no Fitlynutri para gerenciar seus negócios.
           </p>
         </motion.div>
 

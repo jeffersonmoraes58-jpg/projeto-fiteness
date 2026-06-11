@@ -47,8 +47,8 @@ export default function AdminSettings() {
   });
 
   const [email, setEmail] = useState({
-    fromName: settings?.emailFromName || 'FitSaaS',
-    fromAddress: settings?.emailFromAddress || 'noreply@fitsaas.com.br',
+    fromName: settings?.emailFromName || 'Fitlynutri',
+    fromAddress: settings?.emailFromAddress || 'noreply@fitlynutri.com.br',
     smtpHost: settings?.smtpHost || 'smtp.sendgrid.net',
     smtpPort: settings?.smtpPort || '587',
   });

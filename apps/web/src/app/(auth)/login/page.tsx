@@ -50,7 +50,7 @@ export default function LoginPage() {
             <div className="w-12 h-12 bg-gradient-brand rounded-2xl flex items-center justify-center">
               <Dumbbell className="w-6 h-6 text-white" />
             </div>
-            <span className="text-3xl font-bold gradient-text">FitSaaS</span>
+            <span className="text-3xl font-bold gradient-text">Fitlynutri</span>
           </Link>
           <h1 className="text-4xl font-bold mb-4">
             Bem-vindo de volta!
@@ -87,7 +87,7 @@ export default function LoginPage() {
               <div className="w-8 h-8 bg-gradient-brand rounded-lg flex items-center justify-center">
                 <Dumbbell className="w-4 h-4 text-white" />
               </div>
-              <span className="text-xl font-bold gradient-text">FitSaaS</span>
+              <span className="text-xl font-bold gradient-text">Fitlynutri</span>
             </Link>
           </div>
 

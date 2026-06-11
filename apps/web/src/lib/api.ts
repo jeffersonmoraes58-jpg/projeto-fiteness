@@ -8,7 +8,7 @@ export const api = axios.create({
 
 api.interceptors.request.use((config) => {
   if (typeof window !== 'undefined') {
-    const storage = localStorage.getItem('fitsaas-auth');
+    const storage = localStorage.getItem('fitlynutri-auth');
     if (storage) {
       const { state } = JSON.parse(storage);
       if (state?.accessToken) {
@@ -28,7 +28,7 @@ api.interceptors.response.use(
       originalRequest._retry = true;
 
       try {
-        const storage = localStorage.getItem('fitsaas-auth');
+        const storage = localStorage.getItem('fitlynutri-auth');
         if (storage) {
           const { state } = JSON.parse(storage);
           const { data } = await axios.post(
@@ -41,13 +41,13 @@ api.interceptors.response.use(
 
           const parsed = JSON.parse(storage);
           parsed.state.accessToken = accessToken;
-          localStorage.setItem('fitsaas-auth', JSON.stringify(parsed));
+          localStorage.setItem('fitlynutri-auth', JSON.stringify(parsed));
 
           return api(originalRequest);
         }
       } catch {
         if (typeof window !== 'undefined') {
-          localStorage.removeItem('fitsaas-auth');
+          localStorage.removeItem('fitlynutri-auth');
           window.location.href = '/login';
         }
       }

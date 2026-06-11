@@ -102,7 +102,7 @@ export function LandingHero() {
                 <div className="w-3 h-3 rounded-full bg-yellow-500/70" />
                 <div className="w-3 h-3 rounded-full bg-green-500/70" />
                 <div className="flex-1 mx-4 h-6 bg-white/5 rounded-md flex items-center px-3">
-                  <span className="text-[11px] text-white/30">app.fitsaas.com.br/trainer</span>
+                  <span className="text-[11px] text-white/30">app.fitlynutri.com.br/trainer</span>
                 </div>
               </div>
               <DashboardPreview />

@@ -22,8 +22,8 @@ const ROLE_PREFIXES: Record<string, string[]> = {
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  const isAuth = request.cookies.get('fitsaas-auth')?.value === '1';
-  const role = request.cookies.get('fitsaas-role')?.value || '';
+  const isAuth = request.cookies.get('fitlynutri-auth')?.value === '1';
+  const role = request.cookies.get('fitlynutri-role')?.value || '';
 
   const isAuthPath = AUTH_PATHS.some((p) => pathname.startsWith(p));
   const isDashboardRedirect = pathname === '/dashboard';

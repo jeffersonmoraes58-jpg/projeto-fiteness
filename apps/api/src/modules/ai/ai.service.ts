@@ -170,7 +170,7 @@ export class AiService {
   }
 
   async chatWithAssistant(userId: string, message: string, chatHistory: any[] = [], context?: string) {
-    const basePrompt = `Você é um assistente de nutrição especializado da plataforma FitSaaS.
+    const basePrompt = `Você é um assistente de nutrição especializado da plataforma Fitlynutri.
 Responda sempre em português brasileiro de forma clara e baseada em evidências científicas.
 Se a pergunta envolver condição médica grave, oriente consultar um profissional de saúde.`;
 

@@ -41,8 +41,8 @@ export const useAuthStore = create<AuthState>()(
           const { user, accessToken, refreshToken } = res.data.data;
           set({ user, accessToken, refreshToken });
           api.defaults.headers.Authorization = `Bearer ${accessToken}`;
-          document.cookie = `fitsaas-role=${user.role};path=/;max-age=${7 * 24 * 3600};SameSite=Lax`;
-          document.cookie = `fitsaas-auth=1;path=/;max-age=${7 * 24 * 3600};SameSite=Lax`;
+          document.cookie = `fitlynutri-role=${user.role};path=/;max-age=${7 * 24 * 3600};SameSite=Lax`;
+          document.cookie = `fitlynutri-auth=1;path=/;max-age=${7 * 24 * 3600};SameSite=Lax`;
         } finally {
           set({ isLoading: false });
         }
@@ -55,8 +55,8 @@ export const useAuthStore = create<AuthState>()(
           const { user, accessToken, refreshToken } = res.data.data;
           set({ user, accessToken, refreshToken });
           api.defaults.headers.Authorization = `Bearer ${accessToken}`;
-          document.cookie = `fitsaas-role=${user.role};path=/;max-age=${7 * 24 * 3600};SameSite=Lax`;
-          document.cookie = `fitsaas-auth=1;path=/;max-age=${7 * 24 * 3600};SameSite=Lax`;
+          document.cookie = `fitlynutri-role=${user.role};path=/;max-age=${7 * 24 * 3600};SameSite=Lax`;
+          document.cookie = `fitlynutri-auth=1;path=/;max-age=${7 * 24 * 3600};SameSite=Lax`;
         } finally {
           set({ isLoading: false });
         }
@@ -69,8 +69,8 @@ export const useAuthStore = create<AuthState>()(
         } finally {
           set({ user: null, accessToken: null, refreshToken: null });
           delete api.defaults.headers.Authorization;
-          document.cookie = 'fitsaas-role=;path=/;max-age=0';
-          document.cookie = 'fitsaas-auth=;path=/;max-age=0';
+          document.cookie = 'fitlynutri-role=;path=/;max-age=0';
+          document.cookie = 'fitlynutri-auth=;path=/;max-age=0';
         }
       },
 
@@ -78,7 +78,7 @@ export const useAuthStore = create<AuthState>()(
       setTokens: (accessToken, refreshToken) => set({ accessToken, refreshToken }),
     }),
     {
-      name: 'fitsaas-auth',
+      name: 'fitlynutri-auth',
       partialize: (state) => ({
         user: state.user,
         accessToken: state.accessToken,

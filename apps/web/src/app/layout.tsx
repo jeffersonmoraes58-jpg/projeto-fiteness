@@ -9,24 +9,24 @@ const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
   title: {
-    default: 'FitSaaS - Plataforma Fitness Completa',
-    template: '%s | FitSaaS',
+    default: 'Fitlynutri - Plataforma Fitness Completa',
+    template: '%s | Fitlynutri',
   },
   description:
     'Plataforma SaaS completa para personal trainers, nutricionistas e academias. Gerencie treinos, dietas e evolução dos seus alunos com IA.',
   keywords: ['fitness', 'personal trainer', 'nutricionista', 'academia', 'treino', 'dieta'],
-  authors: [{ name: 'FitSaaS' }],
+  authors: [{ name: 'Fitlynutri' }],
   openGraph: {
     type: 'website',
     locale: 'pt_BR',
-    url: 'https://fitsaas.com',
-    title: 'FitSaaS - Plataforma Fitness Completa',
+    url: 'https://fitlynutri.com.br',
+    title: 'Fitlynutri - Plataforma Fitness Completa',
     description: 'Gerencie treinos, dietas e evolução com IA',
-    siteName: 'FitSaaS',
+    siteName: 'Fitlynutri',
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'FitSaaS',
+    title: 'Fitlynutri',
     description: 'Plataforma SaaS Fitness com IA',
   },
   robots: { index: true, follow: true },

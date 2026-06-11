@@ -91,7 +91,7 @@ export function DashboardSidebar() {
               exit={{ opacity: 0, width: 0 }}
               className="font-bold text-lg gradient-text overflow-hidden whitespace-nowrap"
             >
-              FitSaaS
+              Fitlynutri
             </motion.span>
           )}
         </AnimatePresence>
