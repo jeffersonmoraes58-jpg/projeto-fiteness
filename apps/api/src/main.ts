@@ -45,7 +45,7 @@ async function bootstrap() {
 
   if (nodeEnv !== 'production') {
     const config = new DocumentBuilder()
-      .setTitle('FitSaaS API')
+      .setTitle('Fitlynutri API')
       .setDescription('API completa para plataforma SaaS Fitness')
       .setVersion('1.0')
       .addBearerAuth()
@@ -76,7 +76,7 @@ async function bootstrap() {
   }
 
   await app.listen(port);
-  console.log(`\n🚀 FitSaaS API running on: http://localhost:${port}/api/v1`);
+  console.log(`\n🚀 Fitlynutri API running on: http://localhost:${port}/api/v1`);
   console.log(`📚 Swagger docs: http://localhost:${port}/api/docs\n`);
 }
 

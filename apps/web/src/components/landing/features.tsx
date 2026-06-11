@@ -102,7 +102,7 @@ export function LandingFeatures() {
           </h2>
           <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
             Da criação de treinos ao controle financeiro, passando pela IA até a gamificação.
-            FitSaaS tem tudo para seu negócio fitness crescer.
+            Fitlynutri tem tudo para seu negócio fitness crescer.
           </p>
         </motion.div>
 

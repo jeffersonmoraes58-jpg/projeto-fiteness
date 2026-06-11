@@ -13,7 +13,7 @@ const faqs = [
   },
   {
     question: 'Posso importar meus alunos de outra plataforma?',
-    answer: 'Sim. O FitSaaS suporta importação em massa via CSV com nome, e-mail, telefone e histórico básico. Nossa equipe de suporte também pode ajudar na migração de sistemas como Trainner, Total Pass, entre outros.',
+    answer: 'Sim. O Fitlynutri suporta importação em massa via CSV com nome, e-mail, telefone e histórico básico. Nossa equipe de suporte também pode ajudar na migração de sistemas como Trainner, Total Pass, entre outros.',
   },
   {
     question: 'O app é disponível para iOS e Android?',
@@ -28,7 +28,7 @@ const faqs = [
     answer: 'No plano Pro você pode adicionar sua logo e personalizar as cores principais. No Enterprise, você tem domínio próprio (app.suaacademia.com.br), marca completa no app mobile e e-mails transacionais com sua identidade.',
   },
   {
-    question: 'Os pagamentos dos alunos passam pelo FitSaaS?',
+    question: 'Os pagamentos dos alunos passam pelo Fitlynutri?',
     answer: 'Sim, opcionalmente. Você pode usar o módulo de pagamentos integrado com Stripe e Mercado Pago para cobrar mensalidades automaticamente. Ou pode gerenciar pagamentos externamente — a escolha é sua.',
   },
   {

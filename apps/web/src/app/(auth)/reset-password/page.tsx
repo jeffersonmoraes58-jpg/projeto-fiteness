@@ -75,7 +75,7 @@ function ResetPasswordContent() {
             <div className="w-10 h-10 bg-gradient-brand rounded-xl flex items-center justify-center">
               <Dumbbell className="w-5 h-5 text-white" />
             </div>
-            <span className="text-2xl font-bold gradient-text">FitSaaS</span>
+            <span className="text-2xl font-bold gradient-text">Fitlynutri</span>
           </Link>
         </div>
 

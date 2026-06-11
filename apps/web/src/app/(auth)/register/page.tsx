@@ -112,7 +112,7 @@ export default function RegisterPage() {
             <div className="w-12 h-12 bg-gradient-brand rounded-2xl flex items-center justify-center">
               <Dumbbell className="w-6 h-6 text-white" />
             </div>
-            <span className="text-3xl font-bold gradient-text">FitSaaS</span>
+            <span className="text-3xl font-bold gradient-text">Fitlynutri</span>
           </Link>
           <h1 className="text-3xl font-bold mb-4">A plataforma fitness mais completa</h1>
           <p className="text-muted-foreground">
@@ -139,7 +139,7 @@ export default function RegisterPage() {
               <div className="w-8 h-8 bg-gradient-brand rounded-lg flex items-center justify-center">
                 <Dumbbell className="w-4 h-4 text-white" />
               </div>
-              <span className="text-xl font-bold gradient-text">FitSaaS</span>
+              <span className="text-xl font-bold gradient-text">Fitlynutri</span>
             </Link>
           </div>
 
@@ -169,7 +169,7 @@ export default function RegisterPage() {
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: -20 }}
               >
-                <h2 className="text-2xl font-bold mb-1">Como você vai usar o FitSaaS?</h2>
+                <h2 className="text-2xl font-bold mb-1">Como você vai usar o Fitlynutri?</h2>
                 <p className="text-muted-foreground text-sm mb-6">Escolha o perfil que melhor descreve você</p>
 
                 <div className="grid grid-cols-2 gap-3 mb-6">

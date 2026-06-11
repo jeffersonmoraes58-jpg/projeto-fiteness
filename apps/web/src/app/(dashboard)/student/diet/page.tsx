@@ -131,7 +131,7 @@ export default function StudentDiet() {
     </style></head><body>
     <div class="header">
       <div>
-        <div class="logo">FitSaaS</div>
+        <div class="logo">Fitlynutri</div>
         <div class="subtitle">Plano Alimentar</div>
       </div>
       <div>
@@ -152,7 +152,7 @@ export default function StudentDiet() {
       </tr></thead>
       <tbody>${mealRows}</tbody>
     </table>
-    <div class="footer">Gerado pelo FitSaaS · Consulte sempre seu nutricionista</div>
+    <div class="footer">Gerado pelo Fitlynutri · Consulte sempre seu nutricionista</div>
     <button class="print-btn" onclick="window.print()">⬇ Salvar PDF</button>
     </body></html>`;
 

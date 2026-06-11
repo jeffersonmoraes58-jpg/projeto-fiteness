@@ -169,7 +169,7 @@ export default function NutritionistAI() {
   const [config, setConfig] = useState<AiConfig>(() => {
     if (typeof window === 'undefined') return EMPTY_CONFIG;
     try {
-      const saved = localStorage.getItem('fitsaas-ai-config');
+      const saved = localStorage.getItem('fitlynutri-ai-config');
       return saved ? JSON.parse(saved) : EMPTY_CONFIG;
     } catch {
       return EMPTY_CONFIG;
@@ -229,7 +229,7 @@ export default function NutritionistAI() {
 
   const saveConfig = () => {
     setConfig(draft);
-    localStorage.setItem('fitsaas-ai-config', JSON.stringify(draft));
+    localStorage.setItem('fitlynutri-ai-config', JSON.stringify(draft));
     setTrainingOpen(false);
     // Reset chat so AI greets with new config
     setMessages([{
@@ -243,7 +243,7 @@ export default function NutritionistAI() {
   const clearConfig = () => {
     setDraft(EMPTY_CONFIG);
     setConfig(EMPTY_CONFIG);
-    localStorage.removeItem('fitsaas-ai-config');
+    localStorage.removeItem('fitlynutri-ai-config');
   };
 
   const configured = isConfigured(config);

@@ -11,7 +11,7 @@ type Mode = 'search' | 'create';
 
 function getTenantId(): string | undefined {
   try {
-    const storage = localStorage.getItem('fitsaas-auth');
+    const storage = localStorage.getItem('fitlynutri-auth');
     if (storage) {
       const { state } = JSON.parse(storage);
       const token = state?.accessToken;
