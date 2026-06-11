@@ -192,7 +192,7 @@ export function DashboardSidebar() {
             initial={{ x: -280 }}
             animate={{ x: 0 }}
             exit={{ x: -280 }}
-            className="lg:hidden fixed left-0 top-0 bottom-0 w-64 bg-card border-r border-border z-50 relative"
+            className="lg:hidden fixed left-0 top-0 bottom-0 w-64 bg-card border-r border-border z-50"
           >
             <SidebarContent />
           </motion.div>

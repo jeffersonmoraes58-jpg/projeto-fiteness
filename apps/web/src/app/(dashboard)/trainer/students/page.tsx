@@ -50,19 +50,19 @@ export default function TrainerStudents() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="page-header">
         <div>
           <h1 className="text-2xl font-bold">Alunos</h1>
           <p className="text-muted-foreground text-sm mt-1">{totalStudents} alunos cadastrados</p>
         </div>
-        <Link href="/trainer/students/new" className="btn-primary flex items-center gap-2 text-sm py-2">
+        <Link href="/trainer/students/new" className="btn-primary flex items-center gap-2 text-sm py-2 self-start sm:self-auto">
           <Plus className="w-4 h-4" />
           Novo aluno
         </Link>
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {[
           { label: 'Total', value: totalStudents, icon: Users, color: 'from-purple-600 to-indigo-600' },
           { label: 'Ativos', value: activeStudents, icon: Activity, color: 'from-emerald-600 to-teal-600' },

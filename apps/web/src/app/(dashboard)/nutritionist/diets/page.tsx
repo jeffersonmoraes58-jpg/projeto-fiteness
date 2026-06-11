@@ -62,21 +62,21 @@ export default function NutritionistDiets() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="page-header">
         <div>
           <h1 className="text-2xl font-bold">Dietas</h1>
           <p className="text-muted-foreground text-sm mt-1">
             Crie e gerencie planos alimentares
           </p>
         </div>
-        <Link href="/nutritionist/diets/new" className="btn-primary flex items-center gap-2 text-sm py-2">
+        <Link href="/nutritionist/diets/new" className="btn-primary flex items-center gap-2 text-sm py-2 self-start sm:self-auto">
           <Plus className="w-4 h-4" />
           Nova dieta
         </Link>
       </div>
 
       {/* Summary */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {[
           { label: 'Dietas ativas', value: counts.active, color: 'from-emerald-600 to-teal-600', icon: Apple },
           { label: 'Rascunhos', value: counts.draft, color: 'from-yellow-600 to-orange-600', icon: FileText },

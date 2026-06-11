@@ -220,7 +220,7 @@ export default function WorkoutDetailPage() {
       </div>
 
       {/* Stats */}
-      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="grid grid-cols-3 gap-4">
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {[
           { label: 'Duração', value: `${workout.duration ?? 45} min`, icon: Clock, color: 'text-cyan-400' },
           { label: 'Nível', value: LEVEL_LABELS[workout.level] || 'Iniciante', icon: Zap, color: 'text-yellow-400' },

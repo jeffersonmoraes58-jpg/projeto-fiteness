@@ -93,7 +93,7 @@ export default function AdminNotifications() {
       </div>
 
       {/* Summary stats */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {[
           { label: 'Enviadas', value: stats.sent.toLocaleString('pt-BR'), icon: Send, color: 'from-purple-600 to-indigo-600' },
           { label: 'Lidas', value: stats.read.toLocaleString('pt-BR'), icon: CheckCircle2, color: 'from-emerald-600 to-teal-600' },

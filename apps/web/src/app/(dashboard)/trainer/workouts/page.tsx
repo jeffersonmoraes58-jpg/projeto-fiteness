@@ -57,19 +57,19 @@ export default function TrainerWorkouts() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="page-header">
         <div>
           <h1 className="text-2xl font-bold">Treinos</h1>
           <p className="text-muted-foreground text-sm mt-1">Crie e gerencie planos de treino</p>
         </div>
-        <Link href="/trainer/workouts/new" className="btn-primary flex items-center gap-2 text-sm py-2">
+        <Link href="/trainer/workouts/new" className="btn-primary flex items-center gap-2 text-sm py-2 self-start sm:self-auto">
           <Plus className="w-4 h-4" />
           Novo treino
         </Link>
       </div>
 
       {/* Summary */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {[
           { label: 'Treinos ativos', value: counts.active, color: 'from-purple-600 to-indigo-600', icon: Dumbbell },
           { label: 'Rascunhos', value: counts.draft, color: 'from-yellow-600 to-orange-600', icon: FileText },

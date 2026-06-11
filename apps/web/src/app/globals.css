@@ -122,6 +122,10 @@
   .scrollbar-hide::-webkit-scrollbar { display: none; }
 
   .text-balance { text-wrap: balance; }
+
+  .page-header {
+    @apply flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between;
+  }
 }
 
 /* Shimmer skeleton */
