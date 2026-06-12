@@ -137,20 +137,22 @@ jobs:
       packages: read
 
     steps:
-      - name: Setup SSH key
+      - name: Deploy via SSH
+        env:
+          SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          SSH_HOST: ${{ secrets.DEPLOY_HOST }}
+          SSH_USER: ${{ secrets.DEPLOY_USER }}
         run: |
           mkdir -p ~/.ssh
-          echo "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/deploy_key
+          echo "$SSH_KEY" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
-          ssh-keyscan -H ${{ secrets.DEPLOY_HOST }} >> ~/.ssh/known_hosts
-
-      - name: Deploy via SSH
-        run: |
-          ssh -i ~/.ssh/deploy_key ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} << 'ENDSSH'
-            set -e
-            cd /opt/fitsaas
-            git pull origin master
-            docker compose -f docker-compose.prod.yml pull api web
-            docker compose -f docker-compose.prod.yml up -d --no-deps --force-recreate api web
-            docker image prune -f
-          ENDSSH
+          ssh -i ~/.ssh/deploy_key \
+            -o StrictHostKeyChecking=no \
+            -o ConnectTimeout=15 \
+            "$SSH_USER@$SSH_HOST" \
+            'set -e
+             cd /opt/fitsaas
+             git pull origin master
+             docker compose -f docker-compose.prod.yml pull api web
+             docker compose -f docker-compose.prod.yml up -d --no-deps --force-recreate api web
+             docker image prune -f'
