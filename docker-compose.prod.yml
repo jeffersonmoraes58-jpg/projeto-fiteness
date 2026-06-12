@@ -40,9 +40,6 @@ services:
       - fitsaas-network
 
   api:
-    build:
-      context: .
-      dockerfile: apps/api/Dockerfile
     image: ghcr.io/jeffersonmoraes58-jpg/fitsaas-api:${IMAGE_TAG:-latest}
     container_name: fitsaas-api
     restart: always
@@ -64,6 +61,8 @@ services:
       STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY}
       STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET}
       OPENAI_API_KEY: ${OPENAI_API_KEY}
+      RESEND_API_KEY: ${RESEND_API_KEY}
+      RESEND_FROM: ${RESEND_FROM:-noreply@fitlynutri.com.br}
       SMTP_HOST: ${SMTP_HOST}
       SMTP_PORT: ${SMTP_PORT:-587}
       SMTP_USER: ${SMTP_USER}
@@ -86,14 +85,6 @@ services:
           memory: 300M
 
   web:
-    build:
-      context: .
-      dockerfile: apps/web/Dockerfile
-      args:
-        NEXT_PUBLIC_API_URL: ${APP_URL}
-        NEXT_PUBLIC_APP_URL: ${APP_URL}
-        NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: ${NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY}
-        NEXT_PUBLIC_SOCKET_URL: ${APP_URL}
     image: ghcr.io/jeffersonmoraes58-jpg/fitsaas-web:${IMAGE_TAG:-latest}
     container_name: fitsaas-web
     restart: always
