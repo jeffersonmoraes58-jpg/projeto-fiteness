@@ -1,26 +1,35 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, Fragment } from 'react';
 import { motion } from 'framer-motion';
 import {
   Dumbbell, ChevronLeft, Clock, Layers, Zap, Users, UserCheck,
   Calendar, CheckSquare, Square, Plus, Trash2, Search, Save, CheckCircle, Video,
+  Link2, Unlink,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
+import { cn } from '@/lib/utils';
 
 const LEVEL_LABELS = ['', 'Iniciante', 'Básico', 'Intermediário', 'Avançado', 'Elite'];
 const DAYS = [
-  { label: 'Dom', value: 0 },
-  { label: 'Seg', value: 1 },
-  { label: 'Ter', value: 2 },
-  { label: 'Qua', value: 3 },
-  { label: 'Qui', value: 4 },
-  { label: 'Sex', value: 5 },
-  { label: 'Sáb', value: 6 },
+  { label: 'Dom', value: 0 }, { label: 'Seg', value: 1 }, { label: 'Ter', value: 2 },
+  { label: 'Qua', value: 3 }, { label: 'Qui', value: 4 }, { label: 'Sex', value: 5 }, { label: 'Sáb', value: 6 },
 ];
+
+type Technique = 'NORMAL' | 'BI_SET' | 'SUPER_SET' | 'TRI_SET' | 'DROP_SET' | 'GIANT_SET' | 'CIRCUIT';
+
+const TECHNIQUE_CONFIG: Record<Technique, { label: string; color: string; bg: string; border: string }> = {
+  NORMAL:    { label: '–',          color: 'text-muted-foreground', bg: '',                      border: '' },
+  BI_SET:    { label: 'Bi Set',     color: 'text-orange-400',       bg: 'bg-orange-500/10',      border: 'border-l-4 border-orange-500/60' },
+  SUPER_SET: { label: 'Super Set',  color: 'text-blue-400',         bg: 'bg-blue-500/10',        border: 'border-l-4 border-blue-500/60' },
+  TRI_SET:   { label: 'Tri Set',    color: 'text-purple-400',       bg: 'bg-purple-500/10',      border: 'border-l-4 border-purple-500/60' },
+  DROP_SET:  { label: 'Drop Set',   color: 'text-red-400',          bg: 'bg-red-500/10',         border: 'border-l-4 border-red-500/60' },
+  GIANT_SET: { label: 'Giant Set',  color: 'text-pink-400',         bg: 'bg-pink-500/10',        border: 'border-l-4 border-pink-500/60' },
+  CIRCUIT:   { label: 'Circuito',   color: 'text-emerald-400',      bg: 'bg-emerald-500/10',     border: 'border-l-4 border-emerald-500/60' },
+};
 
 interface WorkoutExerciseRow {
   exerciseId: string;
@@ -30,13 +39,24 @@ interface WorkoutExerciseRow {
   weight: number | null;
   restSeconds: number | null;
   videoUrl: string;
+  notes: string;
+  technique: Technique;
+  groupId: string | null;
+}
+
+function deriveTechnique(isSuperSet: boolean, isDropSet: boolean, superSetGroupId: string | null, groupSize: number): Technique {
+  if (isDropSet) return 'DROP_SET';
+  if (!isSuperSet) return 'NORMAL';
+  if (groupSize === 2) return 'BI_SET';
+  if (groupSize === 3) return 'TRI_SET';
+  if (groupSize >= 4) return 'GIANT_SET';
+  return 'SUPER_SET';
 }
 
 export default function WorkoutDetailPage() {
   const { id } = useParams();
   const qc = useQueryClient();
 
-  // Assign state
   const [selectedStudent, setSelectedStudent] = useState('');
   const [dayOfWeek, setDayOfWeek] = useState<number[]>([]);
   const [startDate, setStartDate] = useState(() => new Date().toISOString().split('T')[0]);
@@ -45,7 +65,6 @@ export default function WorkoutDetailPage() {
   const [assignError, setAssignError] = useState('');
   const [assignSuccess, setAssignSuccess] = useState(false);
 
-  // Exercise editor state
   const [exerciseRows, setExerciseRows] = useState<WorkoutExerciseRow[]>([]);
   const [exercisesLoaded, setExercisesLoaded] = useState(false);
   const [exSearch, setExSearch] = useState('');
@@ -55,20 +74,25 @@ export default function WorkoutDetailPage() {
   const { data: workout, isLoading } = useQuery({
     queryKey: ['workout', id],
     queryFn: () =>
-      api.get(`/workouts/${id}`).then((r) => {
+      api.get(`/workouts/${id}`).then(r => {
         const w = r.data.data;
         if (!exercisesLoaded) {
-          setExerciseRows(
-            (w.exercises || []).map((e: any) => ({
-              exerciseId: e.exercise?.id || e.exerciseId,
-              name: e.exercise?.name || '',
-              sets: e.sets || 3,
-              reps: String(e.reps || '10'),
-              weight: e.weight ?? null,
-              restSeconds: e.restSeconds ?? 60,
-              videoUrl: e.exercise?.videoUrl || '',
-            })),
-          );
+          const rawExercises = w.exercises || [];
+          // count group sizes for technique inference
+          const groupSizes: Record<string, number> = {};
+          rawExercises.forEach((e: any) => { if (e.superSetGroupId) groupSizes[e.superSetGroupId] = (groupSizes[e.superSetGroupId] || 0) + 1; });
+          setExerciseRows(rawExercises.map((e: any) => ({
+            exerciseId: e.exercise?.id || e.exerciseId,
+            name: e.exercise?.name || '',
+            sets: e.sets || 3,
+            reps: String(e.reps || '10'),
+            weight: e.weight ?? null,
+            restSeconds: e.restSeconds ?? 60,
+            videoUrl: e.exercise?.videoUrl || '',
+            notes: e.notes || '',
+            technique: deriveTechnique(e.isSuperSet, e.isDropSet, e.superSetGroupId, e.superSetGroupId ? groupSizes[e.superSetGroupId] : 0),
+            groupId: e.superSetGroupId || null,
+          })));
           setExercisesLoaded(true);
         }
         return w;
@@ -77,25 +101,28 @@ export default function WorkoutDetailPage() {
 
   const { data: students } = useQuery({
     queryKey: ['trainer-students'],
-    queryFn: () => api.get('/trainers/me/students').then((r) => r.data.data || []),
+    queryFn: () => api.get('/trainers/me/students').then(r => r.data.data || []),
   });
 
   const { data: allExercises } = useQuery({
     queryKey: ['exercises', exSearch],
-    queryFn: () =>
-      api.get('/exercises', { params: { search: exSearch || undefined } }).then((r) => r.data.data || []),
+    queryFn: () => api.get('/exercises', { params: { search: exSearch || undefined } }).then(r => r.data.data || []),
   });
 
   const saveExercisesMutation = useMutation({
     mutationFn: (rows: WorkoutExerciseRow[]) =>
       api.patch(`/workouts/${id}`, {
-        exercises: rows.map((r) => ({
+        exercises: rows.map(r => ({
           exerciseId: r.exerciseId,
           sets: r.sets,
           reps: r.reps,
           weight: r.weight ?? undefined,
           restSeconds: r.restSeconds ?? undefined,
           videoUrl: r.videoUrl || undefined,
+          notes: r.notes || undefined,
+          isSuperSet: r.technique !== 'NORMAL' && r.technique !== 'DROP_SET',
+          isDropSet: r.technique === 'DROP_SET',
+          superSetGroupId: r.groupId || undefined,
         })),
       }),
     onSuccess: () => {
@@ -119,12 +146,7 @@ export default function WorkoutDetailPage() {
     mutationFn: (data: any) => api.post(`/workouts/${id}/assign`, data),
     onSuccess: () => {
       setAssignSuccess(true);
-      setSelectedStudent('');
-      setDayOfWeek([]);
-      setStartDate(new Date().toISOString().split('T')[0]);
-      setEndDate('');
-      setNotes('');
-      setAssignError('');
+      setSelectedStudent(''); setDayOfWeek([]); setStartDate(new Date().toISOString().split('T')[0]); setEndDate(''); setNotes(''); setAssignError('');
       qc.invalidateQueries({ queryKey: ['workout', id] });
       setTimeout(() => setAssignSuccess(false), 3000);
     },
@@ -134,8 +156,7 @@ export default function WorkoutDetailPage() {
     },
   });
 
-  const toggleDay = (v: number) =>
-    setDayOfWeek((prev) => (prev.includes(v) ? prev.filter((d) => d !== v) : [...prev, v]));
+  const toggleDay = (v: number) => setDayOfWeek(prev => prev.includes(v) ? prev.filter(d => d !== v) : [...prev, v]);
 
   const handleAssign = (e: React.FormEvent) => {
     e.preventDefault();
@@ -148,31 +169,76 @@ export default function WorkoutDetailPage() {
 
   const addExercise = useCallback(
     (ex: any) => {
-      if (exerciseRows.find((r) => r.exerciseId === ex.id)) return;
-      setExerciseRows((prev) => [
-        ...prev,
-        { exerciseId: ex.id, name: ex.name, sets: 3, reps: '10', weight: null, restSeconds: 60, videoUrl: ex.videoUrl || '' },
-      ]);
+      if (exerciseRows.find(r => r.exerciseId === ex.id)) return;
+      setExerciseRows(prev => [...prev, { exerciseId: ex.id, name: ex.name, sets: 3, reps: '10', weight: null, restSeconds: 60, videoUrl: ex.videoUrl || '', notes: '', technique: 'NORMAL', groupId: null }]);
     },
     [exerciseRows],
   );
 
-  const removeExercise = (idx: number) =>
-    setExerciseRows((prev) => prev.filter((_, i) => i !== idx));
+  const removeExercise = (idx: number) => {
+    const row = exerciseRows[idx];
+    // if in a group, check if group becomes orphaned
+    const remaining = exerciseRows.filter((_, i) => i !== idx);
+    const groupStillUsed = remaining.filter(r => r.groupId === row.groupId).length;
+    setExerciseRows(
+      groupStillUsed < 1
+        ? remaining.map(r => r.groupId === row.groupId ? { ...r, groupId: null, technique: 'NORMAL' } : r)
+        : remaining,
+    );
+  };
 
   const updateRow = (idx: number, field: keyof WorkoutExerciseRow, value: any) =>
-    setExerciseRows((prev) =>
-      prev.map((r, i) => (i === idx ? { ...r, [field]: value } : r)),
-    );
+    setExerciseRows(prev => prev.map((r, i) => i === idx ? { ...r, [field]: value } : r));
+
+  const updateTechnique = (idx: number, technique: Technique) => {
+    if (technique === 'NORMAL') {
+      const row = exerciseRows[idx];
+      const sameGroup = exerciseRows.filter(r => r.groupId === row.groupId && r.groupId !== null);
+      if (sameGroup.length <= 2) {
+        // unlink all in this pair
+        setExerciseRows(prev => prev.map((r, i) =>
+          r.groupId === row.groupId ? { ...r, groupId: null, technique: 'NORMAL' } : r,
+        ));
+      } else {
+        setExerciseRows(prev => prev.map((r, i) => i === idx ? { ...r, groupId: null, technique: 'NORMAL' } : r));
+      }
+    } else {
+      const row = exerciseRows[idx];
+      if (row.groupId) {
+        // update all in group
+        setExerciseRows(prev => prev.map(r => r.groupId === row.groupId ? { ...r, technique } : r));
+      } else {
+        setExerciseRows(prev => prev.map((r, i) => i === idx ? { ...r, technique } : r));
+      }
+    }
+  };
+
+  const linkExercises = (i: number, j: number) => {
+    const rowI = exerciseRows[i];
+    const rowJ = exerciseRows[j];
+    const groupId = rowI.groupId || rowJ.groupId || `grp_${Date.now()}`;
+    const technique: Technique = (rowI.technique !== 'NORMAL' ? rowI.technique : rowJ.technique !== 'NORMAL' ? rowJ.technique : 'BI_SET');
+    setExerciseRows(prev => prev.map((r, idx) => {
+      if (idx === i || idx === j) return { ...r, groupId, technique };
+      if (r.groupId === rowI.groupId && rowI.groupId) return { ...r, groupId, technique }; // carry existing group
+      return r;
+    }));
+  };
+
+  const unlinkBetween = (i: number, j: number) => {
+    const groupId = exerciseRows[i].groupId;
+    if (!groupId) return;
+    const members = exerciseRows.map((r, idx) => ({ idx, r })).filter(({ r }) => r.groupId === groupId);
+    if (members.length <= 2) {
+      setExerciseRows(prev => prev.map(r => r.groupId === groupId ? { ...r, groupId: null, technique: 'NORMAL' } : r));
+    } else {
+      // split at the boundary: rows before j keep group, rows from j onwards get new group or become normal
+      setExerciseRows(prev => prev.map((r, idx) => idx === j ? { ...r, groupId: null, technique: 'NORMAL' } : r));
+    }
+  };
 
   if (isLoading) {
-    return (
-      <div className="max-w-2xl mx-auto space-y-4">
-        {[...Array(4)].map((_, i) => (
-          <div key={i} className="glass-card animate-pulse h-20" />
-        ))}
-      </div>
-    );
+    return <div className="max-w-2xl mx-auto space-y-4">{[...Array(4)].map((_, i) => <div key={i} className="glass-card animate-pulse h-20" />)}</div>;
   }
 
   if (!workout) {
@@ -186,8 +252,8 @@ export default function WorkoutDetailPage() {
   }
 
   const STATUS_LABELS: Record<string, { label: string; color: string }> = {
-    DRAFT: { label: 'Rascunho', color: 'bg-yellow-500/10 text-yellow-400' },
-    ACTIVE: { label: 'Ativo', color: 'bg-emerald-500/10 text-emerald-400' },
+    DRAFT:    { label: 'Rascunho', color: 'bg-yellow-500/10 text-yellow-400' },
+    ACTIVE:   { label: 'Ativo',    color: 'bg-emerald-500/10 text-emerald-400' },
     ARCHIVED: { label: 'Arquivado', color: 'bg-muted text-muted-foreground' },
   };
   const status = STATUS_LABELS[workout.status] || STATUS_LABELS.DRAFT;
@@ -203,15 +269,9 @@ export default function WorkoutDetailPage() {
           <h1 className="text-2xl font-bold">{workout.name}</h1>
           <div className="flex items-center gap-2 mt-1">
             <span className={`text-xs px-2 py-0.5 rounded-full ${status.color}`}>{status.label}</span>
-            {workout.isTemplate && (
-              <span className="text-xs px-1.5 py-0.5 rounded bg-cyan-500/10 text-cyan-400">Template</span>
-            )}
+            {workout.isTemplate && <span className="text-xs px-1.5 py-0.5 rounded bg-cyan-500/10 text-cyan-400">Template</span>}
             {workout.status === 'DRAFT' && (
-              <button
-                onClick={() => activateMutation.mutate()}
-                disabled={activateMutation.isPending}
-                className="text-xs px-2 py-0.5 rounded-full bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600/40 transition-all disabled:opacity-50"
-              >
+              <button onClick={() => activateMutation.mutate()} disabled={activateMutation.isPending} className="text-xs px-2 py-0.5 rounded-full bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600/40 transition-all disabled:opacity-50">
                 {activateMutation.isPending ? 'Ativando...' : 'Ativar treino'}
               </button>
             )}
@@ -225,18 +285,14 @@ export default function WorkoutDetailPage() {
           { label: 'Duração', value: `${workout.duration ?? 45} min`, icon: Clock, color: 'text-cyan-400' },
           { label: 'Nível', value: LEVEL_LABELS[workout.level] || 'Iniciante', icon: Zap, color: 'text-yellow-400' },
           { label: 'Alunos', value: workout._count?.plans ?? 0, icon: Users, color: 'text-purple-400' },
-        ].map((s) => (
+        ].map(s => (
           <div key={s.label} className="glass-card flex items-center gap-3">
             <s.icon className={`w-5 h-5 ${s.color} flex-shrink-0`} />
-            <div>
-              <div className="font-semibold text-sm">{s.value}</div>
-              <div className="text-xs text-muted-foreground">{s.label}</div>
-            </div>
+            <div><div className="font-semibold text-sm">{s.value}</div><div className="text-xs text-muted-foreground">{s.label}</div></div>
           </div>
         ))}
       </motion.div>
 
-      {/* Description */}
       {workout.description && (
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="glass-card">
           <h2 className="font-semibold mb-2">Descrição</h2>
@@ -251,11 +307,7 @@ export default function WorkoutDetailPage() {
             <Layers className="w-4 h-4 text-muted-foreground" />
             Exercícios ({exerciseRows.length})
           </h2>
-          <button
-            onClick={() => saveExercisesMutation.mutate(exerciseRows)}
-            disabled={saveExercisesMutation.isPending}
-            className="btn-primary text-xs px-3 py-1.5 flex items-center gap-1.5 disabled:opacity-50"
-          >
+          <button onClick={() => saveExercisesMutation.mutate(exerciseRows)} disabled={saveExercisesMutation.isPending} className="btn-primary text-xs px-3 py-1.5 flex items-center gap-1.5 disabled:opacity-50">
             {saveExSuccess ? <CheckCircle className="w-3.5 h-3.5" /> : <Save className="w-3.5 h-3.5" />}
             {saveExercisesMutation.isPending ? 'Salvando...' : saveExSuccess ? 'Salvo!' : 'Salvar exercícios'}
           </button>
@@ -264,170 +316,174 @@ export default function WorkoutDetailPage() {
         {/* Search to add exercises */}
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <input
-            type="text"
-            value={exSearch}
-            onChange={(e) => setExSearch(e.target.value)}
-            placeholder="Buscar exercício para adicionar..."
-            className="input-field pl-9"
-          />
+          <input type="text" value={exSearch} onChange={e => setExSearch(e.target.value)} placeholder="Buscar exercício para adicionar..." className="input-field pl-9" />
         </div>
 
         {exSearch && (
           <div className="glass rounded-xl divide-y divide-border max-h-48 overflow-y-auto">
-            {(allExercises || [])
-              .filter((e: any) => !exerciseRows.find((r) => r.exerciseId === e.id))
-              .slice(0, 8)
-              .map((ex: any) => (
-                <button
-                  key={ex.id}
-                  type="button"
-                  onClick={() => { addExercise(ex); setExSearch(''); }}
-                  className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-accent transition-all text-left"
-                >
-                  <span className="text-sm">{ex.name}</span>
-                  <Plus className="w-4 h-4 text-primary flex-shrink-0" />
-                </button>
-              ))}
-            {(allExercises || []).filter((e: any) => !exerciseRows.find((r) => r.exerciseId === e.id)).length === 0 && (
+            {(allExercises || []).filter((e: any) => !exerciseRows.find(r => r.exerciseId === e.id)).slice(0, 8).map((ex: any) => (
+              <button key={ex.id} type="button" onClick={() => { addExercise(ex); setExSearch(''); }} className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-accent transition-all text-left">
+                <span className="text-sm">{ex.name}</span>
+                <Plus className="w-4 h-4 text-primary flex-shrink-0" />
+              </button>
+            ))}
+            {(allExercises || []).filter((e: any) => !exerciseRows.find(r => r.exerciseId === e.id)).length === 0 && (
               <p className="text-sm text-muted-foreground text-center py-3">Nenhum resultado</p>
             )}
           </div>
         )}
 
-        {/* Exercise rows */}
-        {exerciseRows.length > 0 ? (
-          <div className="space-y-3">
-            {exerciseRows.map((row, i) => (
-              <div key={row.exerciseId} className="glass rounded-xl p-3 space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="font-medium text-sm flex items-center gap-2">
-                    <span className="w-6 h-6 rounded-lg bg-purple-600/10 flex items-center justify-center text-xs font-bold text-purple-400">
-                      {i + 1}
-                    </span>
-                    {row.name}
-                  </span>
-                  <button type="button" onClick={() => removeExercise(i)} className="text-muted-foreground hover:text-red-400 transition-colors">
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
-                <div className="grid grid-cols-4 gap-2">
-                  <div>
-                    <label className="text-xs text-muted-foreground block mb-1">Séries</label>
-                    <input
-                      type="number"
-                      min={1}
-                      value={row.sets}
-                      onChange={(e) => updateRow(i, 'sets', Number(e.target.value))}
-                      className="input-field py-1.5 text-sm text-center"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs text-muted-foreground block mb-1">Reps</label>
-                    <input
-                      type="text"
-                      value={row.reps}
-                      onChange={(e) => updateRow(i, 'reps', e.target.value)}
-                      placeholder="10"
-                      className="input-field py-1.5 text-sm text-center"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs text-muted-foreground block mb-1">Carga (kg)</label>
-                    <input
-                      type="number"
-                      min={0}
-                      value={row.weight ?? ''}
-                      onChange={(e) => updateRow(i, 'weight', e.target.value ? Number(e.target.value) : null)}
-                      placeholder="—"
-                      className="input-field py-1.5 text-sm text-center"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs text-muted-foreground block mb-1">Descanso (s)</label>
-                    <input
-                      type="number"
-                      min={0}
-                      value={row.restSeconds ?? ''}
-                      onChange={(e) => updateRow(i, 'restSeconds', e.target.value ? Number(e.target.value) : null)}
-                      placeholder="60"
-                      className="input-field py-1.5 text-sm text-center"
-                    />
-                  </div>
-                </div>
-                <div>
-                  <label className="text-xs text-muted-foreground block mb-1 flex items-center gap-1">
-                    <Video className="w-3 h-3" />
-                    URL do vídeo (YouTube, Vimeo ou .mp4)
-                  </label>
-                  <input
-                    type="url"
-                    value={row.videoUrl}
-                    onChange={(e) => updateRow(i, 'videoUrl', e.target.value)}
-                    placeholder="https://youtube.com/watch?v=..."
-                    className="input-field py-1.5 text-sm"
-                  />
-                </div>
-              </div>
-            ))}
+        {/* Legend */}
+        {exerciseRows.some(r => r.technique !== 'NORMAL') && (
+          <div className="flex items-center gap-2 flex-wrap text-[10px]">
+            <span className="text-muted-foreground">Técnicas:</span>
+            {(Object.entries(TECHNIQUE_CONFIG) as [Technique, typeof TECHNIQUE_CONFIG.NORMAL][])
+              .filter(([k]) => k !== 'NORMAL' && exerciseRows.some(r => r.technique === k))
+              .map(([k, v]) => (
+                <span key={k} className={cn('px-2 py-0.5 rounded-full font-semibold', v.bg, v.color)}>{v.label}</span>
+              ))}
           </div>
-        ) : (
-          <p className="text-sm text-muted-foreground text-center py-4">
-            Busque exercícios acima para adicionar ao treino
-          </p>
         )}
 
-        {saveExError && (
-          <div className="glass rounded-xl p-3 border border-red-500/20 text-red-400 text-sm">{saveExError}</div>
+        {/* Exercise rows */}
+        {exerciseRows.length > 0 ? (
+          <div className="space-y-1">
+            {exerciseRows.map((row, i) => {
+              const cfg = TECHNIQUE_CONFIG[row.technique];
+              const nextRow = exerciseRows[i + 1];
+              const isInGroup = !!row.groupId;
+              const nextInSameGroup = !!nextRow && nextRow.groupId === row.groupId && !!row.groupId;
+              const isFirstInGroup = isInGroup && (i === 0 || exerciseRows[i - 1].groupId !== row.groupId);
+
+              return (
+                <Fragment key={row.exerciseId}>
+                  <div className={cn('glass rounded-xl p-3 space-y-2 transition-all', isInGroup && cfg.border, isInGroup && cfg.bg)}>
+                    {/* Header row */}
+                    <div className="flex items-center justify-between">
+                      <span className="font-medium text-sm flex items-center gap-2">
+                        <span className="w-6 h-6 rounded-lg bg-purple-600/10 flex items-center justify-center text-xs font-bold text-purple-400">{i + 1}</span>
+                        {row.name}
+                        {isInGroup && isFirstInGroup && (
+                          <span className={cn('text-[10px] px-1.5 py-0.5 rounded-full font-semibold', cfg.bg, cfg.color)}>{cfg.label}</span>
+                        )}
+                      </span>
+                      <button type="button" onClick={() => removeExercise(i)} className="text-muted-foreground hover:text-red-400 transition-colors">
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+
+                    {/* Metrics */}
+                    <div className="grid grid-cols-4 gap-2">
+                      <div>
+                        <label className="text-xs text-muted-foreground block mb-1">Séries</label>
+                        <input type="number" min={1} value={row.sets} onChange={e => updateRow(i, 'sets', Number(e.target.value))} className="input-field py-1.5 text-sm text-center" />
+                      </div>
+                      <div>
+                        <label className="text-xs text-muted-foreground block mb-1">Reps</label>
+                        <input type="text" value={row.reps} onChange={e => updateRow(i, 'reps', e.target.value)} placeholder="10" className="input-field py-1.5 text-sm text-center" />
+                      </div>
+                      <div>
+                        <label className="text-xs text-muted-foreground block mb-1">Carga (kg)</label>
+                        <input type="number" min={0} value={row.weight ?? ''} onChange={e => updateRow(i, 'weight', e.target.value ? Number(e.target.value) : null)} placeholder="—" className="input-field py-1.5 text-sm text-center" />
+                      </div>
+                      <div>
+                        <label className="text-xs text-muted-foreground block mb-1">Descanso (s)</label>
+                        <input type="number" min={0} value={row.restSeconds ?? ''} onChange={e => updateRow(i, 'restSeconds', e.target.value ? Number(e.target.value) : null)} placeholder="60" className="input-field py-1.5 text-sm text-center" />
+                      </div>
+                    </div>
+
+                    {/* Video URL */}
+                    <div>
+                      <label className="text-xs text-muted-foreground block mb-1 flex items-center gap-1">
+                        <Video className="w-3 h-3" />URL do vídeo
+                      </label>
+                      <input type="url" value={row.videoUrl} onChange={e => updateRow(i, 'videoUrl', e.target.value)} placeholder="https://youtube.com/watch?v=..." className="input-field py-1.5 text-sm" />
+                    </div>
+
+                    {/* Notes */}
+                    <div>
+                      <input type="text" value={row.notes} onChange={e => updateRow(i, 'notes', e.target.value)} placeholder="Observações (ex: foco na contração, ritmo lento...)" className="input-field py-1.5 text-xs text-muted-foreground" />
+                    </div>
+
+                    {/* Technique selector */}
+                    <div className="flex items-center gap-1 flex-wrap pt-1 border-t border-border/50">
+                      <span className="text-[10px] text-muted-foreground mr-0.5">Técnica:</span>
+                      {(Object.entries(TECHNIQUE_CONFIG) as [Technique, typeof TECHNIQUE_CONFIG.NORMAL][]).map(([key, c]) => (
+                        <button
+                          key={key}
+                          onClick={() => updateTechnique(i, key)}
+                          className={cn(
+                            'text-[10px] px-2 py-0.5 rounded-full font-medium transition-all',
+                            row.technique === key
+                              ? cn('font-semibold', c.bg, c.color, 'ring-1 ring-current/30')
+                              : 'text-muted-foreground/40 hover:text-muted-foreground',
+                          )}
+                        >
+                          {c.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Connector between rows */}
+                  {i < exerciseRows.length - 1 && (
+                    <div className="flex items-center justify-center h-5 relative">
+                      {nextInSameGroup ? (
+                        <button
+                          onClick={() => unlinkBetween(i, i + 1)}
+                          className={cn('flex items-center gap-1 text-[10px] font-medium transition-all hover:opacity-70', cfg.color)}
+                          title="Desvincular exercícios"
+                        >
+                          <div className={cn('w-0.5 h-3', cfg.bg.replace('bg-', 'bg-').replace('/10', '/60'))} style={{ background: 'currentColor' }} />
+                          <Unlink className="w-2.5 h-2.5" />
+                          <div className={cn('w-0.5 h-3')} style={{ background: 'currentColor' }} />
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => linkExercises(i, i + 1)}
+                          className="flex items-center gap-1 text-[10px] text-muted-foreground/30 hover:text-primary transition-colors"
+                          title="Vincular como treino conjugado"
+                        >
+                          <Link2 className="w-2.5 h-2.5" />
+                          <span>vincular</span>
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </Fragment>
+              );
+            })}
+          </div>
+        ) : (
+          <p className="text-sm text-muted-foreground text-center py-4">Busque exercícios acima para adicionar ao treino</p>
         )}
+
+        {saveExError && <div className="glass rounded-xl p-3 border border-red-500/20 text-red-400 text-sm">{saveExError}</div>}
       </motion.div>
 
       {/* Assign to student */}
-      <motion.form
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.3 }}
-        onSubmit={handleAssign}
-        className="glass-card space-y-5"
-      >
+      <motion.form initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} onSubmit={handleAssign} className="glass-card space-y-5">
         <h2 className="font-semibold flex items-center gap-2">
-          <UserCheck className="w-4 h-4 text-cyan-400" />
-          Atribuir a aluno
+          <UserCheck className="w-4 h-4 text-cyan-400" />Atribuir a aluno
         </h2>
 
         <div>
           <label className="text-sm font-medium mb-1.5 block">Aluno *</label>
-          <select
-            value={selectedStudent}
-            onChange={(e) => setSelectedStudent(e.target.value)}
-            className="input-field"
-          >
+          <select value={selectedStudent} onChange={e => setSelectedStudent(e.target.value)} className="input-field">
             <option value="">Selecione um aluno...</option>
             {(students || []).map((s: any) => (
-              <option key={s.id} value={s.id}>
-                {s.user?.profile?.firstName} {s.user?.profile?.lastName}
-              </option>
+              <option key={s.id} value={s.id}>{s.user?.profile?.firstName} {s.user?.profile?.lastName}</option>
             ))}
           </select>
         </div>
 
         <div>
-          <label className="text-sm font-medium mb-2 block flex items-center gap-1.5">
-            <Calendar className="w-3.5 h-3.5" />
-            Dias da semana *
-          </label>
+          <label className="text-sm font-medium mb-2 block flex items-center gap-1.5"><Calendar className="w-3.5 h-3.5" />Dias da semana *</label>
           <div className="flex gap-2 flex-wrap">
-            {DAYS.map((d) => {
+            {DAYS.map(d => {
               const active = dayOfWeek.includes(d.value);
               return (
-                <button
-                  key={d.value}
-                  type="button"
-                  onClick={() => toggleDay(d.value)}
-                  className={`w-11 h-11 rounded-xl text-sm font-medium transition-all flex flex-col items-center justify-center gap-0.5 ${
-                    active ? 'bg-primary text-primary-foreground' : 'glass hover:bg-accent text-muted-foreground'
-                  }`}
-                >
+                <button key={d.value} type="button" onClick={() => toggleDay(d.value)} className={`w-11 h-11 rounded-xl text-sm font-medium transition-all flex flex-col items-center justify-center gap-0.5 ${active ? 'bg-primary text-primary-foreground' : 'glass hover:bg-accent text-muted-foreground'}`}>
                   {active ? <CheckSquare className="w-3 h-3" /> : <Square className="w-3 h-3" />}
                   {d.label}
                 </button>
@@ -439,53 +495,24 @@ export default function WorkoutDetailPage() {
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className="text-sm font-medium mb-1.5 block">Data de início *</label>
-            <input
-              type="date"
-              value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
-              className="input-field"
-              required
-            />
+            <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="input-field" required />
           </div>
           <div>
             <label className="text-sm font-medium mb-1.5 block">Data de término</label>
-            <input
-              type="date"
-              value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
-              className="input-field"
-              min={startDate}
-            />
+            <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="input-field" min={startDate} />
           </div>
         </div>
 
         <div>
           <label className="text-sm font-medium mb-1.5 block">Observações</label>
-          <input
-            type="text"
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            placeholder="Ex: Foco em progressão de carga"
-            className="input-field"
-          />
+          <input type="text" value={notes} onChange={e => setNotes(e.target.value)} placeholder="Ex: Foco em progressão de carga" className="input-field" />
         </div>
 
-        {assignError && (
-          <div className="glass rounded-xl p-3 border border-red-500/20 text-red-400 text-sm">{assignError}</div>
-        )}
-        {assignSuccess && (
-          <div className="glass rounded-xl p-3 border border-emerald-500/20 text-emerald-400 text-sm">
-            Treino atribuído com sucesso!
-          </div>
-        )}
+        {assignError && <div className="glass rounded-xl p-3 border border-red-500/20 text-red-400 text-sm">{assignError}</div>}
+        {assignSuccess && <div className="glass rounded-xl p-3 border border-emerald-500/20 text-emerald-400 text-sm">Treino atribuído com sucesso!</div>}
 
-        <button
-          type="submit"
-          disabled={assignMutation.isPending}
-          className="btn-primary w-full flex items-center justify-center gap-2 disabled:opacity-50"
-        >
-          <UserCheck className="w-4 h-4" />
-          {assignMutation.isPending ? 'Atribuindo...' : 'Atribuir treino'}
+        <button type="submit" disabled={assignMutation.isPending} className="btn-primary w-full flex items-center justify-center gap-2 disabled:opacity-50">
+          <UserCheck className="w-4 h-4" />{assignMutation.isPending ? 'Atribuindo...' : 'Atribuir treino'}
         </button>
       </motion.form>
     </div>
