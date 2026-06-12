@@ -11,6 +11,7 @@ import {
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { ThrottlerGuard } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
+import { EmailService } from '../email/email.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
@@ -25,7 +26,7 @@ import { CurrentUser } from '../../decorators/current-user.decorator';
 @Controller('auth')
 @UseGuards(ThrottlerGuard)
 export class AuthController {
-  constructor(private authService: AuthService) {}
+  constructor(private authService: AuthService, private emailService: EmailService) {}
 
   @Public()
   @Post('register')
@@ -87,6 +88,16 @@ export class AuthController {
   @ApiOperation({ summary: 'Callback Google OAuth' })
   async googleCallback(@Req() req: any) {
     return this.authService.googleLogin(req.user);
+  }
+
+  @Post('send-welcome')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Enviar email de boas-vindas ao aluno' })
+  async sendWelcome(@Body() body: { to: string; studentName: string; trainerName: string; tempPassword: string; anamneseType?: string }) {
+    const result = await this.emailService.sendStudentWelcome(body);
+    return { data: result };
   }
 
   @Get('me')
