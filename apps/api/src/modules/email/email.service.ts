@@ -21,7 +21,8 @@ export class EmailService {
     const frontendUrl = this.config.get('FRONTEND_URL', 'https://fitlynutri.com.br');
     const loginUrl = `${frontendUrl}/login`;
     const anamneseUrl = `${frontendUrl}/student/progress`;
-    const from = this.config.get('RESEND_FROM', 'Fitlynutri <onboarding@resend.dev>');
+    const fromEmail = this.config.get('RESEND_FROM', 'onboarding@resend.dev');
+    const from = fromEmail.includes('@') && !fromEmail.includes('<') ? `Fitlynutri <${fromEmail}>` : fromEmail;
 
     const html = `
 <!DOCTYPE html>
