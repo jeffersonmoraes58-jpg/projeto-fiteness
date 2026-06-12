@@ -96,8 +96,7 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Enviar email de boas-vindas ao aluno' })
   async sendWelcome(@Body() body: { to: string; studentName: string; trainerName: string; tempPassword: string; anamneseType?: string }) {
-    const result = await this.emailService.sendStudentWelcome(body);
-    return { data: result };
+    return this.emailService.sendStudentWelcome(body);
   }
 
   @Get('me')
