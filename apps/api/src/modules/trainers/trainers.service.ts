@@ -39,10 +39,10 @@ export class TrainersService {
     const relations = await this.prisma.trainerStudent.findMany({
       where: { trainerId: trainer.id, isActive: true },
       include: {
-        student: { include: { user: { include: { profile: true } } } },
+        student: { include: { user: { include: { profile: true } }, anamnesis: true } },
       },
     });
-    const results = relations.map((r) => ({ ...r.student, monthlyFee: r.monthlyFee, startedAt: r.startedAt }));
+    const results = relations.map((r) => ({ ...r.student, monthlyFee: r.monthlyFee, startedAt: r.startedAt, isActive: r.isActive }));
     if (!search) return results;
     const q = search.toLowerCase();
     return results.filter((s) => {
