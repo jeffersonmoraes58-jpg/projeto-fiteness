@@ -3,6 +3,7 @@ import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { StudentsService } from './students.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../../decorators/current-user.decorator';
+import { Public } from '../../decorators/public.decorator';
 
 @ApiTags('students')
 @ApiBearerAuth()
@@ -87,5 +88,19 @@ export class StudentsController {
   @ApiOperation({ summary: 'Atualizar perfil do aluno' })
   update(@CurrentUser() user: any, @Body() body: any) {
     return this.service.update(user.id, body);
+  }
+
+  @Public()
+  @Get('public/anamnese/:userId')
+  @ApiOperation({ summary: 'Status da anamnese (público)' })
+  getAnamneseStatus(@Param('userId') userId: string) {
+    return this.service.getAnamneseStatus(userId);
+  }
+
+  @Public()
+  @Post('public/anamnese/:userId')
+  @ApiOperation({ summary: 'Submeter anamnese (público)' })
+  submitAnamnese(@Param('userId') userId: string, @Body() body: any) {
+    return this.service.submitAnamnese(userId, body);
   }
 }

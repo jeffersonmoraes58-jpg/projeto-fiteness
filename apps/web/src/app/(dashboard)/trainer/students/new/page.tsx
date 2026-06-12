@@ -146,6 +146,7 @@ export default function NewStudentPage() {
             trainerName,
             tempPassword,
             anamneseType: data.enviarAnamnese === 'Sim' ? data.anamnese : undefined,
+            studentUserId: newUserId,
           });
           emailSent = res.data?.data?.sent === true;
         } catch {}

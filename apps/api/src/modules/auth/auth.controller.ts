@@ -95,7 +95,7 @@ export class AuthController {
   @ApiBearerAuth()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Enviar email de boas-vindas ao aluno' })
-  async sendWelcome(@Body() body: { to: string; studentName: string; trainerName: string; tempPassword: string; anamneseType?: string }) {
+  async sendWelcome(@Body() body: { to: string; studentName: string; trainerName: string; tempPassword: string; anamneseType?: string; studentUserId?: string }) {
     return this.emailService.sendStudentWelcome(body);
   }
 

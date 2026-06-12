@@ -273,6 +273,28 @@ export class StudentsService {
     return updatedStudent;
   }
 
+  async getAnamneseStatus(userId: string) {
+    const student = await this.prisma.student.findUnique({
+      where: { userId },
+      include: { anamnesis: true },
+    });
+    if (!student) throw new NotFoundException('Aluno não encontrado');
+    return { filled: !!student.anamnesis, anamnesis: student.anamnesis };
+  }
+
+  async submitAnamnese(userId: string, data: any) {
+    const student = await this.prisma.student.findUnique({ where: { userId } });
+    if (!student) throw new NotFoundException('Aluno não encontrado');
+
+    const { anamneseType, ...answers } = data;
+    const anamnesis = await this.prisma.anamnesis.upsert({
+      where: { studentId: student.id },
+      create: { studentId: student.id, ...answers },
+      update: { ...answers, completedAt: new Date() },
+    });
+    return { success: true, anamnesis };
+  }
+
   async findByTenant(tenantId: string, search?: string) {
     return this.prisma.user.findMany({
       where: {
