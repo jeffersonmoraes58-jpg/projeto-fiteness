@@ -1,15 +1,18 @@
 'use client';
 
 import { useState } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
   Dumbbell, Plus, Search, Copy, Archive, MoreVertical,
   ChevronRight, Clock, Users, Layers, Zap, FileText,
+  ChevronDown, ChevronUp, Sparkles,
 } from 'lucide-react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
+import toast from 'react-hot-toast';
 
 const STATUS_FILTERS = ['Todos', 'Rascunho', 'Ativo', 'Arquivado', 'Templates'];
 const STATUS_MAP: Record<string, string> = { Rascunho: 'DRAFT', Ativo: 'ACTIVE', Arquivado: 'ARCHIVED' };
@@ -20,10 +23,172 @@ const STATUS_LABELS: Record<string, { label: string; color: string }> = {
 };
 const LEVEL_LABELS = ['', 'Iniciante', 'Básico', 'Intermediário', 'Avançado', 'Elite'];
 
+interface TemplateExercise {
+  name: string;
+  sets: number;
+  reps: string;
+  restSeconds: number;
+}
+
+interface WorkoutTemplate {
+  id: string;
+  emoji: string;
+  name: string;
+  description: string;
+  category: string;
+  level: number;
+  duration: number;
+  tags: string[];
+  gradient: string;
+  exercises: TemplateExercise[];
+}
+
+const WORKOUT_TEMPLATES: WorkoutTemplate[] = [
+  {
+    id: 'abc-a',
+    emoji: '💪',
+    name: 'Treino A – Peito e Bíceps',
+    description: 'ABC Hipertrofia — Dia 1. Peito superior, médio e inferior com finalização de bíceps.',
+    category: 'Hipertrofia',
+    level: 2,
+    duration: 60,
+    tags: ['hipertrofia', 'abc', 'peito', 'bíceps'],
+    gradient: 'from-purple-600 to-indigo-600',
+    exercises: [
+      { name: 'Supino Reto', sets: 4, reps: '8-10', restSeconds: 90 },
+      { name: 'Supino Inclinado', sets: 3, reps: '10-12', restSeconds: 60 },
+      { name: 'Crucifixo', sets: 3, reps: '12', restSeconds: 60 },
+      { name: 'Crossover', sets: 3, reps: '15', restSeconds: 45 },
+      { name: 'Rosca Direta', sets: 4, reps: '10', restSeconds: 60 },
+      { name: 'Rosca Alternada', sets: 3, reps: '12', restSeconds: 60 },
+    ],
+  },
+  {
+    id: 'abc-b',
+    emoji: '🔷',
+    name: 'Treino B – Costas e Tríceps',
+    description: 'ABC Hipertrofia — Dia 2. Volume para dorsais e romboides com tríceps no final.',
+    category: 'Hipertrofia',
+    level: 2,
+    duration: 60,
+    tags: ['hipertrofia', 'abc', 'costas', 'tríceps'],
+    gradient: 'from-blue-600 to-cyan-600',
+    exercises: [
+      { name: 'Puxada Frontal', sets: 4, reps: '10', restSeconds: 90 },
+      { name: 'Remada Curvada', sets: 4, reps: '10', restSeconds: 90 },
+      { name: 'Remada Unilateral', sets: 3, reps: '12', restSeconds: 60 },
+      { name: 'Barra Fixa', sets: 3, reps: 'máx', restSeconds: 90 },
+      { name: 'Tríceps Corda', sets: 4, reps: '12', restSeconds: 60 },
+      { name: 'Tríceps Testa', sets: 3, reps: '10', restSeconds: 60 },
+    ],
+  },
+  {
+    id: 'abc-c',
+    emoji: '🦵',
+    name: 'Treino C – Pernas Completo',
+    description: 'ABC Hipertrofia — Dia 3. Quadríceps, posteriores, glúteos e panturrilha.',
+    category: 'Hipertrofia',
+    level: 2,
+    duration: 70,
+    tags: ['hipertrofia', 'abc', 'pernas', 'glúteos'],
+    gradient: 'from-emerald-600 to-teal-600',
+    exercises: [
+      { name: 'Agachamento Livre', sets: 4, reps: '10', restSeconds: 120 },
+      { name: 'Leg Press 45°', sets: 4, reps: '12', restSeconds: 90 },
+      { name: 'Cadeira Extensora', sets: 3, reps: '15', restSeconds: 60 },
+      { name: 'Cadeira Flexora', sets: 3, reps: '15', restSeconds: 60 },
+      { name: 'Stiff', sets: 3, reps: '12', restSeconds: 90 },
+      { name: 'Panturrilha em Pé', sets: 4, reps: '20', restSeconds: 45 },
+    ],
+  },
+  {
+    id: 'ombros-core',
+    emoji: '🏋️',
+    name: 'Ombros e Core',
+    description: 'Treino complementar para deltoides, trapézio e abdômen.',
+    category: 'Hipertrofia',
+    level: 2,
+    duration: 50,
+    tags: ['hipertrofia', 'ombros', 'core'],
+    gradient: 'from-yellow-600 to-orange-600',
+    exercises: [
+      { name: 'Desenvolvimento com Barra', sets: 4, reps: '10', restSeconds: 90 },
+      { name: 'Elevação Lateral', sets: 4, reps: '12', restSeconds: 60 },
+      { name: 'Elevação Frontal', sets: 3, reps: '12', restSeconds: 60 },
+      { name: 'Rosca Martelo', sets: 3, reps: '12', restSeconds: 60 },
+      { name: 'Abdômen Crunch', sets: 4, reps: '20', restSeconds: 45 },
+      { name: 'Prancha', sets: 4, reps: '45s', restSeconds: 60 },
+    ],
+  },
+  {
+    id: 'full-body',
+    emoji: '🔥',
+    name: 'Full Body Emagrecimento',
+    description: 'Treino completo 3x/semana com compostos e cardio para queima calórica.',
+    category: 'Emagrecimento',
+    level: 1,
+    duration: 45,
+    tags: ['emagrecimento', 'full body', 'iniciante'],
+    gradient: 'from-rose-600 to-pink-600',
+    exercises: [
+      { name: 'Agachamento Livre', sets: 3, reps: '15', restSeconds: 45 },
+      { name: 'Supino Reto', sets: 3, reps: '12', restSeconds: 45 },
+      { name: 'Remada Curvada', sets: 3, reps: '12', restSeconds: 45 },
+      { name: 'Desenvolvimento com Barra', sets: 3, reps: '12', restSeconds: 45 },
+      { name: 'Abdômen Crunch', sets: 3, reps: '20', restSeconds: 30 },
+      { name: 'Esteira', sets: 1, reps: '20min', restSeconds: 0 },
+    ],
+  },
+  {
+    id: 'hiit',
+    emoji: '⚡',
+    name: 'HIIT Força e Cardio',
+    description: 'Alta intensidade com intervalos curtos. Queima acelerada de gordura.',
+    category: 'Emagrecimento',
+    level: 3,
+    duration: 40,
+    tags: ['hiit', 'cardio', 'emagrecimento', 'avançado'],
+    gradient: 'from-orange-600 to-red-600',
+    exercises: [
+      { name: 'Flexão de Braço', sets: 4, reps: '15', restSeconds: 30 },
+      { name: 'Agachamento Livre', sets: 4, reps: '20', restSeconds: 30 },
+      { name: 'Bicicleta Ergométrica', sets: 3, reps: '5min', restSeconds: 60 },
+      { name: 'Abdômen Crunch', sets: 4, reps: '20', restSeconds: 20 },
+      { name: 'Prancha', sets: 3, reps: '45s', restSeconds: 30 },
+      { name: 'Esteira', sets: 1, reps: '10min', restSeconds: 0 },
+    ],
+  },
+  {
+    id: 'gluteos',
+    emoji: '🍑',
+    name: 'Glúteos e Pernas',
+    description: 'Foco em glúteos e posterior de coxa. Ideal para hipertrofia feminina.',
+    category: 'Hipertrofia',
+    level: 2,
+    duration: 60,
+    tags: ['glúteos', 'pernas', 'feminino', 'hipertrofia'],
+    gradient: 'from-pink-600 to-rose-600',
+    exercises: [
+      { name: 'Agachamento Livre', sets: 4, reps: '12', restSeconds: 90 },
+      { name: 'Leg Press 45°', sets: 4, reps: '15', restSeconds: 75 },
+      { name: 'Stiff', sets: 4, reps: '12', restSeconds: 75 },
+      { name: 'Cadeira Flexora', sets: 3, reps: '15', restSeconds: 60 },
+      { name: 'Panturrilha em Pé', sets: 4, reps: '20', restSeconds: 45 },
+    ],
+  },
+];
+
+const CATEGORIES = ['Todos', 'Hipertrofia', 'Emagrecimento'];
+
 export default function TrainerWorkouts() {
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState('Todos');
+  const [templatesOpen, setTemplatesOpen] = useState(true);
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
+  const [categoryFilter, setCategoryFilter] = useState('Todos');
+  const [usingTemplateId, setUsingTemplateId] = useState<string | null>(null);
   const queryClient = useQueryClient();
+  const router = useRouter();
 
   const { data: workouts, isLoading } = useQuery({
     queryKey: ['trainer-workouts'],
@@ -39,6 +204,57 @@ export default function TrainerWorkouts() {
     mutationFn: (id: string) => api.patch(`/workouts/${id}`, { status: 'ARCHIVED' }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['trainer-workouts'] }),
   });
+
+  const useTemplateMutation = useMutation({
+    mutationFn: async (template: WorkoutTemplate) => {
+      const exercisesRes = await api.get('/exercises');
+      const allExercises: any[] = exercisesRes.data.data || [];
+
+      const createRes = await api.post('/workouts', {
+        name: template.name,
+        description: template.description,
+        level: template.level,
+        duration: template.duration,
+        tags: template.tags,
+        status: 'ACTIVE',
+      });
+      const workoutId = createRes.data.data?.id;
+      if (!workoutId) throw new Error('Falha ao criar treino');
+
+      const exercises = template.exercises.flatMap((te) => {
+        const ex = allExercises.find((e: any) =>
+          e.name.toLowerCase() === te.name.toLowerCase()
+        );
+        if (!ex) return [];
+        return [{ exerciseId: ex.id, sets: te.sets, reps: te.reps, restSeconds: te.restSeconds }];
+      });
+
+      if (exercises.length > 0) {
+        await api.patch(`/workouts/${workoutId}`, { exercises });
+      }
+
+      return workoutId;
+    },
+    onSuccess: (workoutId) => {
+      queryClient.invalidateQueries({ queryKey: ['trainer-workouts'] });
+      toast.success('Treino criado a partir do template!');
+      setUsingTemplateId(null);
+      router.push(`/trainer/workouts/${workoutId}`);
+    },
+    onError: () => {
+      toast.error('Erro ao criar treino. Tente novamente.');
+      setUsingTemplateId(null);
+    },
+  });
+
+  const handleUseTemplate = (template: WorkoutTemplate) => {
+    setUsingTemplateId(template.id);
+    useTemplateMutation.mutate(template);
+  };
+
+  const visibleTemplates = categoryFilter === 'Todos'
+    ? WORKOUT_TEMPLATES
+    : WORKOUT_TEMPLATES.filter((t) => t.category === categoryFilter);
 
   const filtered = (workouts || []).filter((w: any) => {
     const matchSearch = w.name?.toLowerCase().includes(search.toLowerCase());
@@ -91,6 +307,72 @@ export default function TrainerWorkouts() {
             </div>
           </motion.div>
         ))}
+      </div>
+
+      {/* Templates Section */}
+      <div className="glass-card !p-0 overflow-hidden">
+        <button
+          onClick={() => setTemplatesOpen(!templatesOpen)}
+          className="w-full flex items-center justify-between px-6 py-4 hover:bg-accent/30 transition-all"
+        >
+          <div className="flex items-center gap-2">
+            <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-violet-600 to-purple-600 flex items-center justify-center">
+              <Sparkles className="w-3.5 h-3.5 text-white" />
+            </div>
+            <span className="font-semibold">Treinos Prontos</span>
+            <span className="text-xs text-muted-foreground hidden sm:inline">— use como base e personalize para seus alunos</span>
+          </div>
+          {templatesOpen ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
+        </button>
+
+        <AnimatePresence>
+          {templatesOpen && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className="overflow-hidden border-t border-border"
+            >
+              {/* Category filter */}
+              <div className="flex gap-2 px-6 pt-4">
+                {CATEGORIES.map((cat) => (
+                  <button
+                    key={cat}
+                    onClick={() => setCategoryFilter(cat)}
+                    className={cn(
+                      'px-3 py-1 rounded-lg text-xs font-medium transition-all border',
+                      categoryFilter === cat
+                        ? 'bg-primary text-primary-foreground border-primary'
+                        : 'glass border-transparent hover:bg-accent text-muted-foreground',
+                    )}
+                  >
+                    {cat}
+                  </button>
+                ))}
+              </div>
+
+              {/* Template cards — horizontal scroll */}
+              <div className="overflow-x-auto px-6 pb-5 pt-3 scrollbar-hide">
+                <div className="flex gap-4" style={{ width: 'max-content' }}>
+                  {visibleTemplates.map((template, i) => (
+                    <TemplateCard
+                      key={template.id}
+                      template={template}
+                      index={i}
+                      isExpanded={selectedTemplateId === template.id}
+                      isLoading={usingTemplateId === template.id}
+                      onToggle={() => setSelectedTemplateId(
+                        selectedTemplateId === template.id ? null : template.id
+                      )}
+                      onUse={() => handleUseTemplate(template)}
+                    />
+                  ))}
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
       {/* Search & filter */}
@@ -154,11 +436,98 @@ export default function TrainerWorkouts() {
             <Dumbbell className="w-8 h-8 text-muted-foreground" />
           </div>
           <h3 className="font-semibold mb-1">Nenhum treino encontrado</h3>
-          <p className="text-sm text-muted-foreground mb-4">Crie seu primeiro treino para seus alunos.</p>
+          <p className="text-sm text-muted-foreground mb-4">Use um template acima ou crie um treino personalizado.</p>
           <Link href="/trainer/workouts/new" className="btn-primary text-sm py-2">Criar treino</Link>
         </div>
       )}
     </div>
+  );
+}
+
+function TemplateCard({
+  template, index, isExpanded, isLoading, onToggle, onUse,
+}: {
+  template: WorkoutTemplate;
+  index: number;
+  isExpanded: boolean;
+  isLoading: boolean;
+  onToggle: () => void;
+  onUse: () => void;
+}) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: index * 0.05 }}
+      className={cn(
+        'w-52 rounded-2xl flex-shrink-0 overflow-hidden border transition-all cursor-pointer',
+        isExpanded ? 'border-primary/40 bg-primary/5' : 'glass border-border/40 hover:border-border',
+      )}
+      onClick={onToggle}
+    >
+      <div className={`h-1.5 bg-gradient-to-r ${template.gradient}`} />
+      <div className="p-4">
+        <div className="text-2xl mb-2">{template.emoji}</div>
+        <div className="font-semibold text-sm leading-snug mb-1">{template.name}</div>
+        <div className="text-[11px] text-muted-foreground mb-3 line-clamp-2">{template.description}</div>
+
+        <div className="flex items-center gap-3 text-[11px] text-muted-foreground mb-3">
+          <span className="flex items-center gap-1"><Layers className="w-3 h-3" />{template.exercises.length} ex.</span>
+          <span className="flex items-center gap-1"><Clock className="w-3 h-3" />{template.duration}min</span>
+          <span className="flex items-center gap-1"><Zap className="w-3 h-3 text-yellow-400" />{LEVEL_LABELS[template.level]}</span>
+        </div>
+
+        <div className="flex gap-1 flex-wrap mb-3">
+          {template.tags.slice(0, 2).map((tag) => (
+            <span key={tag} className="text-[9px] px-1.5 py-0.5 rounded-full glass text-muted-foreground">{tag}</span>
+          ))}
+        </div>
+
+        {/* Exercise list (expanded) */}
+        <AnimatePresence>
+          {isExpanded && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              className="overflow-hidden mb-3"
+            >
+              <div className="border-t border-border pt-3 space-y-1.5">
+                {template.exercises.map((ex) => (
+                  <div key={ex.name} className="flex items-center justify-between text-[11px]">
+                    <span className="text-foreground truncate pr-2">{ex.name}</span>
+                    <span className="text-muted-foreground flex-shrink-0">{ex.sets}×{ex.reps}</span>
+                  </div>
+                ))}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        <button
+          onClick={(e) => { e.stopPropagation(); onUse(); }}
+          disabled={isLoading}
+          className={cn(
+            'w-full py-2 rounded-xl text-xs font-semibold transition-all flex items-center justify-center gap-1.5',
+            isLoading
+              ? 'bg-primary/50 text-primary-foreground cursor-not-allowed'
+              : `bg-gradient-to-r ${template.gradient} text-white hover:opacity-90 active:scale-95`,
+          )}
+        >
+          {isLoading ? (
+            <>
+              <div className="w-3 h-3 border border-white/40 border-t-white rounded-full animate-spin" />
+              Criando...
+            </>
+          ) : (
+            <>
+              <Plus className="w-3 h-3" />
+              Usar Template
+            </>
+          )}
+        </button>
+      </div>
+    </motion.div>
   );
 }
 
