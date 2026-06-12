@@ -137,24 +137,20 @@ jobs:
       packages: read
 
     steps:
+      - name: Setup SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H ${{ secrets.DEPLOY_HOST }} >> ~/.ssh/known_hosts
+
       - name: Deploy via SSH
-        uses: appleboy/ssh-action@v1
-        with:
-          host: ${{ secrets.DEPLOY_HOST }}
-          username: ${{ secrets.DEPLOY_USER }}
-          key: ${{ secrets.DEPLOY_SSH_KEY }}
-          script: |
+        run: |
+          ssh -i ~/.ssh/deploy_key ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} << 'ENDSSH'
             set -e
             cd /opt/fitsaas
-
-            # Update repo so docker-compose.prod.yml is current
             git pull origin master
-
-            # Pull latest images (public GHCR — no login needed)
             docker compose -f docker-compose.prod.yml pull api web
-
-            # Force-recreate so containers always restart with the new image
             docker compose -f docker-compose.prod.yml up -d --no-deps --force-recreate api web
-
-            # Cleanup old images
             docker image prune -f
+          ENDSSH
