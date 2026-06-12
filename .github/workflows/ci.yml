@@ -150,12 +150,11 @@ jobs:
             # Update repo so docker-compose.prod.yml is current
             git pull origin master
 
-            # Pull latest images from ghcr.io
-            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+            # Pull latest images (public GHCR — no login needed)
             docker compose -f docker-compose.prod.yml pull api web
 
-            # Rolling restart
-            docker compose -f docker-compose.prod.yml up -d --no-deps api web nginx
+            # Force-recreate so containers always restart with the new image
+            docker compose -f docker-compose.prod.yml up -d --no-deps --force-recreate api web
 
             # Cleanup old images
             docker image prune -f
