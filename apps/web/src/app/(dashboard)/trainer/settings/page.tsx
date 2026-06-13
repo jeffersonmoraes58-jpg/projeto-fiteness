@@ -30,7 +30,7 @@ export default function TrainerSettings() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: (data: any) => api.patch('/users/me', data),
+    mutationFn: (data: any) => api.patch('/trainers/me', data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['trainer-profile'] });
       setEditing(false);
