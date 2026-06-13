@@ -5,7 +5,7 @@ import { motion } from 'framer-motion';
 import {
   User, Camera, Mail, Phone, MapPin, Award,
   Bell, Shield, LogOut, Save, Edit2, ChevronRight,
-  Globe, Star, CreditCard,
+  Globe, Star, CreditCard, Eye, EyeOff, X,
 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
@@ -16,6 +16,11 @@ export default function TrainerSettings() {
   const { user, logout } = useAuthStore();
   const [editing, setEditing] = useState(false);
   const [avatarUploading, setAvatarUploading] = useState(false);
+  const [showSecurity, setShowSecurity] = useState(false);
+  const [showCurrent, setShowCurrent] = useState(false);
+  const [showNew, setShowNew] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [pwForm, setPwForm] = useState({ current: '', newPw: '', confirm: '' });
   const fileInputRef = useRef<HTMLInputElement>(null);
   const queryClient = useQueryClient();
 
@@ -28,6 +33,26 @@ export default function TrainerSettings() {
     firstName: '', lastName: '', phone: '', city: '', state: '', bio: '',
     cref: '', specialties: '', experienceYears: '',
   });
+
+  const changePasswordMutation = useMutation({
+    mutationFn: (data: { currentPassword: string; newPassword: string }) =>
+      api.patch('/auth/change-password', data),
+    onSuccess: () => {
+      toast.success('Senha alterada com sucesso!');
+      setShowSecurity(false);
+      setPwForm({ current: '', newPw: '', confirm: '' });
+    },
+    onError: (err: any) => {
+      const msg = err?.response?.data?.message;
+      toast.error(msg === 'Senha atual incorreta' ? 'Senha atual incorreta' : 'Erro ao alterar senha');
+    },
+  });
+
+  const handleChangePassword = () => {
+    if (pwForm.newPw.length < 8) return toast.error('A nova senha deve ter no mínimo 8 caracteres');
+    if (pwForm.newPw !== pwForm.confirm) return toast.error('As senhas não coincidem');
+    changePasswordMutation.mutate({ currentPassword: pwForm.current, newPassword: pwForm.newPw });
+  };
 
   const updateMutation = useMutation({
     mutationFn: (data: any) => api.patch('/trainers/me', data),
@@ -227,11 +252,11 @@ export default function TrainerSettings() {
         <h2 className="font-semibold mb-3">Preferências</h2>
         <div className="space-y-1">
           {[
-            { icon: Bell, label: 'Notificações', description: 'Alertas, lembretes e novidades' },
-            { icon: Shield, label: 'Segurança', description: 'Senha e autenticação em dois fatores' },
-            { icon: CreditCard, label: 'Plano e Cobrança', description: 'Gerenciar assinatura' },
+            { icon: Bell, label: 'Notificações', description: 'Alertas, lembretes e novidades', onClick: undefined },
+            { icon: Shield, label: 'Segurança', description: 'Senha e autenticação em dois fatores', onClick: () => setShowSecurity(true) },
+            { icon: CreditCard, label: 'Plano e Cobrança', description: 'Gerenciar assinatura', onClick: undefined },
           ].map((item) => (
-            <button key={item.label} className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-accent transition-all text-left">
+            <button key={item.label} onClick={item.onClick} className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-accent transition-all text-left">
               <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center flex-shrink-0">
                 <item.icon className="w-4 h-4 text-muted-foreground" />
               </div>
@@ -254,6 +279,90 @@ export default function TrainerSettings() {
           Sair da conta
         </button>
       </motion.div>
+
+      {/* Security modal */}
+      {showSecurity && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="glass-card w-full max-w-md"
+          >
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-purple-600/20 flex items-center justify-center">
+                  <Shield className="w-5 h-5 text-purple-400" />
+                </div>
+                <h2 className="font-semibold text-lg">Alterar Senha</h2>
+              </div>
+              <button onClick={() => setShowSecurity(false)} className="w-8 h-8 rounded-lg hover:bg-accent flex items-center justify-center">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="text-xs text-muted-foreground mb-1 block">Senha atual</label>
+                <div className="relative">
+                  <input
+                    type={showCurrent ? 'text' : 'password'}
+                    value={pwForm.current}
+                    onChange={(e) => setPwForm({ ...pwForm, current: e.target.value })}
+                    className="input-field pr-10"
+                    placeholder="••••••••"
+                  />
+                  <button type="button" onClick={() => setShowCurrent(!showCurrent)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+                    {showCurrent ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs text-muted-foreground mb-1 block">Nova senha</label>
+                <div className="relative">
+                  <input
+                    type={showNew ? 'text' : 'password'}
+                    value={pwForm.newPw}
+                    onChange={(e) => setPwForm({ ...pwForm, newPw: e.target.value })}
+                    className="input-field pr-10"
+                    placeholder="Mínimo 8 caracteres"
+                  />
+                  <button type="button" onClick={() => setShowNew(!showNew)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+                    {showNew ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs text-muted-foreground mb-1 block">Confirmar nova senha</label>
+                <div className="relative">
+                  <input
+                    type={showConfirm ? 'text' : 'password'}
+                    value={pwForm.confirm}
+                    onChange={(e) => setPwForm({ ...pwForm, confirm: e.target.value })}
+                    className="input-field pr-10"
+                    placeholder="Repita a nova senha"
+                  />
+                  <button type="button" onClick={() => setShowConfirm(!showConfirm)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+                    {showConfirm ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex gap-3 mt-6">
+              <button onClick={() => setShowSecurity(false)} className="btn-secondary flex-1 py-2.5">Cancelar</button>
+              <button
+                onClick={handleChangePassword}
+                disabled={changePasswordMutation.isPending || !pwForm.current || !pwForm.newPw || !pwForm.confirm}
+                className="btn-primary flex-1 py-2.5"
+              >
+                {changePasswordMutation.isPending ? 'Salvando...' : 'Alterar senha'}
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
     </div>
   );
 }

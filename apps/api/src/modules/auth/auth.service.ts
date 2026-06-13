@@ -142,6 +142,18 @@ export class AuthService {
     return { message: 'Logout realizado com sucesso' };
   }
 
+  async changePassword(userId: string, currentPassword: string, newPassword: string) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) throw new NotFoundException('Usuário não encontrado');
+
+    const valid = await bcrypt.compare(currentPassword, user.password);
+    if (!valid) throw new BadRequestException('Senha atual incorreta');
+
+    const hashed = await bcrypt.hash(newPassword, 12);
+    await this.prisma.user.update({ where: { id: userId }, data: { password: hashed } });
+    return { message: 'Senha alterada com sucesso' };
+  }
+
   async googleLogin(googleUser: any) {
     let user = await this.prisma.user.findFirst({
       where: { googleId: googleUser.googleId },
