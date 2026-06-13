@@ -131,6 +131,19 @@ services:
       - certbot_conf:/etc/letsencrypt
     entrypoint: /bin/sh -c "trap exit TERM; while :; do certbot renew; sleep 12h & wait $${!}; done"
 
+  watchtower:
+    image: containrrr/watchtower:latest
+    container_name: fitsaas-watchtower
+    restart: always
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      WATCHTOWER_POLL_INTERVAL: 300
+      WATCHTOWER_CLEANUP: 'true'
+      WATCHTOWER_INCLUDE_STOPPED: 'false'
+      WATCHTOWER_NO_STARTUP_MESSAGE: 'true'
+    command: fitsaas-api fitsaas-web
+
 volumes:
   postgres_data:
   redis_data:
