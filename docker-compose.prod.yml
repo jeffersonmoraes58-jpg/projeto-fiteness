@@ -132,7 +132,7 @@ services:
     entrypoint: /bin/sh -c "trap exit TERM; while :; do certbot renew; sleep 12h & wait $${!}; done"
 
   watchtower:
-    image: containrrr/watchtower:latest
+    image: containrrr/watchtower:1.7.1
     container_name: fitsaas-watchtower
     restart: always
     volumes:
@@ -142,6 +142,7 @@ services:
       WATCHTOWER_CLEANUP: 'true'
       WATCHTOWER_INCLUDE_STOPPED: 'false'
       WATCHTOWER_NO_STARTUP_MESSAGE: 'true'
+      DOCKER_API_VERSION: '1.41'
     command: fitsaas-api fitsaas-web
 
 volumes:
