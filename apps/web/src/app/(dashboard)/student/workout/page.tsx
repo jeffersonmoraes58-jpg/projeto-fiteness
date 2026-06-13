@@ -15,6 +15,43 @@ import toast from 'react-hot-toast';
 const DAYS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 const TODAY = new Date().getDay();
 
+type Technique = 'NORMAL' | 'BI_SET' | 'SUPER_SET' | 'TRI_SET' | 'DROP_SET' | 'GIANT_SET' | 'CIRCUIT';
+const TECHNIQUE_CONFIG: Record<Technique, { label: string; color: string; bg: string; border: string }> = {
+  NORMAL:    { label: '',          color: '',                   bg: '',                  border: '' },
+  BI_SET:    { label: 'Bi Set',    color: 'text-orange-400',    bg: 'bg-orange-500/10',  border: 'border-l-4 border-orange-500/60' },
+  SUPER_SET: { label: 'Super Set', color: 'text-blue-400',      bg: 'bg-blue-500/10',    border: 'border-l-4 border-blue-500/60' },
+  TRI_SET:   { label: 'Tri Set',   color: 'text-purple-400',    bg: 'bg-purple-500/10',  border: 'border-l-4 border-purple-500/60' },
+  DROP_SET:  { label: 'Drop Set',  color: 'text-red-400',       bg: 'bg-red-500/10',     border: 'border-l-4 border-red-500/60' },
+  GIANT_SET: { label: 'Giant Set', color: 'text-pink-400',      bg: 'bg-pink-500/10',    border: 'border-l-4 border-pink-500/60' },
+  CIRCUIT:   { label: 'Circuito',  color: 'text-emerald-400',   bg: 'bg-emerald-500/10', border: 'border-l-4 border-emerald-500/60' },
+};
+
+function deriveTechnique(exercises: any[]): Technique {
+  if (!exercises.length) return 'NORMAL';
+  if (exercises.some((e) => e.isDropSet)) return 'DROP_SET';
+  const size = exercises.length;
+  if (size === 2) return 'BI_SET';
+  if (size === 3) return 'TRI_SET';
+  return 'GIANT_SET';
+}
+
+function groupExercises(exercises: any[]): { technique: Technique; items: any[] }[] {
+  const groups: { technique: Technique; items: any[] }[] = [];
+  const used = new Set<string>();
+  for (const ex of exercises) {
+    if (used.has(ex.id)) continue;
+    if (ex.superSetGroupId) {
+      const members = exercises.filter((e) => e.superSetGroupId === ex.superSetGroupId);
+      members.forEach((e) => used.add(e.id));
+      groups.push({ technique: deriveTechnique(members), items: members });
+    } else {
+      used.add(ex.id);
+      groups.push({ technique: 'NORMAL', items: [ex] });
+    }
+  }
+  return groups;
+}
+
 // ─── Video helpers ──────────────────────────────────────────────────────────
 
 function getEmbedInfo(url: string): { embedUrl: string; type: 'youtube' | 'vimeo' | 'direct' } | null {
@@ -332,19 +369,52 @@ export default function StudentWorkout() {
 
             {/* Exercise list */}
             <div className="space-y-3">
-              {(dayPlan.workout?.exercises || []).map((ex: any, i: number) => (
-                <ExerciseCard
-                  key={ex.id}
-                  exercise={ex}
-                  index={i}
-                  isExpanded={expandedExercise === ex.id}
-                  onToggle={() => setExpandedExercise(expandedExercise === ex.id ? null : ex.id)}
-                  completedSets={completedSets[ex.id] || []}
-                  onToggleSet={(setIdx) => toggleSet(ex.id, setIdx)}
-                  isActive={activeWorkout}
-                  onOpenVideo={openVideo}
-                />
-              ))}
+              {groupExercises(dayPlan.workout?.exercises || []).map((group, gi) => {
+                const cfg = TECHNIQUE_CONFIG[group.technique];
+                if (group.technique === 'NORMAL') {
+                  const ex = group.items[0];
+                  const flatIdx = (dayPlan.workout?.exercises || []).indexOf(ex);
+                  return (
+                    <ExerciseCard
+                      key={ex.id}
+                      exercise={ex}
+                      index={flatIdx}
+                      isExpanded={expandedExercise === ex.id}
+                      onToggle={() => setExpandedExercise(expandedExercise === ex.id ? null : ex.id)}
+                      completedSets={completedSets[ex.id] || []}
+                      onToggleSet={(setIdx) => toggleSet(ex.id, setIdx)}
+                      isActive={activeWorkout}
+                      onOpenVideo={openVideo}
+                    />
+                  );
+                }
+                return (
+                  <div key={gi} className={cn('rounded-2xl overflow-hidden', cfg.bg, cfg.border)}>
+                    <div className={cn('px-4 pt-3 pb-1 flex items-center gap-2 text-xs font-semibold', cfg.color)}>
+                      <span>{cfg.label}</span>
+                      <span className="text-muted-foreground font-normal">· {group.items.length} exercícios em sequência</span>
+                    </div>
+                    <div className="space-y-2 p-2">
+                      {group.items.map((ex: any) => {
+                        const flatIdx = (dayPlan.workout?.exercises || []).indexOf(ex);
+                        return (
+                          <ExerciseCard
+                            key={ex.id}
+                            exercise={ex}
+                            index={flatIdx}
+                            isExpanded={expandedExercise === ex.id}
+                            onToggle={() => setExpandedExercise(expandedExercise === ex.id ? null : ex.id)}
+                            completedSets={completedSets[ex.id] || []}
+                            onToggleSet={(setIdx) => toggleSet(ex.id, setIdx)}
+                            isActive={activeWorkout}
+                            onOpenVideo={openVideo}
+                          />
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
 
             {/* Finish workout */}
