@@ -30,7 +30,7 @@ jobs:
 
       - name: Run API tests
         working-directory: apps/api
-        run: npm test -- --ci --coverage --forceExit
+        run: npx jest --ci --coverage --forceExit
 
       - name: Upload coverage
         uses: actions/upload-artifact@v4
