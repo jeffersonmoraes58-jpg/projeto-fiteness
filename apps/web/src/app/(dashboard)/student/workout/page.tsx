@@ -3,9 +3,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Dumbbell, Play, CheckCircle2, Clock, ChevronDown,
-  ChevronUp, Flame, RotateCcw, Timer, ChevronRight,
-  X, Maximize2, PlayCircle, Trophy, Share2, Download,
+  Dumbbell, Play, CheckCircle2, Clock, ChevronLeft,
+  Flame, RotateCcw, Timer, ChevronRight,
+  X, PlayCircle, Trophy, Share2, Download,
 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
@@ -52,8 +52,6 @@ function groupExercises(exercises: any[]): { technique: Technique; items: any[] 
   return groups;
 }
 
-// ─── Video helpers ──────────────────────────────────────────────────────────
-
 function getEmbedInfo(url: string): { embedUrl: string; type: 'youtube' | 'vimeo' | 'direct' } | null {
   if (!url) return null;
   const ytMatch = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&\n?#]+)/);
@@ -61,6 +59,13 @@ function getEmbedInfo(url: string): { embedUrl: string; type: 'youtube' | 'vimeo
   const vimeoMatch = url.match(/(?:vimeo\.com\/)(\d+)/);
   if (vimeoMatch) return { type: 'vimeo', embedUrl: `https://player.vimeo.com/video/${vimeoMatch[1]}?title=0&byline=0` };
   if (/\.(mp4|webm|ogg)(\?|$)/i.test(url)) return { type: 'direct', embedUrl: url };
+  return null;
+}
+
+function getVideoThumbnail(url: string): string | null {
+  if (!url) return null;
+  const ytMatch = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&\n?#]+)/);
+  if (ytMatch) return `https://img.youtube.com/vi/${ytMatch[1]}/mqdefault.jpg`;
   return null;
 }
 
@@ -94,10 +99,7 @@ function VideoModal({ url, title, onClose }: { url: string; title: string; onClo
         >
           <div className="flex items-center justify-between px-4 py-3 bg-white/5">
             <span className="font-medium text-sm truncate">{title}</span>
-            <button
-              onClick={onClose}
-              className="w-8 h-8 rounded-lg hover:bg-white/10 flex items-center justify-center transition-all flex-shrink-0 ml-3"
-            >
+            <button onClick={onClose} className="w-8 h-8 rounded-lg hover:bg-white/10 flex items-center justify-center transition-all flex-shrink-0 ml-3">
               <X className="w-4 h-4" />
             </button>
           </div>
@@ -126,8 +128,8 @@ function VideoModal({ url, title, onClose }: { url: string; title: string; onClo
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function StudentWorkout() {
+  const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
   const [activePlanId, setActivePlanId] = useState<string | null>(null);
-  const [expandedExercise, setExpandedExercise] = useState<string | null>(null);
   const [activeWorkout, setActiveWorkout] = useState(false);
   const [completedSets, setCompletedSets] = useState<Record<string, boolean[]>>({});
   const [videoModal, setVideoModal] = useState<{ url: string; title: string } | null>(null);
@@ -151,7 +153,9 @@ export default function StudentWorkout() {
     onError: () => toast.error('Erro ao registrar treino'),
   });
 
+  const selectedPlan = (workoutPlans || []).find((p: any) => p.id === selectedPlanId);
   const activePlan = (workoutPlans || []).find((p: any) => p.id === activePlanId);
+  const isSelectedPlanActive = selectedPlanId === activePlanId && activeWorkout;
 
   const weekStart = new Date();
   weekStart.setHours(0, 0, 0, 0);
@@ -162,6 +166,13 @@ export default function StudentWorkout() {
       .map((log: any) => new Date(log.completedAt || log.startedAt).getDay()),
   );
 
+  const planExercises: any[] = selectedPlan?.workout?.exercises ?? [];
+  const planAllCompleted = isSelectedPlanActive && planExercises.length > 0 &&
+    planExercises.every((ex: any) => {
+      const sets = completedSets[ex.id] || [];
+      return sets.filter(Boolean).length >= ex.sets;
+    });
+
   const toggleSet = (exerciseId: string, setIndex: number) => {
     setCompletedSets((prev) => {
       const sets = prev[exerciseId] || [];
@@ -171,17 +182,12 @@ export default function StudentWorkout() {
     });
   };
 
-  const openVideo = useCallback((url: string, title: string) => {
-    setVideoModal({ url, title });
-  }, []);
-
+  const openVideo = useCallback((url: string, title: string) => setVideoModal({ url, title }), []);
   const closeVideo = useCallback(() => setVideoModal(null), []);
 
   function downloadWorkoutPDF() {
     if (!workoutPlans?.length) { toast.error('Nenhum plano de treino carregado'); return; }
-
     const date = new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' });
-
     const dayBlocks = workoutPlans.map((plan: any) => {
       const exercises = (plan.workout?.exercises ?? []).map((ex: any, i: number) => `
         <tr>
@@ -190,11 +196,9 @@ export default function StudentWorkout() {
           <td style="padding:8px 8px;text-align:center;font-size:13px;color:#374151;">${ex.reps ?? '—'}</td>
           <td style="padding:8px 8px;text-align:center;font-size:13px;color:#374151;">${ex.weight ? ex.weight + ' kg' : '—'}</td>
           <td style="padding:8px 8px;text-align:center;font-size:13px;color:#374151;">${ex.restSeconds ? ex.restSeconds + 's' : '—'}</td>
-          <td style="padding:8px 12px;font-size:12px;color:#6b7280;">${ex.exercise?.muscleGroup ?? '—'}</td>
         </tr>
-        ${ex.notes ? `<tr><td colspan="6" style="padding:0 12px 8px 28px;font-size:11px;color:#9ca3af;font-style:italic;">Obs: ${ex.notes}</td></tr>` : ''}
+        ${ex.notes ? `<tr><td colspan="5" style="padding:0 12px 8px 28px;font-size:11px;color:#9ca3af;font-style:italic;">Obs: ${ex.notes}</td></tr>` : ''}
       `).join('');
-
       return `
         <div class="plan-block">
           <div class="plan-header">
@@ -205,54 +209,33 @@ export default function StudentWorkout() {
           <table>
             <thead><tr>
               <th style="text-align:left;">Exercício</th>
-              <th>Séries</th><th>Reps</th><th>Carga</th><th>Descanso</th><th style="text-align:left;">Músculo</th>
+              <th>Séries</th><th>Reps</th><th>Carga</th><th>Descanso</th>
             </tr></thead>
-            <tbody>${exercises || '<tr><td colspan="6" style="padding:8px 12px;color:#9ca3af;font-size:12px;">Nenhum exercício cadastrado</td></tr>'}</tbody>
+            <tbody>${exercises || '<tr><td colspan="5" style="padding:8px 12px;color:#9ca3af;font-size:12px;">Nenhum exercício cadastrado</td></tr>'}</tbody>
           </table>
         </div>`;
     }).join('');
-
-    const html = `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">
-    <title>Plano de Treino — Fitlynutri</title>
-    <style>
-      * { box-sizing: border-box; margin: 0; padding: 0; }
-      body { font-family: 'Segoe UI', Arial, sans-serif; color: #111827; background: #fff; padding: 32px; }
-      @media print {
-        body { padding: 16px; }
-        button { display: none !important; }
-        .plan-block { page-break-inside: avoid; }
-        @page { margin: 16mm 12mm; }
-      }
-      .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 28px; border-bottom: 2px solid #7c3aed; padding-bottom: 16px; }
-      .logo { font-size: 22px; font-weight: 700; color: #7c3aed; }
-      .subtitle { font-size: 12px; color: #6b7280; margin-top: 2px; }
-      .date { font-size: 12px; color: #6b7280; margin-top: 4px; text-align: right; }
-      .plan-block { margin-bottom: 28px; border: 1px solid #e5e7eb; border-radius: 12px; overflow: hidden; }
-      .plan-header { background: #7c3aed; color: white; padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; }
-      .plan-title { font-size: 15px; font-weight: 600; }
-      .plan-meta { font-size: 12px; opacity: .8; }
-      .division { padding: 6px 16px; background: #f5f3ff; font-size: 12px; color: #7c3aed; font-weight: 500; }
-      table { width: 100%; border-collapse: collapse; }
-      thead th { background: #f9fafb; color: #6b7280; padding: 8px 12px; font-size: 11px; font-weight: 600; text-align: center; border-bottom: 1px solid #e5e7eb; }
-      thead th:first-child { text-align: left; }
-      tbody tr:nth-child(odd) { background: #fafafa; }
-      tbody tr:hover { background: #f5f3ff; }
-      .footer { margin-top: 24px; text-align: center; font-size: 11px; color: #9ca3af; border-top: 1px solid #e5e7eb; padding-top: 12px; }
-      .print-btn { position: fixed; bottom: 24px; right: 24px; background: #7c3aed; color: white; border: none; padding: 12px 20px; border-radius: 10px; font-size: 14px; font-weight: 600; cursor: pointer; box-shadow: 0 4px 12px rgba(124,58,237,.4); }
-      .print-btn:hover { background: #6d28d9; }
+    const html = `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><title>Plano de Treino — Fitlynutri</title>
+    <style>* { box-sizing: border-box; margin: 0; padding: 0; } body { font-family: 'Segoe UI', Arial, sans-serif; color: #111827; background: #fff; padding: 32px; }
+    @media print { body { padding: 16px; } button { display: none !important; } .plan-block { page-break-inside: avoid; } @page { margin: 16mm 12mm; } }
+    .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 28px; border-bottom: 2px solid #7c3aed; padding-bottom: 16px; }
+    .logo { font-size: 22px; font-weight: 700; color: #7c3aed; } .subtitle { font-size: 12px; color: #6b7280; margin-top: 2px; }
+    .date { font-size: 12px; color: #6b7280; margin-top: 4px; text-align: right; }
+    .plan-block { margin-bottom: 28px; border: 1px solid #e5e7eb; border-radius: 12px; overflow: hidden; }
+    .plan-header { background: #7c3aed; color: white; padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; }
+    .plan-title { font-size: 15px; font-weight: 600; } .plan-meta { font-size: 12px; opacity: .8; }
+    .division { padding: 6px 16px; background: #f5f3ff; font-size: 12px; color: #7c3aed; font-weight: 500; }
+    table { width: 100%; border-collapse: collapse; }
+    thead th { background: #f9fafb; color: #6b7280; padding: 8px 12px; font-size: 11px; font-weight: 600; text-align: center; border-bottom: 1px solid #e5e7eb; }
+    thead th:first-child { text-align: left; } tbody tr:nth-child(odd) { background: #fafafa; }
+    .footer { margin-top: 24px; text-align: center; font-size: 11px; color: #9ca3af; border-top: 1px solid #e5e7eb; padding-top: 12px; }
+    .print-btn { position: fixed; bottom: 24px; right: 24px; background: #7c3aed; color: white; border: none; padding: 12px 20px; border-radius: 10px; font-size: 14px; font-weight: 600; cursor: pointer; }
     </style></head><body>
-    <div class="header">
-      <div>
-        <div class="logo">Fitlynutri</div>
-        <div class="subtitle">Plano de Treino</div>
-      </div>
-      <div class="date">Emitido em ${date}</div>
-    </div>
+    <div class="header"><div><div class="logo">Fitlynutri</div><div class="subtitle">Plano de Treino</div></div><div class="date">Emitido em ${date}</div></div>
     ${dayBlocks}
     <div class="footer">Gerado pelo Fitlynutri · Siga sempre as orientações do seu personal trainer</div>
     <button class="print-btn" onclick="window.print()">⬇ Salvar PDF</button>
     </body></html>`;
-
     const w = window.open('', '_blank', 'width=960,height=720');
     if (!w) { toast.error('Permita pop-ups para gerar o PDF'); return; }
     w.document.write(html);
@@ -262,424 +245,341 @@ export default function StudentWorkout() {
 
   return (
     <>
-      {videoModal && (
-        <VideoModal url={videoModal.url} title={videoModal.title} onClose={closeVideo} />
-      )}
+      {videoModal && <VideoModal url={videoModal.url} title={videoModal.title} onClose={closeVideo} />}
       {showSummary && startTime && activePlan && (
         <WorkoutSummaryModal
           workoutName={activePlan.workout?.name || 'Treino'}
           startTime={startTime}
           isPending={logMutation.isPending}
-          onConfirm={(intensity, comment) =>
-            logMutation.mutate({ workoutPlanId: activePlan.id, intensity, comment })
-          }
+          onConfirm={(intensity, comment) => logMutation.mutate({ workoutPlanId: activePlan.id, intensity, comment })}
           onClose={() => {
             setShowSummary(false);
             setActiveWorkout(false);
             setCompletedSets({});
             setStartTime(null);
             setActivePlanId(null);
+            setSelectedPlanId(null);
           }}
         />
       )}
 
       <div className="space-y-6 max-w-2xl mx-auto">
-        {/* Header */}
-        <div className="page-header">
-          <div>
-            <h1 className="text-2xl font-bold">Meu Treino</h1>
-            <p className="text-muted-foreground text-sm mt-1">Escolha o treino do dia e execute</p>
-          </div>
-          <div className="flex items-center gap-2">
-            {workoutPlans?.length > 0 && (
+        {selectedPlan ? (
+          // ── DETAIL VIEW ────────────────────────────────────────────────────
+          <>
+            {/* Header */}
+            <div className="flex items-center gap-3">
               <button
-                onClick={downloadWorkoutPDF}
-                className="btn-secondary flex items-center gap-2 text-sm py-2 px-3"
-                title="Baixar treino em PDF"
+                onClick={() => setSelectedPlanId(null)}
+                className="w-9 h-9 rounded-xl glass flex items-center justify-center hover:bg-accent transition-all flex-shrink-0"
               >
-                <Download className="w-4 h-4" />
-                PDF
+                <ChevronLeft className="w-4 h-4" />
               </button>
-            )}
-          </div>
-        </div>
+              <div className="flex-1 min-w-0">
+                {selectedPlan.division && <div className="text-xs text-muted-foreground">{selectedPlan.division}</div>}
+                <h1 className="text-xl font-bold truncate">{selectedPlan.workout?.name}</h1>
+                <div className="flex items-center gap-3 mt-0.5 text-xs text-muted-foreground">
+                  <span className="flex items-center gap-1"><Clock className="w-3 h-3" />{selectedPlan.workout?.duration || 45} min</span>
+                  <span className="flex items-center gap-1"><Dumbbell className="w-3 h-3" />{planExercises.length} exercícios</span>
+                  <span className="flex items-center gap-1"><Flame className="w-3 h-3 text-orange-400" />~{(selectedPlan.workout?.duration || 45) * 7} kcal</span>
+                </div>
+              </div>
+              {workoutPlans?.length > 0 && (
+                <button onClick={downloadWorkoutPDF} className="btn-secondary flex items-center gap-1.5 text-xs py-1.5 px-2.5 flex-shrink-0">
+                  <Download className="w-3.5 h-3.5" />PDF
+                </button>
+              )}
+            </div>
 
-        {/* Week frequency strip */}
-        <div className="glass-card">
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-sm font-semibold">Frequência semanal</span>
-            <span className="text-xs text-muted-foreground">
-              {completedDaysThisWeek.size} treino{completedDaysThisWeek.size !== 1 ? 's' : ''} essa semana
-            </span>
-          </div>
-          <div className="flex gap-1">
-            {DAYS.map((day, i) => {
-              const done = completedDaysThisWeek.has(i);
-              const isToday = i === TODAY;
-              return (
-                <div
-                  key={day}
-                  className={cn(
-                    'flex-1 flex flex-col items-center gap-1.5 py-2 rounded-xl text-xs',
-                    isToday && 'bg-primary/10',
-                  )}
+            {/* Iniciar / Em andamento */}
+            {!isSelectedPlanActive ? (
+              <div className="space-y-2">
+                <button
+                  onClick={() => {
+                    setActivePlanId(selectedPlanId!);
+                    setActiveWorkout(true);
+                    setStartTime(new Date());
+                    setCompletedSets({});
+                  }}
+                  className="w-full bg-emerald-500 hover:bg-emerald-600 active:bg-emerald-700 text-white font-bold text-base py-4 rounded-2xl transition-all flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20"
                 >
-                  <span className={cn('font-medium', isToday ? 'text-primary' : 'text-muted-foreground')}>{day}</span>
-                  <div
-                    className={cn(
-                      'w-2 h-2 rounded-full',
-                      done ? 'bg-emerald-400' : isToday ? 'bg-primary/40' : 'bg-white/10',
-                    )}
+                  <Play className="w-5 h-5" />
+                  INICIAR
+                </button>
+                <p className="text-center text-xs text-muted-foreground px-4">
+                  Você está no "modo visualização". Aperte INICIAR para começar seu treino.
+                </p>
+              </div>
+            ) : (
+              <div className="flex items-center justify-center gap-2 py-3 text-emerald-400 font-semibold text-sm">
+                <Timer className="w-4 h-4" />Em andamento
+              </div>
+            )}
+
+            {/* Exercise list */}
+            <div className="space-y-3">
+              {groupExercises(planExercises).map((group, gi) => {
+                const cfg = TECHNIQUE_CONFIG[group.technique];
+                const rows = group.items.map((ex: any) => (
+                  <ExerciseRow
+                    key={ex.id}
+                    exercise={ex}
+                    isActive={isSelectedPlanActive}
+                    completedSets={completedSets[ex.id] || []}
+                    onToggleSet={(i) => toggleSet(ex.id, i)}
+                    onOpenVideo={openVideo}
                   />
-                </div>
-              );
-            })}
-          </div>
-        </div>
+                ));
 
-        {/* Workout plans list */}
-        {(workoutPlans?.length ?? 0) > 0 ? (
-          <div className="space-y-6">
-            {workoutPlans.map((plan: any) => {
-              const isThisPlanActive = activePlanId === plan.id && activeWorkout;
-              const planExercises: any[] = plan.workout?.exercises ?? [];
-              const planAllCompleted = isThisPlanActive && planExercises.length > 0 &&
-                planExercises.every((ex: any) => {
-                  const sets = completedSets[ex.id] || [];
-                  return sets.filter(Boolean).length >= ex.sets;
-                });
+                if (group.technique === 'NORMAL') return rows;
 
-              return (
-                <motion.div key={plan.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-3">
-                  {/* Plan header */}
-                  <div className="glass-card">
-                    <div className="flex items-start justify-between mb-4">
-                      <div>
-                        {plan.division && <div className="text-xs text-muted-foreground mb-1">{plan.division}</div>}
-                        <h2 className="font-bold text-lg">{plan.workout?.name}</h2>
-                        <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
-                          <span className="flex items-center gap-1"><Clock className="w-3 h-3" />{plan.workout?.duration || 45} min</span>
-                          <span className="flex items-center gap-1"><Dumbbell className="w-3 h-3" />{planExercises.length} exercícios</span>
-                          <span className="flex items-center gap-1"><Flame className="w-3 h-3 text-orange-400" />~{(plan.workout?.duration || 45) * 7} kcal</span>
-                        </div>
-                      </div>
-                      {!isThisPlanActive ? (
-                        <button
-                          onClick={() => {
-                            setActivePlanId(plan.id);
-                            setActiveWorkout(true);
-                            setStartTime(new Date());
-                            setCompletedSets({});
-                            setExpandedExercise(null);
-                          }}
-                          className="btn-primary flex items-center gap-2 text-sm py-2 px-4 flex-shrink-0"
-                        >
-                          <Play className="w-4 h-4" />Iniciar
-                        </button>
-                      ) : (
-                        <div className="flex items-center gap-2 text-emerald-400 text-sm font-semibold flex-shrink-0">
-                          <Timer className="w-4 h-4" />Em andamento
-                        </div>
-                      )}
+                return (
+                  <div key={gi} className={cn('rounded-2xl overflow-hidden', cfg.bg, cfg.border)}>
+                    <div className={cn('px-4 pt-3 pb-1 text-xs font-semibold flex items-center gap-1.5', cfg.color)}>
+                      {cfg.label}
+                      <span className="text-muted-foreground font-normal">· {group.items.length} exercícios em sequência</span>
+                    </div>
+                    <div className="space-y-2 p-2">{rows}</div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Finalizar */}
+            {isSelectedPlanActive && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="glass-card bg-gradient-to-br from-emerald-600/10 to-teal-600/10 border border-emerald-600/20"
+              >
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="font-semibold">{planAllCompleted ? 'Treino concluído!' : 'Progresso do treino'}</div>
+                    <div className="text-sm text-muted-foreground mt-1">
+                      {planAllCompleted ? 'Parabéns! Registre seu treino.' : 'Conclua todos os exercícios para finalizar.'}
                     </div>
                   </div>
-
-                  {/* Exercise list */}
-                  <div className="space-y-3">
-                    {groupExercises(planExercises).map((group, gi) => {
-                      const cfg = TECHNIQUE_CONFIG[group.technique];
-                      if (group.technique === 'NORMAL') {
-                        const ex = group.items[0];
-                        const flatIdx = planExercises.indexOf(ex);
-                        return (
-                          <ExerciseCard
-                            key={ex.id}
-                            exercise={ex}
-                            index={flatIdx}
-                            isExpanded={expandedExercise === ex.id}
-                            onToggle={() => setExpandedExercise(expandedExercise === ex.id ? null : ex.id)}
-                            completedSets={isThisPlanActive ? (completedSets[ex.id] || []) : []}
-                            onToggleSet={(setIdx) => isThisPlanActive && toggleSet(ex.id, setIdx)}
-                            isActive={isThisPlanActive}
-                            onOpenVideo={openVideo}
-                          />
-                        );
-                      }
-                      return (
-                        <div key={gi} className={cn('rounded-2xl overflow-hidden', cfg.bg, cfg.border)}>
-                          <div className={cn('px-4 pt-3 pb-1 flex items-center gap-2 text-xs font-semibold', cfg.color)}>
-                            <span>{cfg.label}</span>
-                            <span className="text-muted-foreground font-normal">· {group.items.length} exercícios em sequência</span>
-                          </div>
-                          <div className="space-y-2 p-2">
-                            {group.items.map((ex: any) => {
-                              const flatIdx = planExercises.indexOf(ex);
-                              return (
-                                <ExerciseCard
-                                  key={ex.id}
-                                  exercise={ex}
-                                  index={flatIdx}
-                                  isExpanded={expandedExercise === ex.id}
-                                  onToggle={() => setExpandedExercise(expandedExercise === ex.id ? null : ex.id)}
-                                  completedSets={isThisPlanActive ? (completedSets[ex.id] || []) : []}
-                                  onToggleSet={(setIdx) => isThisPlanActive && toggleSet(ex.id, setIdx)}
-                                  isActive={isThisPlanActive}
-                                  onOpenVideo={openVideo}
-                                />
-                              );
-                            })}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-
-                  {/* Finish workout */}
-                  {isThisPlanActive && (
-                    <motion.div
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className="glass-card bg-gradient-to-br from-emerald-600/10 to-teal-600/10 border border-emerald-600/20"
-                    >
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <div className="font-semibold">
-                            {planAllCompleted ? 'Treino concluído!' : 'Progresso do treino'}
-                          </div>
-                          <div className="text-sm text-muted-foreground mt-1">
-                            {planAllCompleted
-                              ? 'Parabéns! Registre seu treino.'
-                              : 'Conclua todos os exercícios para finalizar.'}
-                          </div>
-                        </div>
-                        <button
-                          disabled={!planAllCompleted}
-                          onClick={() => setShowSummary(true)}
-                          className={cn(
-                            'btn-primary text-sm py-2 px-4 flex items-center gap-2',
-                            !planAllCompleted && 'opacity-50 cursor-not-allowed',
-                          )}
-                        >
-                          <CheckCircle2 className="w-4 h-4" />Finalizar
-                        </button>
-                      </div>
-                    </motion.div>
-                  )}
-                </motion.div>
-              );
-            })}
-          </div>
+                  <button
+                    disabled={!planAllCompleted}
+                    onClick={() => setShowSummary(true)}
+                    className={cn('btn-primary text-sm py-2 px-4 flex items-center gap-2', !planAllCompleted && 'opacity-50 cursor-not-allowed')}
+                  >
+                    <CheckCircle2 className="w-4 h-4" />Finalizar
+                  </button>
+                </div>
+              </motion.div>
+            )}
+          </>
         ) : (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="glass-card flex flex-col items-center justify-center py-16 text-center"
-          >
-            <div className="w-16 h-16 rounded-2xl bg-white/5 flex items-center justify-center mb-4">
-              <Dumbbell className="w-8 h-8 text-muted-foreground" />
+          // ── LIST VIEW ──────────────────────────────────────────────────────
+          <>
+            {/* Header */}
+            <div className="page-header">
+              <div>
+                <h1 className="text-2xl font-bold">Meu Treino</h1>
+                <p className="text-muted-foreground text-sm mt-1">Escolha o treino do dia e execute</p>
+              </div>
+              {workoutPlans?.length > 0 && (
+                <button onClick={downloadWorkoutPDF} className="btn-secondary flex items-center gap-2 text-sm py-2 px-3" title="Baixar treino em PDF">
+                  <Download className="w-4 h-4" />PDF
+                </button>
+              )}
             </div>
-            <h3 className="font-semibold mb-1">Nenhum treino atribuído</h3>
-            <p className="text-sm text-muted-foreground">Seu personal ainda não atribuiu treinos para você.</p>
-          </motion.div>
-        )}
 
-        {/* Recent logs */}
-        {workoutLogs?.length > 0 && (
-          <div className="glass-card">
-            <h2 className="font-semibold mb-4 flex items-center gap-2">
-              <RotateCcw className="w-4 h-4 text-muted-foreground" />
-              Histórico Recente
-            </h2>
-            <div className="space-y-2">
-              {workoutLogs.map((log: any, i: number) => (
-                <div key={i} className="flex items-center gap-3 p-3 rounded-xl hover:bg-accent transition-all">
-                  <div className="w-9 h-9 rounded-xl bg-emerald-600/10 flex items-center justify-center">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                  </div>
-                  <div className="flex-1">
-                    <div className="text-sm font-medium">{log.workoutPlan?.workout?.name || 'Treino'}</div>
-                    <div className="text-xs text-muted-foreground">
-                      {new Date(log.startedAt || log.completedAt).toLocaleDateString('pt-BR')} • {log.duration} min
+            {/* Week frequency strip */}
+            <div className="glass-card">
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-sm font-semibold">Frequência semanal</span>
+                <span className="text-xs text-muted-foreground">
+                  {completedDaysThisWeek.size} treino{completedDaysThisWeek.size !== 1 ? 's' : ''} essa semana
+                </span>
+              </div>
+              <div className="flex gap-1">
+                {DAYS.map((day, i) => {
+                  const done = completedDaysThisWeek.has(i);
+                  const isToday = i === TODAY;
+                  return (
+                    <div key={day} className={cn('flex-1 flex flex-col items-center gap-1.5 py-2 rounded-xl text-xs', isToday && 'bg-primary/10')}>
+                      <span className={cn('font-medium', isToday ? 'text-primary' : 'text-muted-foreground')}>{day}</span>
+                      <div className={cn('w-2 h-2 rounded-full', done ? 'bg-emerald-400' : isToday ? 'bg-primary/40' : 'bg-white/10')} />
                     </div>
-                  </div>
-                  <ChevronRight className="w-4 h-4 text-muted-foreground" />
-                </div>
-              ))}
+                  );
+                })}
+              </div>
             </div>
-          </div>
+
+            {/* Plan list */}
+            {(workoutPlans?.length ?? 0) > 0 ? (
+              <div className="space-y-3">
+                {workoutPlans.map((plan: any) => {
+                  const isActive = plan.id === activePlanId && activeWorkout;
+                  return (
+                    <motion.button
+                      key={plan.id}
+                      initial={{ opacity: 0, y: 8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      onClick={() => setSelectedPlanId(plan.id)}
+                      className="glass-card w-full text-left hover:bg-accent/50 transition-all cursor-pointer"
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="min-w-0">
+                          {plan.division && <div className="text-xs text-muted-foreground mb-0.5">{plan.division}</div>}
+                          <div className="font-bold text-base truncate">{plan.workout?.name}</div>
+                          <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
+                            <span className="flex items-center gap-1"><Clock className="w-3 h-3" />{plan.workout?.duration || 45} min</span>
+                            <span className="flex items-center gap-1"><Dumbbell className="w-3 h-3" />{plan.workout?.exercises?.length || 0} exercícios</span>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          {isActive && (
+                            <span className="text-xs text-emerald-400 font-semibold flex items-center gap-1">
+                              <Timer className="w-3 h-3" />Em andamento
+                            </span>
+                          )}
+                          <ChevronRight className="w-5 h-5 text-muted-foreground" />
+                        </div>
+                      </div>
+                    </motion.button>
+                  );
+                })}
+              </div>
+            ) : (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="glass-card flex flex-col items-center justify-center py-16 text-center"
+              >
+                <div className="w-16 h-16 rounded-2xl bg-white/5 flex items-center justify-center mb-4">
+                  <Dumbbell className="w-8 h-8 text-muted-foreground" />
+                </div>
+                <h3 className="font-semibold mb-1">Nenhum treino atribuído</h3>
+                <p className="text-sm text-muted-foreground">Seu personal ainda não atribuiu treinos para você.</p>
+              </motion.div>
+            )}
+
+            {/* Recent logs */}
+            {workoutLogs?.length > 0 && (
+              <div className="glass-card">
+                <h2 className="font-semibold mb-4 flex items-center gap-2">
+                  <RotateCcw className="w-4 h-4 text-muted-foreground" />Histórico Recente
+                </h2>
+                <div className="space-y-2">
+                  {workoutLogs.map((log: any, i: number) => (
+                    <div key={i} className="flex items-center gap-3 p-3 rounded-xl hover:bg-accent transition-all">
+                      <div className="w-9 h-9 rounded-xl bg-emerald-600/10 flex items-center justify-center">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                      </div>
+                      <div className="flex-1">
+                        <div className="text-sm font-medium">{log.workoutPlan?.workout?.name || 'Treino'}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {new Date(log.startedAt || log.completedAt).toLocaleDateString('pt-BR')} • {log.duration} min
+                        </div>
+                      </div>
+                      <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </>
         )}
       </div>
     </>
   );
 }
 
-// ─── Exercise Card ────────────────────────────────────────────────────────────
+// ─── Exercise Row ─────────────────────────────────────────────────────────────
 
-function ExerciseCard({
-  exercise, index, isExpanded, onToggle, completedSets, onToggleSet, isActive, onOpenVideo,
+function ExerciseRow({
+  exercise, isActive, completedSets, onToggleSet, onOpenVideo,
 }: {
   exercise: any;
-  index: number;
-  isExpanded: boolean;
-  onToggle: () => void;
+  isActive: boolean;
   completedSets: boolean[];
   onToggleSet: (i: number) => void;
-  isActive: boolean;
   onOpenVideo: (url: string, title: string) => void;
 }) {
-  const doneCount = completedSets.filter(Boolean).length;
-  const allDone = doneCount >= exercise.sets;
   const videoUrl: string | undefined = exercise.exercise?.videoUrl;
-  const exerciseName: string = exercise.exercise?.name || '';
+  const name: string = exercise.exercise?.name || '';
+  const thumbnail = getVideoThumbnail(videoUrl || '');
+  const doneCount = completedSets.filter(Boolean).length;
+  const allDone = isActive && doneCount >= exercise.sets;
 
   return (
-    <motion.div
-      initial={{ opacity: 0, x: -10 }}
-      animate={{ opacity: 1, x: 0 }}
-      transition={{ delay: index * 0.05 }}
-      className={cn(
-        'glass-card !p-0 overflow-hidden transition-all',
-        allDone && 'border border-emerald-600/20',
-      )}
-    >
-      <button
-        onClick={onToggle}
-        className="w-full flex items-center gap-4 p-4 hover:bg-accent/50 transition-all text-left"
-      >
-        <div className={cn(
-          'w-10 h-10 rounded-xl flex items-center justify-center font-bold text-sm flex-shrink-0',
-          allDone ? 'bg-emerald-600/20 text-emerald-400' : 'bg-purple-600/10 text-purple-400',
-        )}>
-          {allDone ? <CheckCircle2 className="w-5 h-5" /> : index + 1}
-        </div>
+    <div className={cn('glass-card transition-all', allDone && 'border border-emerald-600/20 bg-emerald-600/5')}>
+      <div className="flex gap-3">
+        {/* Left: exercise info */}
         <div className="flex-1 min-w-0">
-          <div className="font-medium truncate flex items-center gap-2">
-            {exerciseName}
-            {videoUrl && (
-              <PlayCircle className="w-3.5 h-3.5 text-purple-400 flex-shrink-0" />
+          <div className={cn('font-bold text-base mb-2', allDone && 'text-emerald-400 line-through opacity-70')}>{name}</div>
+          <div className="text-sm space-y-0.5">
+            <div>
+              <span className="font-semibold">Séries:</span>{' '}
+              <span className="text-muted-foreground">{exercise.sets}x{exercise.reps}</span>
+            </div>
+            {exercise.weight != null && exercise.weight > 0 && (
+              <div>
+                <span className="font-semibold">Carga:</span>{' '}
+                <span className="text-muted-foreground">{exercise.weight}kg</span>
+              </div>
+            )}
+            {exercise.restSeconds != null && (
+              <div>
+                <span className="font-semibold">Intervalo:</span>{' '}
+                <span className="text-muted-foreground">{exercise.restSeconds}s</span>
+              </div>
             )}
           </div>
-          <div className="text-xs text-muted-foreground mt-0.5">
-            {exercise.sets} séries × {exercise.reps}
-            {exercise.weight ? ` • ${exercise.weight}kg` : ''}
-            {exercise.restSeconds ? ` • ${exercise.restSeconds}s descanso` : ''}
-          </div>
-        </div>
-        {isActive && (
-          <div className="text-xs text-muted-foreground mr-2">
-            {doneCount}/{exercise.sets}
-          </div>
-        )}
-        {isExpanded ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
-      </button>
-
-      <AnimatePresence>
-        {isExpanded && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            className="border-t border-border/50"
-          >
-            <div className="p-4 space-y-4">
-              {/* Video preview */}
-              {videoUrl && (
-                <VideoPreview
-                  url={videoUrl}
-                  title={exerciseName}
-                  onExpand={() => onOpenVideo(videoUrl, exerciseName)}
-                />
-              )}
-
-              {exercise.exercise?.description && (
-                <p className="text-xs text-muted-foreground">{exercise.exercise.description}</p>
-              )}
-
-              {isActive && (
-                <div>
-                  <div className="text-xs font-medium mb-2">Marcar séries concluídas:</div>
-                  <div className="flex gap-2 flex-wrap">
-                    {[...Array(exercise.sets)].map((_, i) => (
-                      <button
-                        key={i}
-                        onClick={() => onToggleSet(i)}
-                        className={cn(
-                          'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all border',
-                          completedSets[i]
-                            ? 'bg-emerald-600/20 text-emerald-400 border-emerald-600/30'
-                            : 'glass border-transparent hover:bg-accent',
-                        )}
-                      >
-                        {completedSets[i] ? <CheckCircle2 className="w-3 h-3" /> : <Circle className="w-3 h-3" />}
-                        Série {i + 1}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {exercise.notes && (
-                <div className="glass rounded-xl p-3">
-                  <div className="text-xs text-muted-foreground">{exercise.notes}</div>
-                </div>
-              )}
+          {exercise.notes && (
+            <div className="mt-2 text-xs text-muted-foreground">
+              <span className="font-semibold text-foreground/70">Instruções:</span>{' '}{exercise.notes}
             </div>
-          </motion.div>
+          )}
+        </div>
+
+        {/* Right: video thumbnail */}
+        {videoUrl && (
+          <button
+            onClick={() => onOpenVideo(videoUrl, name)}
+            className="flex-shrink-0 w-32 h-24 rounded-xl overflow-hidden relative group"
+          >
+            {thumbnail ? (
+              <img src={thumbnail} alt={name} className="w-full h-full object-cover" />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center bg-black/30">
+                <PlayCircle className="w-8 h-8 text-white/50" />
+              </div>
+            )}
+            <div className="absolute inset-0 flex items-center justify-center bg-black/20 group-hover:bg-black/40 transition-all">
+              <div className="w-11 h-11 rounded-full bg-black/60 flex items-center justify-center group-hover:scale-110 transition-transform shadow-lg">
+                <Play className="w-4 h-4 text-white ml-0.5" />
+              </div>
+            </div>
+          </button>
         )}
-      </AnimatePresence>
-    </motion.div>
-  );
-}
-
-// ─── Inline video preview (inside expanded card) ──────────────────────────────
-
-function VideoPreview({ url, title, onExpand }: { url: string; title: string; onExpand: () => void }) {
-  const info = getEmbedInfo(url);
-  if (!info) return null;
-
-  return (
-    <div className="space-y-1.5">
-      <div className="flex items-center justify-between">
-        <span className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
-          <PlayCircle className="w-3.5 h-3.5 text-purple-400" />
-          Demonstração
-        </span>
-        <button
-          onClick={onExpand}
-          className="text-xs text-purple-400 hover:text-purple-300 flex items-center gap-1 transition-colors"
-        >
-          <Maximize2 className="w-3 h-3" />
-          Ampliar
-        </button>
       </div>
-      <div
-        className="relative rounded-xl overflow-hidden cursor-pointer group bg-black"
-        style={{ paddingTop: '56.25%' }}
-        onClick={onExpand}
-      >
-        {info.type === 'direct' ? (
-          <video
-            src={info.embedUrl}
-            className="absolute inset-0 w-full h-full object-cover"
-            muted
-            playsInline
-          />
-        ) : (
-          <iframe
-            src={info.embedUrl}
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-            allowFullScreen
-            className="absolute inset-0 w-full h-full border-0 pointer-events-none"
-            tabIndex={-1}
-          />
-        )}
-        {/* Overlay to intercept clicks and open modal */}
-        <div className="absolute inset-0 flex items-center justify-center bg-black/10 group-hover:bg-black/30 transition-all">
-          <div className="w-14 h-14 rounded-full bg-black/60 flex items-center justify-center opacity-80 group-hover:opacity-100 transition-all group-hover:scale-110 scale-100">
-            <Maximize2 className="w-6 h-6 text-white" />
+
+      {/* Set checkboxes — only when workout is active */}
+      {isActive && (
+        <div className="mt-3 pt-3 border-t border-border/50">
+          <div className="flex gap-2 flex-wrap">
+            {[...Array(exercise.sets)].map((_, i) => (
+              <button
+                key={i}
+                onClick={() => onToggleSet(i)}
+                className={cn(
+                  'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all border',
+                  completedSets[i]
+                    ? 'bg-emerald-600/20 text-emerald-400 border-emerald-600/30'
+                    : 'glass border-transparent hover:bg-accent',
+                )}
+              >
+                {completedSets[i] ? <CheckCircle2 className="w-3 h-3" /> : <Circle className="w-3 h-3" />}
+                Série {i + 1}
+              </button>
+            ))}
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
@@ -752,7 +652,6 @@ function WorkoutSummaryModal({ workoutName, startTime, isPending, onConfirm, onC
           <X className="w-4 h-4" />
         </button>
 
-        {/* Header */}
         <div className="text-center mb-6 pt-2">
           <div className="w-16 h-16 rounded-full bg-emerald-500/20 flex items-center justify-center mx-auto mb-4">
             <Trophy className="w-8 h-8 text-emerald-400" />
@@ -762,7 +661,6 @@ function WorkoutSummaryModal({ workoutName, startTime, isPending, onConfirm, onC
           <p className="text-primary font-medium mt-1">{workoutName}</p>
         </div>
 
-        {/* Stats */}
         <div className="grid grid-cols-3 gap-2 mb-3">
           {[{ label: 'Data', value: dateStr }, { label: 'Início', value: startStr }, { label: 'Fim', value: endStr }].map((s) => (
             <div key={s.label} className="glass rounded-xl p-3 text-center">
@@ -789,15 +687,12 @@ function WorkoutSummaryModal({ workoutName, startTime, isPending, onConfirm, onC
                   <option>Pesado</option>
                   <option>Muito pesado</option>
                 </select>
-                <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
               </div>
             </div>
-
             <div className="mb-6">
               <label className="text-xs text-muted-foreground mb-2 block">Deixe um comentário (opcional)</label>
               <textarea value={comment} onChange={(e) => setComment(e.target.value)} placeholder="Como foi seu treino? Algo a destacar?" className="input-field resize-none w-full" rows={3} />
             </div>
-
             <button onClick={handleConcluir} disabled={isPending} className="btn-primary w-full flex items-center justify-center gap-2">
               <CheckCircle2 className="w-4 h-4" />
               {isPending ? 'Salvando...' : 'Concluir Treino'}
@@ -851,27 +746,22 @@ function generateWorkoutCard({ workoutName, dateStr, startStr, endStr, durationS
   canvas.width = W; canvas.height = H;
   const ctx = canvas.getContext('2d')!;
 
-  // Background gradient
   const bg = ctx.createLinearGradient(0, 0, W, H);
   bg.addColorStop(0, '#0d0d1a'); bg.addColorStop(1, '#160d2e');
   ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
 
-  // Top accent bar
   const bar = ctx.createLinearGradient(0, 0, W, 0);
   bar.addColorStop(0, '#7c3aed'); bar.addColorStop(1, '#4f46e5');
   ctx.fillStyle = bar; ctx.fillRect(0, 0, W, 10);
 
-  // Glow
   const glow = ctx.createRadialGradient(W / 2, 300, 0, W / 2, 300, 420);
   glow.addColorStop(0, 'rgba(124,58,237,0.18)'); glow.addColorStop(1, 'rgba(0,0,0,0)');
   ctx.fillStyle = glow; ctx.fillRect(0, 0, W, H);
 
-  // App name
   ctx.fillStyle = 'rgba(255,255,255,0.35)';
   ctx.font = '500 36px system-ui,sans-serif';
   ctx.textAlign = 'center'; ctx.fillText('Fitlynutri', W / 2, 85);
 
-  // Green circle with checkmark
   ctx.fillStyle = '#059669';
   ctx.beginPath(); ctx.arc(W / 2, 235, 85, 0, Math.PI * 2); ctx.fill();
   ctx.strokeStyle = '#fff'; ctx.lineWidth = 13; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
@@ -879,26 +769,17 @@ function generateWorkoutCard({ workoutName, dateStr, startStr, endStr, durationS
   ctx.moveTo(W / 2 - 33, 235); ctx.lineTo(W / 2 - 5, 268); ctx.lineTo(W / 2 + 43, 198);
   ctx.stroke();
 
-  // Title
   ctx.fillStyle = '#ffffff'; ctx.font = 'bold 76px system-ui,sans-serif';
   ctx.textAlign = 'center'; ctx.fillText('Treino Concluído!', W / 2, 385);
 
-  // Workout name
   ctx.fillStyle = '#a78bfa'; ctx.font = '50px system-ui,sans-serif';
   const nameShort = workoutName.length > 28 ? workoutName.slice(0, 25) + '...' : workoutName;
   ctx.fillText(nameShort, W / 2, 455);
 
-  // Divider
   ctx.strokeStyle = 'rgba(255,255,255,0.1)'; ctx.lineWidth = 2;
   ctx.beginPath(); ctx.moveTo(100, 495); ctx.lineTo(W - 100, 495); ctx.stroke();
 
-  // Stats boxes
-  const stats = [
-    { label: 'Data', value: dateStr },
-    { label: 'Início', value: startStr },
-    { label: 'Fim', value: endStr },
-    { label: 'Duração', value: durationStr + ' min' },
-  ];
+  const stats = [{ label: 'Data', value: dateStr }, { label: 'Início', value: startStr }, { label: 'Fim', value: endStr }, { label: 'Duração', value: durationStr + ' min' }];
   const bW = 218, bH = 112, bGap = 16;
   const totalBW = stats.length * bW + (stats.length - 1) * bGap;
   const bStartX = (W - totalBW) / 2;
@@ -911,14 +792,10 @@ function generateWorkoutCard({ workoutName, dateStr, startStr, endStr, durationS
     ctx.fillStyle = '#ffffff';
     let fSize = 34;
     ctx.font = `bold ${fSize}px system-ui,sans-serif`;
-    while (ctx.measureText(s.value).width > bW - 16 && fSize > 18) {
-      fSize -= 2;
-      ctx.font = `bold ${fSize}px system-ui,sans-serif`;
-    }
+    while (ctx.measureText(s.value).width > bW - 16 && fSize > 18) { fSize -= 2; ctx.font = `bold ${fSize}px system-ui,sans-serif`; }
     ctx.fillText(s.value, x + bW / 2, y + 82);
   });
 
-  // Intensity pill
   const showIntensity = !!intensity;
   if (showIntensity) {
     const pW = 360, pH = 76, pX = (W - pW) / 2, pY = 685;
@@ -932,7 +809,6 @@ function generateWorkoutCard({ workoutName, dateStr, startStr, endStr, durationS
     ctx.fillText(intensity, W / 2, pY + 65);
   }
 
-  // Comment
   if (comment.trim()) {
     const cY = showIntensity ? 820 : 720;
     ctx.fillStyle = 'rgba(255,255,255,0.5)'; ctx.font = 'italic 32px system-ui,sans-serif';
@@ -941,7 +817,6 @@ function generateWorkoutCard({ workoutName, dateStr, startStr, endStr, durationS
     ctx.fillText(`"${t}"`, W / 2, cY);
   }
 
-  // Watermark
   ctx.fillStyle = 'rgba(255,255,255,0.16)'; ctx.font = '24px system-ui,sans-serif';
   ctx.textAlign = 'center'; ctx.fillText('Gerado com Fitlynutri', W / 2, H - 38);
 
