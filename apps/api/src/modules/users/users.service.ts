@@ -20,20 +20,22 @@ export class UsersService {
   }
 
   async updateProfile(userId: string, data: any) {
-    return this.prisma.profile.update({
+    const profileData = {
+      firstName: data.firstName,
+      lastName: data.lastName,
+      phone: data.phone,
+      bio: data.bio,
+      gender: data.gender,
+      birthDate: data.birthDate ? new Date(data.birthDate) : undefined,
+      city: data.city,
+      state: data.state,
+      country: data.country,
+      avatarUrl: data.avatarUrl,
+    };
+    return this.prisma.profile.upsert({
       where: { userId },
-      data: {
-        firstName: data.firstName,
-        lastName: data.lastName,
-        phone: data.phone,
-        bio: data.bio,
-        gender: data.gender,
-        birthDate: data.birthDate ? new Date(data.birthDate) : undefined,
-        city: data.city,
-        state: data.state,
-        country: data.country,
-        avatarUrl: data.avatarUrl,
-      },
+      update: profileData,
+      create: { userId, ...profileData },
     });
   }
 
