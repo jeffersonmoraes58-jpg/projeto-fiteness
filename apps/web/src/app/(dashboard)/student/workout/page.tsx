@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Dumbbell, Play, CheckCircle2, Clock, ChevronDown,
   ChevronUp, Flame, RotateCcw, Timer, ChevronRight,
-  Calendar, Filter, X, Maximize2, PlayCircle, Trophy, Share2, Download,
+  X, Maximize2, PlayCircle, Trophy, Share2, Download,
 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
@@ -126,7 +126,7 @@ function VideoModal({ url, title, onClose }: { url: string; title: string; onClo
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function StudentWorkout() {
-  const [selectedDay, setSelectedDay] = useState(TODAY);
+  const [activePlanId, setActivePlanId] = useState<string | null>(null);
   const [expandedExercise, setExpandedExercise] = useState<string | null>(null);
   const [activeWorkout, setActiveWorkout] = useState(false);
   const [completedSets, setCompletedSets] = useState<Record<string, boolean[]>>({});
@@ -151,7 +151,16 @@ export default function StudentWorkout() {
     onError: () => toast.error('Erro ao registrar treino'),
   });
 
-  const dayPlan = workoutPlans?.find((p: any) => p.dayOfWeek?.includes(selectedDay));
+  const activePlan = (workoutPlans || []).find((p: any) => p.id === activePlanId);
+
+  const weekStart = new Date();
+  weekStart.setHours(0, 0, 0, 0);
+  weekStart.setDate(weekStart.getDate() - weekStart.getDay());
+  const completedDaysThisWeek = new Set<number>(
+    (workoutLogs || [])
+      .filter((log: any) => new Date(log.completedAt || log.startedAt) >= weekStart)
+      .map((log: any) => new Date(log.completedAt || log.startedAt).getDay()),
+  );
 
   const toggleSet = (exerciseId: string, setIndex: number) => {
     setCompletedSets((prev) => {
@@ -161,11 +170,6 @@ export default function StudentWorkout() {
       return { ...prev, [exerciseId]: updated };
     });
   };
-
-  const allCompleted = dayPlan?.workout?.exercises?.every((ex: any) => {
-    const sets = completedSets[ex.id] || [];
-    return sets.filter(Boolean).length >= ex.sets;
-  });
 
   const openVideo = useCallback((url: string, title: string) => {
     setVideoModal({ url, title });
@@ -179,7 +183,6 @@ export default function StudentWorkout() {
     const date = new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' });
 
     const dayBlocks = workoutPlans.map((plan: any) => {
-      const days = (plan.dayOfWeek ?? []).map((d: number) => DAYS[d]).join(', ');
       const exercises = (plan.workout?.exercises ?? []).map((ex: any, i: number) => `
         <tr>
           <td style="padding:8px 12px;font-size:13px;color:#111827;">${i + 1}. ${ex.exercise?.name ?? '—'}</td>
@@ -196,7 +199,7 @@ export default function StudentWorkout() {
         <div class="plan-block">
           <div class="plan-header">
             <span class="plan-title">${plan.workout?.name ?? 'Treino'}</span>
-            <span class="plan-meta">${days} • ${plan.workout?.duration ?? 45} min • ${plan.workout?.exercises?.length ?? 0} exercícios</span>
+            <span class="plan-meta">${plan.workout?.duration ?? 45} min • ${plan.workout?.exercises?.length ?? 0} exercícios</span>
           </div>
           ${plan.division ? `<div class="division">${plan.division}</div>` : ''}
           <table>
@@ -262,19 +265,20 @@ export default function StudentWorkout() {
       {videoModal && (
         <VideoModal url={videoModal.url} title={videoModal.title} onClose={closeVideo} />
       )}
-      {showSummary && startTime && dayPlan && (
+      {showSummary && startTime && activePlan && (
         <WorkoutSummaryModal
-          workoutName={dayPlan.workout?.name || 'Treino'}
+          workoutName={activePlan.workout?.name || 'Treino'}
           startTime={startTime}
           isPending={logMutation.isPending}
           onConfirm={(intensity, comment) =>
-            logMutation.mutate({ workoutPlanId: dayPlan.id, intensity, comment })
+            logMutation.mutate({ workoutPlanId: activePlan.id, intensity, comment })
           }
           onClose={() => {
             setShowSummary(false);
             setActiveWorkout(false);
             setCompletedSets({});
             setStartTime(null);
+            setActivePlanId(null);
           }}
         />
       )}
@@ -284,7 +288,7 @@ export default function StudentWorkout() {
         <div className="page-header">
           <div>
             <h1 className="text-2xl font-bold">Meu Treino</h1>
-            <p className="text-muted-foreground text-sm mt-1">Selecione o dia e execute</p>
+            <p className="text-muted-foreground text-sm mt-1">Escolha o treino do dia e execute</p>
           </div>
           <div className="flex items-center gap-2">
             {workoutPlans?.length > 0 && (
@@ -297,106 +301,96 @@ export default function StudentWorkout() {
                 PDF
               </button>
             )}
-            <button className="glass rounded-xl p-2 hover:bg-accent transition-all">
-              <Filter className="w-4 h-4" />
-            </button>
           </div>
         </div>
 
-        {/* Day selector */}
-        <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-1">
-          {DAYS.map((day, i) => {
-            const hasPlan = workoutPlans?.some((p: any) => p.dayOfWeek?.includes(i));
-            const isToday = i === TODAY;
-            return (
-              <button
-                key={day}
-                onClick={() => setSelectedDay(i)}
-                className={cn(
-                  'flex flex-col items-center gap-1 px-4 py-3 rounded-xl flex-shrink-0 transition-all border',
-                  selectedDay === i
-                    ? 'bg-primary text-primary-foreground border-primary'
-                    : 'glass border-transparent hover:bg-accent',
-                )}
-              >
-                <span className="text-xs font-medium">{day}</span>
-                {hasPlan && (
-                  <div className={cn('w-1.5 h-1.5 rounded-full', selectedDay === i ? 'bg-white/60' : 'bg-primary')} />
-                )}
-                {isToday && selectedDay !== i && (
-                  <span className="text-[9px] text-primary font-semibold">hoje</span>
-                )}
-              </button>
-            );
-          })}
+        {/* Week frequency strip */}
+        <div className="glass-card">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-sm font-semibold">Frequência semanal</span>
+            <span className="text-xs text-muted-foreground">
+              {completedDaysThisWeek.size} treino{completedDaysThisWeek.size !== 1 ? 's' : ''} essa semana
+            </span>
+          </div>
+          <div className="flex gap-1">
+            {DAYS.map((day, i) => {
+              const done = completedDaysThisWeek.has(i);
+              const isToday = i === TODAY;
+              return (
+                <div
+                  key={day}
+                  className={cn(
+                    'flex-1 flex flex-col items-center gap-1.5 py-2 rounded-xl text-xs',
+                    isToday && 'bg-primary/10',
+                  )}
+                >
+                  <span className={cn('font-medium', isToday ? 'text-primary' : 'text-muted-foreground')}>{day}</span>
+                  <div
+                    className={cn(
+                      'w-2 h-2 rounded-full',
+                      done ? 'bg-emerald-400' : isToday ? 'bg-primary/40' : 'bg-white/10',
+                    )}
+                  />
+                </div>
+              );
+            })}
+          </div>
         </div>
 
-        {dayPlan ? (
-          <>
-            {/* Workout info */}
-            <motion.div
-              key={selectedDay}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="glass-card"
-            >
-              <div className="flex items-start justify-between mb-4">
-                <div>
-                  <div className="text-xs text-muted-foreground mb-1">{dayPlan.division || 'Treino'}</div>
-                  <h2 className="font-bold text-lg">{dayPlan.workout?.name}</h2>
-                  <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
-                    <span className="flex items-center gap-1"><Clock className="w-3 h-3" />{dayPlan.workout?.duration || 45} min</span>
-                    <span className="flex items-center gap-1"><Dumbbell className="w-3 h-3" />{dayPlan.workout?.exercises?.length || 0} exercícios</span>
-                    <span className="flex items-center gap-1"><Flame className="w-3 h-3 text-orange-400" />~{(dayPlan.workout?.duration || 45) * 7} kcal</span>
-                  </div>
-                </div>
-                {!activeWorkout ? (
-                  <button
-                    onClick={() => { setActiveWorkout(true); setStartTime(new Date()); }}
-                    className="btn-primary flex items-center gap-2 text-sm py-2 px-4"
-                  >
-                    <Play className="w-4 h-4" />
-                    Iniciar
-                  </button>
-                ) : (
-                  <div className="flex items-center gap-2 text-emerald-400 text-sm font-semibold">
-                    <Timer className="w-4 h-4" />
-                    Em andamento
-                  </div>
-                )}
-              </div>
-            </motion.div>
+        {/* Workout plans list */}
+        {(workoutPlans?.length ?? 0) > 0 ? (
+          <div className="space-y-6">
+            {workoutPlans.map((plan: any) => {
+              const isThisPlanActive = activePlanId === plan.id && activeWorkout;
+              const planExercises: any[] = plan.workout?.exercises ?? [];
+              const planAllCompleted = isThisPlanActive && planExercises.length > 0 &&
+                planExercises.every((ex: any) => {
+                  const sets = completedSets[ex.id] || [];
+                  return sets.filter(Boolean).length >= ex.sets;
+                });
 
-            {/* Exercise list */}
-            <div className="space-y-3">
-              {groupExercises(dayPlan.workout?.exercises || []).map((group, gi) => {
-                const cfg = TECHNIQUE_CONFIG[group.technique];
-                if (group.technique === 'NORMAL') {
-                  const ex = group.items[0];
-                  const flatIdx = (dayPlan.workout?.exercises || []).indexOf(ex);
-                  return (
-                    <ExerciseCard
-                      key={ex.id}
-                      exercise={ex}
-                      index={flatIdx}
-                      isExpanded={expandedExercise === ex.id}
-                      onToggle={() => setExpandedExercise(expandedExercise === ex.id ? null : ex.id)}
-                      completedSets={completedSets[ex.id] || []}
-                      onToggleSet={(setIdx) => toggleSet(ex.id, setIdx)}
-                      isActive={activeWorkout}
-                      onOpenVideo={openVideo}
-                    />
-                  );
-                }
-                return (
-                  <div key={gi} className={cn('rounded-2xl overflow-hidden', cfg.bg, cfg.border)}>
-                    <div className={cn('px-4 pt-3 pb-1 flex items-center gap-2 text-xs font-semibold', cfg.color)}>
-                      <span>{cfg.label}</span>
-                      <span className="text-muted-foreground font-normal">· {group.items.length} exercícios em sequência</span>
+              return (
+                <motion.div key={plan.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-3">
+                  {/* Plan header */}
+                  <div className="glass-card">
+                    <div className="flex items-start justify-between mb-4">
+                      <div>
+                        {plan.division && <div className="text-xs text-muted-foreground mb-1">{plan.division}</div>}
+                        <h2 className="font-bold text-lg">{plan.workout?.name}</h2>
+                        <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
+                          <span className="flex items-center gap-1"><Clock className="w-3 h-3" />{plan.workout?.duration || 45} min</span>
+                          <span className="flex items-center gap-1"><Dumbbell className="w-3 h-3" />{planExercises.length} exercícios</span>
+                          <span className="flex items-center gap-1"><Flame className="w-3 h-3 text-orange-400" />~{(plan.workout?.duration || 45) * 7} kcal</span>
+                        </div>
+                      </div>
+                      {!isThisPlanActive ? (
+                        <button
+                          onClick={() => {
+                            setActivePlanId(plan.id);
+                            setActiveWorkout(true);
+                            setStartTime(new Date());
+                            setCompletedSets({});
+                            setExpandedExercise(null);
+                          }}
+                          className="btn-primary flex items-center gap-2 text-sm py-2 px-4 flex-shrink-0"
+                        >
+                          <Play className="w-4 h-4" />Iniciar
+                        </button>
+                      ) : (
+                        <div className="flex items-center gap-2 text-emerald-400 text-sm font-semibold flex-shrink-0">
+                          <Timer className="w-4 h-4" />Em andamento
+                        </div>
+                      )}
                     </div>
-                    <div className="space-y-2 p-2">
-                      {group.items.map((ex: any) => {
-                        const flatIdx = (dayPlan.workout?.exercises || []).indexOf(ex);
+                  </div>
+
+                  {/* Exercise list */}
+                  <div className="space-y-3">
+                    {groupExercises(planExercises).map((group, gi) => {
+                      const cfg = TECHNIQUE_CONFIG[group.technique];
+                      if (group.technique === 'NORMAL') {
+                        const ex = group.items[0];
+                        const flatIdx = planExercises.indexOf(ex);
                         return (
                           <ExerciseCard
                             key={ex.id}
@@ -404,64 +398,88 @@ export default function StudentWorkout() {
                             index={flatIdx}
                             isExpanded={expandedExercise === ex.id}
                             onToggle={() => setExpandedExercise(expandedExercise === ex.id ? null : ex.id)}
-                            completedSets={completedSets[ex.id] || []}
-                            onToggleSet={(setIdx) => toggleSet(ex.id, setIdx)}
-                            isActive={activeWorkout}
+                            completedSets={isThisPlanActive ? (completedSets[ex.id] || []) : []}
+                            onToggleSet={(setIdx) => isThisPlanActive && toggleSet(ex.id, setIdx)}
+                            isActive={isThisPlanActive}
                             onOpenVideo={openVideo}
                           />
                         );
-                      })}
-                    </div>
+                      }
+                      return (
+                        <div key={gi} className={cn('rounded-2xl overflow-hidden', cfg.bg, cfg.border)}>
+                          <div className={cn('px-4 pt-3 pb-1 flex items-center gap-2 text-xs font-semibold', cfg.color)}>
+                            <span>{cfg.label}</span>
+                            <span className="text-muted-foreground font-normal">· {group.items.length} exercícios em sequência</span>
+                          </div>
+                          <div className="space-y-2 p-2">
+                            {group.items.map((ex: any) => {
+                              const flatIdx = planExercises.indexOf(ex);
+                              return (
+                                <ExerciseCard
+                                  key={ex.id}
+                                  exercise={ex}
+                                  index={flatIdx}
+                                  isExpanded={expandedExercise === ex.id}
+                                  onToggle={() => setExpandedExercise(expandedExercise === ex.id ? null : ex.id)}
+                                  completedSets={isThisPlanActive ? (completedSets[ex.id] || []) : []}
+                                  onToggleSet={(setIdx) => isThisPlanActive && toggleSet(ex.id, setIdx)}
+                                  isActive={isThisPlanActive}
+                                  onOpenVideo={openVideo}
+                                />
+                              );
+                            })}
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
-                );
-              })}
-            </div>
 
-            {/* Finish workout */}
-            {activeWorkout && (
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="glass-card bg-gradient-to-br from-emerald-600/10 to-teal-600/10 border border-emerald-600/20"
-              >
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className="font-semibold">
-                      {allCompleted ? 'Treino concluído!' : 'Progresso do treino'}
-                    </div>
-                    <div className="text-sm text-muted-foreground mt-1">
-                      {allCompleted
-                        ? 'Parabéns! Registre seu treino.'
-                        : 'Conclua todos os exercícios para finalizar.'}
-                    </div>
-                  </div>
-                  <button
-                    disabled={!allCompleted}
-                    onClick={() => setShowSummary(true)}
-                    className={cn(
-                      'btn-primary text-sm py-2 px-4 flex items-center gap-2',
-                      !allCompleted && 'opacity-50 cursor-not-allowed',
-                    )}
-                  >
-                    <CheckCircle2 className="w-4 h-4" />
-                    Finalizar
-                  </button>
-                </div>
-              </motion.div>
-            )}
-          </>
+                  {/* Finish workout */}
+                  {isThisPlanActive && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="glass-card bg-gradient-to-br from-emerald-600/10 to-teal-600/10 border border-emerald-600/20"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <div className="font-semibold">
+                            {planAllCompleted ? 'Treino concluído!' : 'Progresso do treino'}
+                          </div>
+                          <div className="text-sm text-muted-foreground mt-1">
+                            {planAllCompleted
+                              ? 'Parabéns! Registre seu treino.'
+                              : 'Conclua todos os exercícios para finalizar.'}
+                          </div>
+                        </div>
+                        <button
+                          disabled={!planAllCompleted}
+                          onClick={() => setShowSummary(true)}
+                          className={cn(
+                            'btn-primary text-sm py-2 px-4 flex items-center gap-2',
+                            !planAllCompleted && 'opacity-50 cursor-not-allowed',
+                          )}
+                        >
+                          <CheckCircle2 className="w-4 h-4" />Finalizar
+                        </button>
+                      </div>
+                    </motion.div>
+                  )}
+                </motion.div>
+              );
+            })}
+          </div>
         ) : (
           <motion.div
-            key={`empty-${selectedDay}`}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             className="glass-card flex flex-col items-center justify-center py-16 text-center"
           >
             <div className="w-16 h-16 rounded-2xl bg-white/5 flex items-center justify-center mb-4">
-              <Calendar className="w-8 h-8 text-muted-foreground" />
+              <Dumbbell className="w-8 h-8 text-muted-foreground" />
             </div>
-            <h3 className="font-semibold mb-1">Dia de descanso</h3>
-            <p className="text-sm text-muted-foreground">Nenhum treino planejado para este dia.</p>
+            <h3 className="font-semibold mb-1">Nenhum treino atribuído</h3>
+            <p className="text-sm text-muted-foreground">Seu personal ainda não atribuiu treinos para você.</p>
           </motion.div>
         )}
 
