@@ -11,10 +11,11 @@ export class AssignWorkoutDto {
   @IsString()
   division?: string;
 
-  @ApiProperty({ example: [1, 3, 5] })
+  @ApiPropertyOptional({ example: [1, 3, 5] })
+  @IsOptional()
   @IsArray()
   @IsNumber({}, { each: true })
-  dayOfWeek: number[];
+  dayOfWeek?: number[];
 
   @ApiProperty()
   @IsString()

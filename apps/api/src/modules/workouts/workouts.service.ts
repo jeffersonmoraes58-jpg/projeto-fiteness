@@ -151,7 +151,7 @@ export class WorkoutsService {
         studentId: dto.studentId,
         workoutId,
         division: dto.division,
-        dayOfWeek: dto.dayOfWeek,
+        dayOfWeek: dto.dayOfWeek ?? [],
         startDate: new Date(dto.startDate),
         endDate: dto.endDate ? new Date(dto.endDate) : undefined,
         notes: dto.notes,

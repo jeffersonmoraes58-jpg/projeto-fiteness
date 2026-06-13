@@ -4,7 +4,7 @@ import { useState, useCallback, Fragment } from 'react';
 import { motion } from 'framer-motion';
 import {
   Dumbbell, ChevronLeft, Clock, Layers, Zap, Users, UserCheck,
-  Calendar, CheckSquare, Square, Plus, Trash2, Search, Save, CheckCircle, Video,
+  Plus, Trash2, Search, Save, CheckCircle, Video,
   Link2, Unlink,
 } from 'lucide-react';
 import Link from 'next/link';
@@ -14,10 +14,6 @@ import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
 
 const LEVEL_LABELS = ['', 'Iniciante', 'Básico', 'Intermediário', 'Avançado', 'Elite'];
-const DAYS = [
-  { label: 'Dom', value: 0 }, { label: 'Seg', value: 1 }, { label: 'Ter', value: 2 },
-  { label: 'Qua', value: 3 }, { label: 'Qui', value: 4 }, { label: 'Sex', value: 5 }, { label: 'Sáb', value: 6 },
-];
 
 type Technique = 'NORMAL' | 'BI_SET' | 'SUPER_SET' | 'TRI_SET' | 'DROP_SET' | 'GIANT_SET' | 'CIRCUIT';
 
@@ -58,7 +54,6 @@ export default function WorkoutDetailPage() {
   const qc = useQueryClient();
 
   const [selectedStudent, setSelectedStudent] = useState('');
-  const [dayOfWeek, setDayOfWeek] = useState<number[]>([]);
   const [startDate, setStartDate] = useState(() => new Date().toISOString().split('T')[0]);
   const [endDate, setEndDate] = useState('');
   const [notes, setNotes] = useState('');
@@ -146,7 +141,7 @@ export default function WorkoutDetailPage() {
     mutationFn: (data: any) => api.post(`/workouts/${id}/assign`, data),
     onSuccess: () => {
       setAssignSuccess(true);
-      setSelectedStudent(''); setDayOfWeek([]); setStartDate(new Date().toISOString().split('T')[0]); setEndDate(''); setNotes(''); setAssignError('');
+      setSelectedStudent(''); setStartDate(new Date().toISOString().split('T')[0]); setEndDate(''); setNotes(''); setAssignError('');
       qc.invalidateQueries({ queryKey: ['workout', id] });
       setTimeout(() => setAssignSuccess(false), 3000);
     },
@@ -156,15 +151,12 @@ export default function WorkoutDetailPage() {
     },
   });
 
-  const toggleDay = (v: number) => setDayOfWeek(prev => prev.includes(v) ? prev.filter(d => d !== v) : [...prev, v]);
-
   const handleAssign = (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedStudent) { setAssignError('Selecione um aluno'); return; }
-    if (dayOfWeek.length === 0) { setAssignError('Selecione ao menos um dia da semana'); return; }
     if (!startDate) { setAssignError('Informe a data de início'); return; }
     setAssignError('');
-    assignMutation.mutate({ studentId: selectedStudent, dayOfWeek, startDate, endDate: endDate || undefined, notes: notes || undefined });
+    assignMutation.mutate({ studentId: selectedStudent, startDate, endDate: endDate || undefined, notes: notes || undefined });
   };
 
   const addExercise = useCallback(
@@ -475,21 +467,6 @@ export default function WorkoutDetailPage() {
               <option key={s.id} value={s.id}>{s.user?.profile?.firstName} {s.user?.profile?.lastName}</option>
             ))}
           </select>
-        </div>
-
-        <div>
-          <label className="text-sm font-medium mb-2 block flex items-center gap-1.5"><Calendar className="w-3.5 h-3.5" />Dias da semana *</label>
-          <div className="flex gap-2 flex-wrap">
-            {DAYS.map(d => {
-              const active = dayOfWeek.includes(d.value);
-              return (
-                <button key={d.value} type="button" onClick={() => toggleDay(d.value)} className={`w-11 h-11 rounded-xl text-sm font-medium transition-all flex flex-col items-center justify-center gap-0.5 ${active ? 'bg-primary text-primary-foreground' : 'glass hover:bg-accent text-muted-foreground'}`}>
-                  {active ? <CheckSquare className="w-3 h-3" /> : <Square className="w-3 h-3" />}
-                  {d.label}
-                </button>
-              );
-            })}
-          </div>
         </div>
 
         <div className="grid grid-cols-2 gap-4">
