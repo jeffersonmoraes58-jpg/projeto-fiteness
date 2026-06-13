@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Dumbbell, Play, CheckCircle2, Clock, ChevronLeft,
@@ -128,6 +128,7 @@ function VideoModal({ url, title, onClose }: { url: string; title: string; onClo
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function StudentWorkout() {
+  const [selectedTrainerId, setSelectedTrainerId] = useState<string | null>(null);
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
   const [activePlanId, setActivePlanId] = useState<string | null>(null);
   const [activeWorkout, setActiveWorkout] = useState(false);
@@ -153,7 +154,30 @@ export default function StudentWorkout() {
     onError: () => toast.error('Erro ao registrar treino'),
   });
 
-  const selectedPlan = (workoutPlans || []).find((p: any) => p.id === selectedPlanId);
+  const trainers = useMemo(() => {
+    if (!workoutPlans) return [];
+    const map = new Map<string, any>();
+    for (const plan of workoutPlans) {
+      const t = plan.workout?.trainer;
+      if (!t) continue;
+      if (!map.has(t.id)) map.set(t.id, { ...t, planCount: 0 });
+      map.get(t.id).planCount++;
+    }
+    return Array.from(map.values());
+  }, [workoutPlans]);
+
+  useEffect(() => {
+    if (trainers.length === 1 && selectedTrainerId === null) {
+      setSelectedTrainerId(trainers[0].id);
+    }
+  }, [trainers, selectedTrainerId]);
+
+  const filteredPlans = useMemo(
+    () => (workoutPlans || []).filter((p: any) => !selectedTrainerId || p.workout?.trainer?.id === selectedTrainerId),
+    [workoutPlans, selectedTrainerId],
+  );
+
+  const selectedPlan = filteredPlans.find((p: any) => p.id === selectedPlanId);
   const activePlan = (workoutPlans || []).find((p: any) => p.id === activePlanId);
   const isSelectedPlanActive = selectedPlanId === activePlanId && activeWorkout;
 
@@ -186,9 +210,9 @@ export default function StudentWorkout() {
   const closeVideo = useCallback(() => setVideoModal(null), []);
 
   function downloadWorkoutPDF() {
-    if (!workoutPlans?.length) { toast.error('Nenhum plano de treino carregado'); return; }
+    if (!filteredPlans?.length) { toast.error('Nenhum plano de treino carregado'); return; }
     const date = new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' });
-    const dayBlocks = workoutPlans.map((plan: any) => {
+    const dayBlocks = filteredPlans.map((plan: any) => {
       const exercises = (plan.workout?.exercises ?? []).map((ex: any, i: number) => `
         <tr>
           <td style="padding:8px 12px;font-size:13px;color:#111827;">${i + 1}. ${ex.exercise?.name ?? '—'}</td>
@@ -265,7 +289,7 @@ export default function StudentWorkout() {
 
       <div className="space-y-6 max-w-2xl mx-auto">
         {selectedPlan ? (
-          // ── DETAIL VIEW ────────────────────────────────────────────────────
+          // ── DETAIL VIEW ──────────────────────────────────────────────────
           <>
             {/* Header */}
             <div className="flex items-center gap-3">
@@ -284,7 +308,7 @@ export default function StudentWorkout() {
                   <span className="flex items-center gap-1"><Flame className="w-3 h-3 text-orange-400" />~{(selectedPlan.workout?.duration || 45) * 7} kcal</span>
                 </div>
               </div>
-              {workoutPlans?.length > 0 && (
+              {filteredPlans.length > 0 && (
                 <button onClick={downloadWorkoutPDF} className="btn-secondary flex items-center gap-1.5 text-xs py-1.5 px-2.5 flex-shrink-0">
                   <Download className="w-3.5 h-3.5" />PDF
                 </button>
@@ -370,16 +394,68 @@ export default function StudentWorkout() {
               </motion.div>
             )}
           </>
+        ) : !selectedTrainerId && trainers.length > 1 ? (
+          // ── TRAINER PICKER ───────────────────────────────────────────────
+          <>
+            <div className="page-header">
+              <div>
+                <h1 className="text-2xl font-bold">Meu Treino</h1>
+                <p className="text-muted-foreground text-sm mt-1">Selecione seu personal trainer</p>
+              </div>
+            </div>
+            <div className="space-y-3">
+              {trainers.map((trainer) => {
+                const profile = trainer.user?.profile;
+                const name = profile?.name || trainer.user?.name || 'Personal';
+                const avatar = profile?.avatarUrl;
+                return (
+                  <motion.button
+                    key={trainer.id}
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    onClick={() => setSelectedTrainerId(trainer.id)}
+                    className="glass-card w-full text-left hover:bg-accent/50 transition-all cursor-pointer"
+                  >
+                    <div className="flex items-center gap-4">
+                      <div className="w-14 h-14 rounded-full bg-violet-500/20 flex items-center justify-center flex-shrink-0 overflow-hidden">
+                        {avatar ? (
+                          <img src={avatar} alt={name} className="w-full h-full object-cover" />
+                        ) : (
+                          <span className="text-xl font-bold text-violet-400">{name[0]?.toUpperCase()}</span>
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold truncate">{name}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {trainer.planCount} treino{trainer.planCount !== 1 ? 's' : ''} atribuído{trainer.planCount !== 1 ? 's' : ''}
+                        </p>
+                      </div>
+                      <ChevronRight className="w-5 h-5 text-muted-foreground flex-shrink-0" />
+                    </div>
+                  </motion.button>
+                );
+              })}
+            </div>
+          </>
         ) : (
           // ── LIST VIEW ──────────────────────────────────────────────────────
           <>
             {/* Header */}
             <div className="page-header">
               <div>
+                {trainers.length > 1 && (
+                  <button
+                    onClick={() => setSelectedTrainerId(null)}
+                    className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground mb-1 transition-colors"
+                  >
+                    <ChevronLeft className="w-3.5 h-3.5" />
+                    {trainers.find((t) => t.id === selectedTrainerId)?.user?.profile?.name || 'Personal'}
+                  </button>
+                )}
                 <h1 className="text-2xl font-bold">Meu Treino</h1>
                 <p className="text-muted-foreground text-sm mt-1">Escolha o treino do dia e execute</p>
               </div>
-              {workoutPlans?.length > 0 && (
+              {filteredPlans?.length > 0 && (
                 <button onClick={downloadWorkoutPDF} className="btn-secondary flex items-center gap-2 text-sm py-2 px-3" title="Baixar treino em PDF">
                   <Download className="w-4 h-4" />PDF
                 </button>
@@ -409,9 +485,9 @@ export default function StudentWorkout() {
             </div>
 
             {/* Plan list */}
-            {(workoutPlans?.length ?? 0) > 0 ? (
+            {filteredPlans.length > 0 ? (
               <div className="space-y-3">
-                {workoutPlans.map((plan: any) => {
+                {filteredPlans.map((plan: any) => {
                   const isActive = plan.id === activePlanId && activeWorkout;
                   return (
                     <motion.button

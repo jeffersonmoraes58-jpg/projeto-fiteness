@@ -66,6 +66,7 @@ export class StudentsService {
         workout: {
           include: {
             exercises: { include: { exercise: true }, orderBy: { order: 'asc' } },
+            trainer: { include: { user: { include: { profile: true } } } },
           },
         },
       },
