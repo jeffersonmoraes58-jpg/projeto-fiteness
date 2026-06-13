@@ -165,9 +165,16 @@ export class WorkoutsService {
     return { message: 'Plano removido com sucesso' };
   }
 
-  async getStudentWorkouts(studentId: string) {
+  async getStudentWorkouts(studentId: string, userId: string) {
+    const trainer = await this.prisma.trainer.findUnique({ where: { userId } });
+    if (!trainer) throw new ForbiddenException('Usuário não é trainer');
+
     return this.prisma.workoutPlan.findMany({
-      where: { studentId, isActive: true },
+      where: {
+        studentId,
+        isActive: true,
+        workout: { trainerId: trainer.id },
+      },
       include: {
         workout: {
           include: {
