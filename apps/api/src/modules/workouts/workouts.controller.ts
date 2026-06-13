@@ -90,9 +90,13 @@ export class WorkoutsController {
   }
 
   @Get('student/:studentId')
-  @ApiOperation({ summary: 'Treinos do aluno' })
-  getStudentWorkouts(@Param('studentId') studentId: string) {
-    return this.workoutsService.getStudentWorkouts(studentId);
+  @Roles(UserRole.TRAINER, UserRole.NUTRITIONIST)
+  @ApiOperation({ summary: 'Treinos do aluno (apenas os atribuídos pelo trainer logado)' })
+  getStudentWorkouts(
+    @Param('studentId') studentId: string,
+    @CurrentUser('id') userId: string,
+  ) {
+    return this.workoutsService.getStudentWorkouts(studentId, userId);
   }
 
   @Get('student/:studentId/today')
