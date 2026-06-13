@@ -2,6 +2,7 @@ import {
   Controller,
   Post,
   Get,
+  Patch,
   Body,
   UseGuards,
   Req,
@@ -97,6 +98,15 @@ export class AuthController {
   @ApiOperation({ summary: 'Enviar email de boas-vindas ao aluno' })
   async sendWelcome(@Body() body: { to: string; studentName: string; trainerName: string; tempPassword: string; anamneseType?: string; studentUserId?: string }) {
     return this.emailService.sendStudentWelcome(body);
+  }
+
+  @Patch('change-password')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Alterar senha do usuário autenticado' })
+  async changePassword(@CurrentUser('id') userId: string, @Body() body: { currentPassword: string; newPassword: string }) {
+    return this.authService.changePassword(userId, body.currentPassword, body.newPassword);
   }
 
   @Get('me')
