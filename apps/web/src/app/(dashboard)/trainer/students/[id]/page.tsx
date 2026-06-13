@@ -3,8 +3,8 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Users, ChevronLeft, Flame, Dumbbell, Star, Calendar,
-  MessageCircle, UserCheck, CheckSquare, Square, Trash2,
+  Users, ChevronLeft, Flame, Dumbbell, Star,
+  MessageCircle, UserCheck, Trash2,
   Clock, Zap, ChevronRight, ClipboardList, TrendingUp,
   Heart, Activity, Moon, Brain, Target, Info,
 } from 'lucide-react';
@@ -21,8 +21,6 @@ const GOAL_LABELS: Record<string, string> = {
   REHABILITATION: 'Reabilitação',
 };
 
-const DAY_NAMES = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
-const DAYS = DAY_NAMES.map((label, value) => ({ label, value }));
 const LEVEL_LABELS = ['', 'Iniciante', 'Básico', 'Intermediário', 'Avançado', 'Elite'];
 const TABS = [
   { id: 'treinos', label: 'Treinos', icon: Dumbbell },
@@ -49,7 +47,6 @@ export default function StudentDetailPage() {
   const qc = useQueryClient();
   const [tab, setTab] = useState('treinos');
   const [selectedWorkout, setSelectedWorkout] = useState('');
-  const [dayOfWeek, setDayOfWeek] = useState<number[]>([]);
   const [startDate, setStartDate] = useState(() => new Date().toISOString().split('T')[0]);
   const [endDate, setEndDate] = useState('');
   const [notes, setNotes] = useState('');
@@ -84,13 +81,12 @@ export default function StudentDetailPage() {
     mutationFn: (data: any) =>
       api.post(`/workouts/${data.workoutId}/assign`, {
         studentId: student?.id,
-        dayOfWeek: data.dayOfWeek,
         startDate: data.startDate,
         endDate: data.endDate || undefined,
         notes: data.notes || undefined,
       }),
     onSuccess: () => {
-      setSelectedWorkout(''); setDayOfWeek([]); setStartDate(new Date().toISOString().split('T')[0]);
+      setSelectedWorkout(''); setStartDate(new Date().toISOString().split('T')[0]);
       setEndDate(''); setNotes(''); setAssignError('');
       qc.invalidateQueries({ queryKey: ['student-plans', id] });
       toast.success('Treino atribuído com sucesso!');
@@ -112,16 +108,12 @@ export default function StudentDetailPage() {
     onError: () => toast.error('Erro ao remover plano'),
   });
 
-  const toggleDay = (v: number) =>
-    setDayOfWeek((prev) => (prev.includes(v) ? prev.filter((d) => d !== v) : [...prev, v]));
-
   const handleAssign = (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedWorkout) { setAssignError('Selecione um treino'); return; }
-    if (dayOfWeek.length === 0) { setAssignError('Selecione ao menos um dia da semana'); return; }
     if (!startDate) { setAssignError('Informe a data de início'); return; }
     setAssignError('');
-    assignMutation.mutate({ workoutId: selectedWorkout, dayOfWeek, startDate, endDate, notes });
+    assignMutation.mutate({ workoutId: selectedWorkout, startDate, endDate, notes });
   };
 
   if (isLoading) {
@@ -143,11 +135,6 @@ export default function StudentDetailPage() {
   }
 
   const initials = `${student.user?.profile?.firstName?.[0] || ''}${student.user?.profile?.lastName?.[0] || ''}`;
-  const dayToPlan: Record<number, any[]> = { 0: [], 1: [], 2: [], 3: [], 4: [], 5: [], 6: [] };
-  (plans || []).forEach((plan: any) => {
-    (plan.dayOfWeek || []).forEach((d: number) => { dayToPlan[d] = [...(dayToPlan[d] || []), plan]; });
-  });
-  const hasAnyPlan = Object.values(dayToPlan).some((arr) => arr.length > 0);
   const anamnesis = student.anamnesis;
 
   return (
@@ -224,83 +211,44 @@ export default function StudentDetailPage() {
         {/* TAB: TREINOS */}
         {tab === 'treinos' && (
           <motion.div key="treinos" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 8 }} className="space-y-6">
-            {/* Weekly schedule */}
+            {/* Plans list */}
             <div className="glass-card space-y-4">
               <h2 className="font-semibold flex items-center gap-2">
-                <Calendar className="w-4 h-4 text-cyan-400" />
-                Grade semanal de treinos
+                <Dumbbell className="w-4 h-4 text-purple-400" />
+                Treinos atribuídos
+                {(plans || []).length > 0 && (
+                  <span className="ml-auto text-xs text-muted-foreground font-normal">{plans.length} plano{plans.length !== 1 ? 's' : ''}</span>
+                )}
               </h2>
               {plansLoading ? (
-                <div className="space-y-2">{[...Array(3)].map((_, i) => <div key={i} className="h-10 glass rounded-xl animate-pulse" />)}</div>
-              ) : !hasAnyPlan ? (
+                <div className="space-y-2">{[...Array(3)].map((_, i) => <div key={i} className="h-14 glass rounded-xl animate-pulse" />)}</div>
+              ) : (plans || []).length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">
-                  <Calendar className="w-10 h-10 mx-auto mb-2 opacity-40" />
+                  <Dumbbell className="w-10 h-10 mx-auto mb-2 opacity-40" />
                   <p className="text-sm">Nenhum treino atribuído ainda.</p>
-                  <p className="text-xs mt-1">Use o formulário abaixo para montar a grade.</p>
+                  <p className="text-xs mt-1">Use o formulário abaixo para atribuir treinos.</p>
                 </div>
               ) : (
-                <div className="space-y-1">
-                  {DAYS.map(({ label, value }) => {
-                    const dayPlans = dayToPlan[value];
-                    const isToday = new Date().getDay() === value;
-                    return (
-                      <div key={value} className={`flex items-start gap-3 rounded-xl px-3 py-2.5 transition-all ${isToday ? 'bg-primary/10 border border-primary/20' : 'glass'}`}>
-                        <div className={`w-8 text-center flex-shrink-0 pt-0.5 ${isToday ? 'text-primary font-bold' : 'text-muted-foreground'}`}>
-                          <div className="text-xs font-semibold">{label}</div>
-                          {isToday && <div className="text-[9px] text-primary">hoje</div>}
+                <div className="space-y-2">
+                  {(plans || []).map((plan: any) => (
+                    <div key={plan.id} className="glass rounded-xl p-3 flex items-center gap-3">
+                      <Dumbbell className="w-4 h-4 text-purple-400 flex-shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-medium truncate">{plan.workout?.name}</div>
+                        <div className="flex items-center gap-3 mt-0.5 text-xs text-muted-foreground">
+                          {plan.workout?.duration && <span className="flex items-center gap-0.5"><Clock className="w-3 h-3" />{plan.workout.duration}min</span>}
+                          {plan.workout?.level && <span className="flex items-center gap-0.5"><Zap className="w-3 h-3" />{LEVEL_LABELS[plan.workout.level] || ''}</span>}
+                          {plan.notes && <span>• {plan.notes}</span>}
                         </div>
-                        {dayPlans.length === 0 ? (
-                          <div className="flex-1 text-xs text-muted-foreground italic pt-0.5">Descanso</div>
-                        ) : (
-                          <div className="flex-1 flex flex-col gap-1.5">
-                            {dayPlans.map((plan: any) => (
-                              <div key={plan.id} className="flex items-center justify-between group">
-                                <div className="flex items-center gap-2">
-                                  <Dumbbell className="w-3.5 h-3.5 text-purple-400 flex-shrink-0" />
-                                  <div>
-                                    <span className="text-sm font-medium">{plan.workout?.name}</span>
-                                    <div className="flex items-center gap-2 mt-0.5">
-                                      {plan.workout?.duration && <span className="text-[10px] text-muted-foreground flex items-center gap-0.5"><Clock className="w-2.5 h-2.5" />{plan.workout.duration}min</span>}
-                                      {plan.workout?.level && <span className="text-[10px] text-muted-foreground flex items-center gap-0.5"><Zap className="w-2.5 h-2.5" />{LEVEL_LABELS[plan.workout.level] || ''}</span>}
-                                    </div>
-                                  </div>
-                                </div>
-                                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                  <Link href={`/trainer/workouts/${plan.workout?.id}`} className="w-6 h-6 rounded-lg hover:bg-accent flex items-center justify-center">
-                                    <ChevronRight className="w-3.5 h-3.5 text-muted-foreground" />
-                                  </Link>
-                                  <button onClick={() => { if (confirm('Remover este plano?')) removePlanMutation.mutate(plan.id); }} className="w-6 h-6 rounded-lg hover:bg-red-500/10 flex items-center justify-center">
-                                    <Trash2 className="w-3.5 h-3.5 text-red-400" />
-                                  </button>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        )}
                       </div>
-                    );
-                  })}
-                </div>
-              )}
-              {(plans || []).length > 0 && (
-                <div className="pt-2 border-t border-border">
-                  <p className="text-xs text-muted-foreground mb-2">Planos ativos ({plans.length})</p>
-                  <div className="space-y-2">
-                    {plans.map((plan: any) => (
-                      <div key={plan.id} className="glass rounded-xl p-3 flex items-center justify-between">
-                        <div>
-                          <div className="text-sm font-medium">{plan.workout?.name}</div>
-                          <div className="text-xs text-muted-foreground mt-0.5">
-                            {(plan.dayOfWeek || []).map((d: number) => DAY_NAMES[d]).join(', ')}
-                            {plan.notes && ` • ${plan.notes}`}
-                          </div>
-                        </div>
-                        <button onClick={() => { if (confirm('Remover este plano?')) removePlanMutation.mutate(plan.id); }} className="w-7 h-7 rounded-lg hover:bg-red-500/10 flex items-center justify-center flex-shrink-0 ml-3">
-                          <Trash2 className="w-3.5 h-3.5 text-red-400" />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
+                      <Link href={`/trainer/workouts/${plan.workout?.id}`} className="w-7 h-7 rounded-lg hover:bg-accent flex items-center justify-center flex-shrink-0">
+                        <ChevronRight className="w-3.5 h-3.5 text-muted-foreground" />
+                      </Link>
+                      <button onClick={() => { if (confirm('Remover este plano?')) removePlanMutation.mutate(plan.id); }} className="w-7 h-7 rounded-lg hover:bg-red-500/10 flex items-center justify-center flex-shrink-0">
+                        <Trash2 className="w-3.5 h-3.5 text-red-400" />
+                      </button>
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
@@ -319,21 +267,6 @@ export default function StudentDetailPage() {
                     <option key={w.id} value={w.id}>{w.name}{w.duration ? ` — ${w.duration} min` : ''}{w.exercises?.length ? ` (${w.exercises.length} ex)` : ''}</option>
                   ))}
                 </select>
-              </div>
-              <div>
-                <label className="text-sm font-medium mb-2 block">Dias da semana *</label>
-                <div className="flex gap-2 flex-wrap">
-                  {DAYS.map((d) => {
-                    const active = dayOfWeek.includes(d.value);
-                    return (
-                      <button key={d.value} type="button" onClick={() => toggleDay(d.value)}
-                        className={`w-11 h-11 rounded-xl text-sm font-medium transition-all flex flex-col items-center justify-center gap-0.5 ${active ? 'bg-primary text-primary-foreground' : 'glass hover:bg-accent text-muted-foreground'}`}>
-                        {active ? <CheckSquare className="w-3 h-3" /> : <Square className="w-3 h-3" />}
-                        {d.label}
-                      </button>
-                    );
-                  })}
-                </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
