@@ -126,10 +126,10 @@ export class TrainersService {
     const { profile, trainer: trainerData } = data;
     await Promise.all([
       trainerData && Object.keys(trainerData).length
-        ? this.prisma.trainer.update({ where: { id: trainer.id }, data: trainerData })
+        ? this.prisma.trainer.update({ where: { id: trainer.id }, data: Object.fromEntries(Object.entries(trainerData).filter(([, v]) => v !== undefined && v !== '')) })
         : null,
       profile && Object.keys(profile).length
-        ? this.prisma.profile.update({ where: { userId }, data: profile })
+        ? this.prisma.profile.upsert({ where: { userId }, update: profile, create: { userId, ...profile } })
         : null,
     ]);
     return this.prisma.trainer.findUnique({
