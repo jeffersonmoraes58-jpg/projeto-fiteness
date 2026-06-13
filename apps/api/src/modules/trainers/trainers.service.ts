@@ -123,14 +123,19 @@ export class TrainersService {
 
   async update(userId: string, data: any) {
     const trainer = await this.getTrainer(userId);
-    const { profile, ...trainerData } = data;
-    const [updated] = await Promise.all([
-      Object.keys(trainerData).length
+    const { profile, trainer: trainerData } = data;
+    await Promise.all([
+      trainerData && Object.keys(trainerData).length
         ? this.prisma.trainer.update({ where: { id: trainer.id }, data: trainerData })
-        : trainer,
-      profile ? this.prisma.profile.update({ where: { userId }, data: profile }) : null,
+        : null,
+      profile && Object.keys(profile).length
+        ? this.prisma.profile.update({ where: { userId }, data: profile })
+        : null,
     ]);
-    return updated;
+    return this.prisma.trainer.findUnique({
+      where: { id: trainer.id },
+      include: { user: { include: { profile: true } } },
+    });
   }
 }
 
