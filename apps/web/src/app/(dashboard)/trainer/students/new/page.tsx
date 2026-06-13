@@ -64,7 +64,7 @@ function FormField({ label, required, children, hint, error }: {
 interface CreatedStudent {
   name: string;
   email: string;
-  password: string;
+  password: string; // empty string when linked (existing account)
   whatsapp: string;
   anamnese: string;
   emailSent: boolean;
@@ -117,27 +117,48 @@ export default function NewStudentPage() {
       const parts = data.nomeCompleto.trim().split(' ');
       const firstName = parts[0];
       const lastName = parts.slice(1).join(' ') || '-';
-      const tempPassword = generatePassword();
-      const reg = await api.post('/auth/register', {
-        firstName,
-        lastName,
-        email: data.email,
-        password: tempPassword,
-        phone: data.whatsapp ? `+55${data.whatsapp.replace(/\D/g, '')}` : undefined,
-        role: 'STUDENT',
-        tenantId,
-      });
-      const newUserId = reg.data.data?.user?.id;
-      if (!newUserId) throw new Error('Usuário criado mas ID não retornado');
+
+      let userId: string;
+      let tempPassword: string | null = null;
+      let emailSent = false;
+      let linked = false;
+
+      try {
+        tempPassword = generatePassword();
+        const reg = await api.post('/auth/register', {
+          firstName,
+          lastName,
+          email: data.email,
+          password: tempPassword,
+          phone: data.whatsapp ? `+55${data.whatsapp.replace(/\D/g, '')}` : undefined,
+          role: 'STUDENT',
+          tenantId,
+        });
+        const newUserId = reg.data.data?.user?.id;
+        if (!newUserId) throw new Error('Usuário criado mas ID não retornado');
+        userId = newUserId;
+      } catch (registerError: any) {
+        // Email already exists — find and link the existing account
+        const status = registerError?.response?.status;
+        if (status === 409 || status === 400 || status === 422) {
+          const searchRes = await api.get(`/admin/users?search=${encodeURIComponent(data.email)}&role=STUDENT`);
+          const existing = (searchRes.data.data?.users || []).find((u: any) => u.email === data.email);
+          if (!existing) throw new Error('E-mail já cadastrado mas não foi possível localizar o aluno. Use "Buscar existente".');
+          userId = existing.id;
+          tempPassword = null;
+          linked = true;
+        } else {
+          throw registerError;
+        }
+      }
+
       await api.post('/trainers/me/students', {
-        studentUserId: newUserId,
+        studentUserId: userId,
         monthlyFee: data.mensalidade ? Number(data.mensalidade) : undefined,
         goalType: data.grupo,
       });
 
-      // Send welcome email
-      let emailSent = false;
-      if (data.enviarAcesso === 'Sim') {
+      if (!linked && data.enviarAcesso === 'Sim' && tempPassword) {
         try {
           const trainerName = `${user?.profile?.firstName || ''} ${user?.profile?.lastName || ''}`.trim() || 'Seu personal';
           const res = await api.post('/auth/send-welcome', {
@@ -146,19 +167,19 @@ export default function NewStudentPage() {
             trainerName,
             tempPassword,
             anamneseType: data.enviarAnamnese === 'Sim' ? data.anamnese : undefined,
-            studentUserId: newUserId,
+            studentUserId: userId,
           });
           emailSent = res.data?.data?.sent === true;
         } catch {}
       }
 
-      return { tempPassword, emailSent };
+      return { tempPassword, emailSent, linked };
     },
     onSuccess: (result, variables) => {
       setCreated({
         name: variables.nomeCompleto,
         email: variables.email,
-        password: result.tempPassword,
+        password: result.tempPassword ?? '',
         whatsapp: variables.whatsapp,
         anamnese: variables.anamnese,
         emailSent: result.emailSent,
@@ -221,12 +242,16 @@ export default function NewStudentPage() {
             <div className="w-16 h-16 rounded-full bg-emerald-500/20 flex items-center justify-center mx-auto mb-4">
               <CheckCircle2 className="w-8 h-8 text-emerald-400" />
             </div>
-            <h1 className="text-2xl font-bold">Aluno cadastrado!</h1>
-            <p className="text-muted-foreground text-sm mt-1">{created.name} foi adicionado com sucesso.</p>
+            <h1 className="text-2xl font-bold">{created.password ? 'Aluno cadastrado!' : 'Aluno vinculado!'}</h1>
+            <p className="text-muted-foreground text-sm mt-1">
+              {created.password
+                ? `${created.name} foi adicionado com sucesso.`
+                : `${created.name} já possuía conta na plataforma e foi vinculado ao seu perfil. A senha não foi alterada.`}
+            </p>
           </div>
 
-          {/* Credentials card */}
-          <div className="glass-card space-y-4">
+          {/* Credentials card — only shown for newly created accounts */}
+          {created.password && <div className="glass-card space-y-4">
             <div className="flex items-center justify-between">
               <h2 className="font-semibold text-sm">Dados de acesso gerados</h2>
               <button
@@ -259,7 +284,7 @@ export default function NewStudentPage() {
                 ? `E-mail enviado para ${created.email}`
                 : 'E-mail não enviado (configure o SMTP nas configurações)'}
             </div>
-          </div>
+          </div>}
 
           {/* Action buttons */}
           <div className="space-y-3">
