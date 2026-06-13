@@ -35,7 +35,7 @@ export class UsersService {
     return this.prisma.profile.upsert({
       where: { userId },
       update: updateData,
-      create: { userId, firstName: '', ...updateData },
+      create: { userId, firstName: '', lastName: '', ...updateData },
     });
   }
 
