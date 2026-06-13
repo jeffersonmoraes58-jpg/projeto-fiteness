@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Users, ChevronLeft, Flame, Dumbbell, Star,
+  Users, ChevronLeft, Flame, Dumbbell, Star, Calendar,
   MessageCircle, UserCheck, Trash2,
   Clock, Zap, ChevronRight, ClipboardList, TrendingUp,
   Heart, Activity, Moon, Brain, Target, Info,
