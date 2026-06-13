@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Dumbbell, Play, CheckCircle2, Clock, ChevronLeft,
@@ -166,15 +166,12 @@ export default function StudentWorkout() {
     return Array.from(map.values());
   }, [workoutPlans]);
 
-  useEffect(() => {
-    if (trainers.length === 1 && selectedTrainerId === null) {
-      setSelectedTrainerId(trainers[0].id);
-    }
-  }, [trainers, selectedTrainerId]);
+  // Auto-select when only 1 trainer; respect manual selection for 2+
+  const effectiveTrainerId = selectedTrainerId ?? (trainers.length === 1 ? trainers[0]?.id : null);
 
   const filteredPlans = useMemo(
-    () => (workoutPlans || []).filter((p: any) => !selectedTrainerId || p.workout?.trainer?.id === selectedTrainerId),
-    [workoutPlans, selectedTrainerId],
+    () => (workoutPlans || []).filter((p: any) => !effectiveTrainerId || p.workout?.trainer?.id === effectiveTrainerId),
+    [workoutPlans, effectiveTrainerId],
   );
 
   const selectedPlan = filteredPlans.find((p: any) => p.id === selectedPlanId);
@@ -394,7 +391,7 @@ export default function StudentWorkout() {
               </motion.div>
             )}
           </>
-        ) : !selectedTrainerId && trainers.length > 1 ? (
+        ) : !effectiveTrainerId && trainers.length > 1 ? (
           // ── TRAINER PICKER ───────────────────────────────────────────────
           <>
             <div className="page-header">
@@ -406,7 +403,7 @@ export default function StudentWorkout() {
             <div className="space-y-3">
               {trainers.map((trainer) => {
                 const profile = trainer.user?.profile;
-                const name = profile?.name || trainer.user?.name || 'Personal';
+                const name = profile ? `${profile.firstName} ${profile.lastName}`.trim() : 'Personal';
                 const avatar = profile?.avatarUrl;
                 return (
                   <motion.button
@@ -449,7 +446,11 @@ export default function StudentWorkout() {
                     className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground mb-1 transition-colors"
                   >
                     <ChevronLeft className="w-3.5 h-3.5" />
-                    {trainers.find((t) => t.id === selectedTrainerId)?.user?.profile?.name || 'Personal'}
+                    {(() => {
+                      const t = trainers.find((tr) => tr.id === effectiveTrainerId);
+                      const p = t?.user?.profile;
+                      return p ? `${p.firstName} ${p.lastName}`.trim() : 'Personal';
+                    })()}
                   </button>
                 )}
                 <h1 className="text-2xl font-bold">Meu Treino</h1>
