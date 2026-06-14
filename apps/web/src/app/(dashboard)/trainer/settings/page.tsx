@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import {
   User, Camera, Mail, Phone, MapPin, Award,
@@ -14,6 +15,7 @@ import toast from 'react-hot-toast';
 
 export default function TrainerSettings() {
   const { user, logout } = useAuthStore();
+  const router = useRouter();
   const [editing, setEditing] = useState(false);
   const [avatarUploading, setAvatarUploading] = useState(false);
   const [showSecurity, setShowSecurity] = useState(false);
@@ -254,7 +256,7 @@ export default function TrainerSettings() {
           {[
             { icon: Bell, label: 'Notificações', description: 'Alertas, lembretes e novidades', onClick: undefined },
             { icon: Shield, label: 'Segurança', description: 'Senha e autenticação em dois fatores', onClick: () => setShowSecurity(true) },
-            { icon: CreditCard, label: 'Plano e Cobrança', description: 'Gerenciar assinatura', onClick: undefined },
+            { icon: CreditCard, label: 'Plano e Cobrança', description: 'Gerenciar assinatura', onClick: () => router.push('/trainer/billing') },
           ].map((item) => (
             <button key={item.label} onClick={item.onClick} className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-accent transition-all text-left">
               <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center flex-shrink-0">
