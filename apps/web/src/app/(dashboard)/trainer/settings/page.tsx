@@ -6,7 +6,7 @@ import { motion } from 'framer-motion';
 import {
   User, Camera, Mail, Phone, MapPin, Award,
   Bell, Shield, LogOut, Save, Edit2, ChevronRight,
-  Globe, Star, CreditCard, Eye, EyeOff, X,
+  Globe, Star, CreditCard, Eye, EyeOff, X, Trash2, CheckCheck,
 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
@@ -18,6 +18,7 @@ export default function TrainerSettings() {
   const router = useRouter();
   const [editing, setEditing] = useState(false);
   const [avatarUploading, setAvatarUploading] = useState(false);
+  const [showNotifications, setShowNotifications] = useState(false);
   const [showSecurity, setShowSecurity] = useState(false);
   const [showCurrent, setShowCurrent] = useState(false);
   const [showNew, setShowNew] = useState(false);
@@ -34,6 +35,30 @@ export default function TrainerSettings() {
   const [form, setForm] = useState({
     firstName: '', lastName: '', phone: '', city: '', state: '', bio: '',
     cref: '', specialties: '', experienceYears: '',
+  });
+
+  const { data: notifications = [] } = useQuery<any[]>({
+    queryKey: ['notifications'],
+    queryFn: () => api.get('/notifications').then((r) => r.data.data ?? []),
+    enabled: showNotifications,
+  });
+
+  const markReadMutation = useMutation({
+    mutationFn: (id: string) => api.post(`/notifications/${id}/read`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['notifications'] }),
+  });
+
+  const markAllReadMutation = useMutation({
+    mutationFn: () => api.post('/notifications/read-all'),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+      toast.success('Todas marcadas como lidas');
+    },
+  });
+
+  const deleteNotifMutation = useMutation({
+    mutationFn: (id: string) => api.delete(`/notifications/${id}`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['notifications'] }),
   });
 
   const changePasswordMutation = useMutation({
@@ -254,7 +279,7 @@ export default function TrainerSettings() {
         <h2 className="font-semibold mb-3">Preferências</h2>
         <div className="space-y-1">
           {[
-            { icon: Bell, label: 'Notificações', description: 'Alertas, lembretes e novidades', onClick: undefined },
+            { icon: Bell, label: 'Notificações', description: 'Alertas, lembretes e novidades', onClick: () => setShowNotifications(true) },
             { icon: Shield, label: 'Segurança', description: 'Senha e autenticação em dois fatores', onClick: () => setShowSecurity(true) },
             { icon: CreditCard, label: 'Plano e Cobrança', description: 'Gerenciar assinatura', onClick: () => router.push('/trainer/billing') },
           ].map((item) => (
@@ -281,6 +306,72 @@ export default function TrainerSettings() {
           Sair da conta
         </button>
       </motion.div>
+
+      {/* Notifications modal */}
+      {showNotifications && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="glass-card w-full max-w-md max-h-[80vh] flex flex-col"
+          >
+            <div className="flex items-center justify-between mb-4 flex-shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-purple-600/20 flex items-center justify-center">
+                  <Bell className="w-5 h-5 text-purple-400" />
+                </div>
+                <h2 className="font-semibold text-lg">Notificações</h2>
+              </div>
+              <div className="flex items-center gap-2">
+                {notifications.some((n) => !n.isRead) && (
+                  <button
+                    onClick={() => markAllReadMutation.mutate()}
+                    className="flex items-center gap-1 text-xs text-purple-400 hover:text-purple-300 transition-colors"
+                  >
+                    <CheckCheck className="w-4 h-4" /> Marcar todas
+                  </button>
+                )}
+                <button onClick={() => setShowNotifications(false)} className="w-8 h-8 rounded-lg hover:bg-accent flex items-center justify-center">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            <div className="overflow-y-auto flex-1 space-y-2 pr-1">
+              {notifications.length === 0 ? (
+                <div className="text-center py-12 text-muted-foreground text-sm">
+                  <Bell className="w-8 h-8 mx-auto mb-2 opacity-30" />
+                  Nenhuma notificação
+                </div>
+              ) : notifications.map((n: any) => (
+                <div
+                  key={n.id}
+                  className={`flex items-start gap-3 p-3 rounded-xl transition-all ${n.isRead ? 'bg-white/3' : 'bg-purple-500/10 border border-purple-500/20'}`}
+                >
+                  <div className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${n.isRead ? 'bg-transparent' : 'bg-purple-400'}`} />
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-medium">{n.title}</div>
+                    <div className="text-xs text-muted-foreground mt-0.5">{n.body}</div>
+                    <div className="text-xs text-muted-foreground/60 mt-1">
+                      {new Date(n.createdAt).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                    </div>
+                  </div>
+                  <div className="flex gap-1 flex-shrink-0">
+                    {!n.isRead && (
+                      <button onClick={() => markReadMutation.mutate(n.id)} className="w-7 h-7 rounded-lg hover:bg-accent flex items-center justify-center text-purple-400 hover:text-purple-300">
+                        <CheckCheck className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                    <button onClick={() => deleteNotifMutation.mutate(n.id)} className="w-7 h-7 rounded-lg hover:bg-accent flex items-center justify-center text-muted-foreground hover:text-destructive">
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </motion.div>
+        </div>
+      )}
 
       {/* Security modal */}
       {showSecurity && (
