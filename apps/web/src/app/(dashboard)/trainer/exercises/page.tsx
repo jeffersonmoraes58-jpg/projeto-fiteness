@@ -41,6 +41,17 @@ function getYoutubeThumbnail(url: string): string | null {
   return m ? `https://img.youtube.com/vi/${m[1]}/mqdefault.jpg` : null;
 }
 
+function getCloudinaryThumbnail(url: string): string | null {
+  if (!url?.includes('cloudinary.com')) return null;
+  return url
+    .replace('/upload/', '/upload/so_0,w_320,h_240,c_fill/')
+    .replace(/\.(mp4|webm|ogg|mov|avi|mkv)(\?.*)?$/i, '.jpg');
+}
+
+function getVideoThumbnail(url: string): string | null {
+  return getYoutubeThumbnail(url) || getCloudinaryThumbnail(url);
+}
+
 function getEmbedUrl(url: string): { src: string; type: 'iframe' | 'video' } | null {
   if (!url) return null;
   const yt = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&\n?#]+)/);
@@ -137,16 +148,26 @@ function VideoInput({
           </div>
         </div>
       ) : value && value.includes('cloudinary.com') ? (
-        <div className="flex items-center gap-2 p-2 rounded-xl border border-border bg-emerald-500/5">
-          <CheckCircle className="w-4 h-4 text-emerald-400 flex-shrink-0" />
-          <span className="text-xs text-muted-foreground flex-1 truncate">Vídeo enviado</span>
-          <button
-            type="button"
-            onClick={() => { onChange(''); fileRef.current?.click(); }}
-            className="text-xs text-primary hover:underline flex-shrink-0"
-          >
-            Trocar
-          </button>
+        <div className="space-y-2">
+          <video
+            src={value}
+            className="w-full rounded-xl bg-black object-cover"
+            style={{ maxHeight: compact ? '120px' : '160px' }}
+            controls
+            preload="metadata"
+          />
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-emerald-400 flex items-center gap-1 font-medium">
+              <CheckCircle className="w-3 h-3" />Vídeo pronto para uso
+            </span>
+            <button
+              type="button"
+              onClick={() => { onChange(''); fileRef.current?.click(); }}
+              className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+            >
+              Trocar vídeo
+            </button>
+          </div>
         </div>
       ) : (
         <button
@@ -521,7 +542,7 @@ function ExerciseRow({
   isSystem, isEditing, editForm, onEditFormChange, onEdit, onEditSave, onEditCancel, isSaving, onDelete,
   isVideoEditing, videoEditUrl, onVideoEdit, onVideoEditChange, onVideoEditSave, onVideoEditCancel, isVideoSaving,
 }: any) {
-  const thumbnail = exercise.videoUrl ? getYoutubeThumbnail(exercise.videoUrl) : null;
+  const thumbnail = exercise.videoUrl ? getVideoThumbnail(exercise.videoUrl) : null;
   const catLabel = CATEGORIES.find(c => c.value === exercise.category)?.label || exercise.category;
   const hasVideo = !!exercise.videoUrl;
 
