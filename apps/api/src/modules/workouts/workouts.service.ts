@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { CreateWorkoutDto } from './dto/create-workout.dto';
 import { UpdateWorkoutDto } from './dto/update-workout.dto';
 import { AssignWorkoutDto } from './dto/assign-workout.dto';
@@ -7,7 +8,10 @@ import { WorkoutStatus } from '@prisma/client';
 
 @Injectable()
 export class WorkoutsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private notifications: NotificationsService,
+  ) {}
 
   async create(dto: CreateWorkoutDto, userId: string) {
     const trainer = await this.prisma.trainer.findUnique({ where: { userId } });
@@ -239,6 +243,25 @@ export class WorkoutsService {
 
     // Update student streak and points
     await this.updateStudentStreak(student.id);
+
+    // Notify trainer that student completed a workout
+    const plan = await this.prisma.workoutPlan.findUnique({
+      where: { id: data.workoutPlanId },
+      include: {
+        workout: { include: { trainer: { include: { user: true } } } },
+        student: { include: { user: { include: { profile: true } } } },
+      },
+    });
+    if (plan?.workout?.trainer) {
+      const studentName = [plan.student.user.profile?.firstName, plan.student.user.profile?.lastName]
+        .filter(Boolean).join(' ') || plan.student.user.email;
+      await this.notifications.create({
+        userId: plan.workout.trainer.userId,
+        type: 'ACHIEVEMENT',
+        title: '✅ Treino concluído!',
+        body: `${studentName} acabou de finalizar o treino "${plan.workout.name}".`,
+      });
+    }
 
     return log;
   }

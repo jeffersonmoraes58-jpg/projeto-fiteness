@@ -130,6 +130,7 @@ enum NotificationType {
   PAYMENT
   SYSTEM
   CHALLENGE
+  BIRTHDAY
 }
 
 enum MessageType {

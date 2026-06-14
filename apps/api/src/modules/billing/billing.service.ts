@@ -6,6 +6,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { PrismaService } from '../prisma/prisma.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { MercadoPagoConfig, Payment, Preference } from 'mercadopago';
 
 @Injectable()
@@ -13,6 +14,7 @@ export class BillingService {
   constructor(
     private prisma: PrismaService,
     private config: ConfigService,
+    private notifications: NotificationsService,
   ) {}
 
   private mpClient() {
@@ -497,10 +499,46 @@ export class BillingService {
   @Cron(CronExpression.EVERY_DAY_AT_MIDNIGHT)
   async checkOverdueInvoices() {
     const now = new Date();
+
+    const newlyOverdue = await this.prisma.invoice.findMany({
+      where: { status: 'PENDING', dueDate: { lt: now } },
+      include: {
+        billing: {
+          include: {
+            student: { include: { user: { include: { profile: true } } } },
+            trainer: { include: { user: { select: { id: true } } } },
+          },
+        },
+      },
+    });
+
     await this.prisma.invoice.updateMany({
       where: { status: 'PENDING', dueDate: { lt: now } },
       data: { status: 'OVERDUE' },
     });
+
+    for (const invoice of newlyOverdue) {
+      const studentName = [
+        invoice.billing.student.user.profile?.firstName,
+        invoice.billing.student.user.profile?.lastName,
+      ].filter(Boolean).join(' ') || invoice.billing.student.user.email;
+
+      // Notify student
+      await this.notifications.create({
+        userId: invoice.billing.student.userId,
+        type: 'PAYMENT',
+        title: '⚠️ Fatura vencida',
+        body: `Sua mensalidade de ${invoice.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} venceu. Entre em contato com seu personal.`,
+      });
+
+      // Notify trainer
+      await this.notifications.create({
+        userId: invoice.billing.trainer.userId,
+        type: 'PAYMENT',
+        title: '⚠️ Fatura vencida',
+        body: `A mensalidade de ${studentName} (${invoice.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}) venceu.`,
+      });
+    }
 
     const overdueIds = await this.prisma.invoice.findMany({
       where: { status: 'OVERDUE' },
