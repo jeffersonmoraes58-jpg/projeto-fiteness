@@ -1,12 +1,14 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { useTheme } from 'next-themes';
 import { motion } from 'framer-motion';
 import {
   User, Camera, Mail, Phone, MapPin, Award,
   Bell, Shield, LogOut, Save, Edit2, ChevronRight,
   Globe, Star, CreditCard, Eye, EyeOff, X, Trash2, CheckCheck,
+  Palette, Sun, Moon, Monitor, Check,
 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
@@ -16,7 +18,17 @@ import toast from 'react-hot-toast';
 export default function TrainerSettings() {
   const { user, logout } = useAuthStore();
   const router = useRouter();
+  const { theme, setTheme } = useTheme();
+  const [showAppearance, setShowAppearance] = useState(false);
   const [editing, setEditing] = useState(false);
+
+  useEffect(() => {
+    const saved = localStorage.getItem('accent-color');
+    if (saved) {
+      document.documentElement.style.setProperty('--primary', saved);
+      document.documentElement.style.setProperty('--ring', saved);
+    }
+  }, []);
   const [avatarUploading, setAvatarUploading] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [showSecurity, setShowSecurity] = useState(false);
@@ -281,6 +293,7 @@ export default function TrainerSettings() {
           {[
             { icon: Bell, label: 'Notificações', description: 'Alertas, lembretes e novidades', onClick: () => setShowNotifications(true) },
             { icon: Shield, label: 'Segurança', description: 'Senha e autenticação em dois fatores', onClick: () => setShowSecurity(true) },
+            { icon: Palette, label: 'Aparência', description: 'Tema e cor de destaque', onClick: () => setShowAppearance(true) },
             { icon: CreditCard, label: 'Plano e Cobrança', description: 'Gerenciar assinatura', onClick: () => router.push('/trainer/billing') },
           ].map((item) => (
             <button key={item.label} onClick={item.onClick} className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-accent transition-all text-left">
@@ -306,6 +319,78 @@ export default function TrainerSettings() {
           Sair da conta
         </button>
       </motion.div>
+
+      {/* Appearance modal */}
+      {showAppearance && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="glass-card w-full max-w-md">
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-purple-600/20 flex items-center justify-center">
+                  <Palette className="w-5 h-5 text-purple-400" />
+                </div>
+                <h2 className="font-semibold text-lg">Aparência</h2>
+              </div>
+              <button onClick={() => setShowAppearance(false)} className="w-8 h-8 rounded-lg hover:bg-accent flex items-center justify-center">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-5">
+              <div>
+                <p className="text-xs text-muted-foreground mb-3">Tema</p>
+                <div className="grid grid-cols-3 gap-3">
+                  {[
+                    { value: 'light', label: 'Claro', icon: Sun, preview: 'bg-white border-gray-200' },
+                    { value: 'dark', label: 'Escuro', icon: Moon, preview: 'bg-gray-950 border-gray-800' },
+                    { value: 'system', label: 'Sistema', icon: Monitor, preview: 'bg-gradient-to-br from-white to-gray-950 border-gray-400' },
+                  ].map((t) => (
+                    <button
+                      key={t.value}
+                      onClick={() => setTheme(t.value)}
+                      className={`flex flex-col items-center gap-2 p-3 rounded-xl border-2 transition-all ${theme === t.value ? 'border-primary bg-primary/10' : 'border-border/50 hover:border-border bg-white/5'}`}
+                    >
+                      <div className={`w-full h-12 rounded-lg border ${t.preview}`} />
+                      <div className="flex items-center gap-1.5">
+                        <t.icon className="w-3.5 h-3.5 text-muted-foreground" />
+                        <span className="text-xs font-medium">{t.label}</span>
+                        {theme === t.value && <Check className="w-3 h-3 text-primary" />}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <p className="text-xs text-muted-foreground mb-3">Cor de destaque</p>
+                <div className="flex gap-3">
+                  {[
+                    { label: 'Roxo', value: '252 87% 65%', bg: 'bg-[hsl(252,87%,65%)]' },
+                    { label: 'Azul', value: '217 91% 60%', bg: 'bg-[hsl(217,91%,60%)]' },
+                    { label: 'Verde', value: '142 76% 36%', bg: 'bg-[hsl(142,76%,36%)]' },
+                    { label: 'Rosa', value: '330 81% 60%', bg: 'bg-[hsl(330,81%,60%)]' },
+                    { label: 'Laranja', value: '25 95% 53%', bg: 'bg-[hsl(25,95%,53%)]' },
+                  ].map((color) => (
+                    <button
+                      key={color.value}
+                      title={color.label}
+                      onClick={() => {
+                        document.documentElement.style.setProperty('--primary', color.value);
+                        document.documentElement.style.setProperty('--ring', color.value);
+                        localStorage.setItem('accent-color', color.value);
+                      }}
+                      className={`w-8 h-8 rounded-full border-2 border-transparent hover:scale-110 transition-all ${color.bg}`}
+                    />
+                  ))}
+                </div>
+                <p className="text-xs text-muted-foreground/60 mt-2">A cor é salva localmente no seu dispositivo</p>
+              </div>
+            </div>
+
+            <button onClick={() => setShowAppearance(false)} className="btn-primary w-full mt-6 py-2.5">Fechar</button>
+          </motion.div>
+        </div>
+      )}
 
       {/* Notifications modal */}
       {showNotifications && (
