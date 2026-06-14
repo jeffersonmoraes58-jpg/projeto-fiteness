@@ -2,6 +2,11 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { WorkoutsService } from './workouts.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { NotificationsService } from '../notifications/notifications.service';
+
+const mockNotifications = {
+  create: jest.fn().mockResolvedValue({}),
+};
 
 const mockPrisma = {
   trainer: { findUnique: jest.fn() },
@@ -32,6 +37,7 @@ describe('WorkoutsService', () => {
       providers: [
         WorkoutsService,
         { provide: PrismaService, useValue: mockPrisma },
+        { provide: NotificationsService, useValue: mockNotifications },
       ],
     }).compile();
 
