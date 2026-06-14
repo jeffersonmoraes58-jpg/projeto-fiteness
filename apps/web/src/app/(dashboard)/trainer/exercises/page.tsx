@@ -1,11 +1,11 @@
 'use client';
 
-import { useState, Fragment } from 'react';
+import { useState, useRef, Fragment } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Search, Plus, X, Dumbbell, Play, ChevronRight,
   Zap, Filter, ChevronDown, Trash2, Pencil, Save,
-  Lock, BookOpen, User, Video, CheckCircle,
+  Lock, BookOpen, User, Video, CheckCircle, Link2, Upload,
 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
@@ -48,7 +48,121 @@ function getEmbedUrl(url: string): { src: string; type: 'iframe' | 'video' } | n
   const vim = url.match(/vimeo\.com\/(\d+)/);
   if (vim) return { type: 'iframe', src: `https://player.vimeo.com/video/${vim[1]}?autoplay=1` };
   if (/\.(mp4|webm|ogg)(\?|$)/i.test(url)) return { type: 'video', src: url };
+  // Cloudinary video URL
+  if (url.includes('cloudinary.com')) return { type: 'video', src: url };
   return null;
+}
+
+function VideoInput({
+  value,
+  onChange,
+  compact = false,
+}: {
+  value: string;
+  onChange: (url: string) => void;
+  compact?: boolean;
+}) {
+  const [mode, setMode] = useState<'link' | 'upload'>('link');
+  const [uploading, setUploading] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [error, setError] = useState('');
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const handleFile = async (file: File) => {
+    if (!file.type.startsWith('video/')) {
+      setError('Apenas arquivos de vídeo são permitidos');
+      return;
+    }
+    setError('');
+    setUploading(true);
+    setProgress(0);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      const r = await api.post('/uploads/exercise-video', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+        onUploadProgress: (e: any) => {
+          if (e.total) setProgress(Math.round((e.loaded / e.total) * 100));
+        },
+      });
+      const url = r.data?.data?.url || r.data?.url;
+      onChange(url);
+      setProgress(100);
+    } catch {
+      setError('Erro ao enviar vídeo. Tente novamente.');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const inputCls = compact ? 'text-xs py-1.5' : 'text-sm';
+
+  return (
+    <div className="col-span-2 space-y-2">
+      <div className="flex gap-0.5 p-0.5 bg-white/5 rounded-lg w-fit">
+        <button
+          type="button"
+          onClick={() => setMode('link')}
+          className={cn('flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium transition-all', mode === 'link' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground')}
+        >
+          <Link2 className="w-3 h-3" />Link
+        </button>
+        <button
+          type="button"
+          onClick={() => setMode('upload')}
+          className={cn('flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium transition-all', mode === 'upload' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground')}
+        >
+          <Upload className="w-3 h-3" />Minha galeria
+        </button>
+      </div>
+
+      <input ref={fileRef} type="file" accept="video/*" className="hidden" onChange={e => e.target.files?.[0] && handleFile(e.target.files[0])} />
+
+      {mode === 'link' ? (
+        <input
+          type="url"
+          placeholder="https://youtube.com/watch?v=..."
+          value={value}
+          onChange={e => onChange(e.target.value)}
+          className={cn('input-field w-full', inputCls)}
+        />
+      ) : uploading ? (
+        <div className="p-3 rounded-xl border border-border space-y-2">
+          <div className="flex items-center justify-between text-xs">
+            <span className="text-muted-foreground">Enviando vídeo...</span>
+            <span className="text-primary font-medium">{progress}%</span>
+          </div>
+          <div className="w-full h-1.5 bg-white/10 rounded-full overflow-hidden">
+            <div className="h-full bg-primary rounded-full transition-all duration-300" style={{ width: `${progress}%` }} />
+          </div>
+        </div>
+      ) : value && value.includes('cloudinary.com') ? (
+        <div className="flex items-center gap-2 p-2 rounded-xl border border-border bg-emerald-500/5">
+          <CheckCircle className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+          <span className="text-xs text-muted-foreground flex-1 truncate">Vídeo enviado</span>
+          <button
+            type="button"
+            onClick={() => { onChange(''); fileRef.current?.click(); }}
+            className="text-xs text-primary hover:underline flex-shrink-0"
+          >
+            Trocar
+          </button>
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={() => fileRef.current?.click()}
+          className="w-full flex flex-col items-center gap-2 py-4 rounded-xl border-2 border-dashed border-border hover:border-primary/50 hover:bg-primary/5 transition-all"
+        >
+          <Upload className="w-5 h-5 text-muted-foreground" />
+          <span className="text-xs text-muted-foreground">Clique para escolher um vídeo</span>
+          <span className="text-[10px] text-muted-foreground/50">MP4, WebM, MOV — máx 500 MB</span>
+        </button>
+      )}
+
+      {error && <p className="text-xs text-destructive">{error}</p>}
+    </div>
+  );
 }
 
 export default function TrainerExercises() {
@@ -218,7 +332,7 @@ export default function TrainerExercises() {
                 </select>
                 <input placeholder="Equipamento (ex: Barra, Halteres)" value={form.equipment} onChange={e => setForm({ ...form, equipment: e.target.value })} className="input-field col-span-2" />
                 <textarea placeholder="Descrição" value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} className="input-field resize-none col-span-2" rows={2} />
-                <input placeholder="URL do vídeo (YouTube, Vimeo...)" value={form.videoUrl} onChange={e => setForm({ ...form, videoUrl: e.target.value })} className="input-field col-span-2" />
+                <VideoInput value={form.videoUrl} onChange={url => setForm({ ...form, videoUrl: url })} />
               </div>
               <div className="flex gap-3">
                 <button onClick={() => setShowForm(false)} className="btn-secondary flex-1 text-sm py-2">Cancelar</button>
@@ -428,7 +542,7 @@ function ExerciseRow({
               {DIFFICULTY_LABELS.slice(1).map((l, i) => <option key={i + 1} value={i + 1}>{l}</option>)}
             </select>
             <input placeholder="Equipamento" value={editForm.equipment} onChange={e => onEditFormChange('equipment', e.target.value)} className="input-field col-span-2 text-sm py-2" />
-            <input placeholder="URL do vídeo" value={editForm.videoUrl} onChange={e => onEditFormChange('videoUrl', e.target.value)} className="input-field col-span-2 text-sm py-2" />
+            <VideoInput value={editForm.videoUrl} onChange={url => onEditFormChange('videoUrl', url)} compact />
             <textarea placeholder="Descrição" value={editForm.description} onChange={e => onEditFormChange('description', e.target.value)} className="input-field resize-none col-span-2 text-sm py-2" rows={2} />
           </div>
           <div className="flex gap-2">
@@ -471,7 +585,7 @@ function ExerciseRow({
             <div className="flex items-center gap-1 flex-shrink-0">
               {hasVideo && <button onClick={onPlayVideo} className="w-8 h-8 rounded-full border border-border flex items-center justify-center hover:bg-accent transition-all"><Play className="w-3 h-3 text-muted-foreground fill-muted-foreground ml-0.5" /></button>}
               {isSystem ? (
-                <button onClick={onVideoEdit} className="w-8 h-8 rounded-full border border-border flex items-center justify-center hover:bg-accent hover:border-primary/30 transition-all" title="Editar link do vídeo">
+                <button onClick={onVideoEdit} className="w-8 h-8 rounded-full border border-border flex items-center justify-center hover:bg-accent hover:border-primary/30 transition-all" title="Adicionar/editar vídeo">
                   <Video className="w-3 h-3 text-muted-foreground" />
                 </button>
               ) : (
@@ -483,24 +597,25 @@ function ExerciseRow({
             </div>
           </div>
 
-          {/* Inline video URL editor for system exercises */}
+          {/* Inline video editor for system exercises */}
           <AnimatePresence>
             {isVideoEditing && (
               <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden border-t border-border">
-                <div className="p-3 flex items-center gap-2 bg-primary/5">
-                  <Video className="w-3.5 h-3.5 text-primary flex-shrink-0" />
-                  <input
-                    type="url"
-                    placeholder="https://youtube.com/watch?v=..."
-                    value={videoEditUrl}
-                    onChange={e => onVideoEditChange(e.target.value)}
-                    className="flex-1 bg-transparent text-xs outline-none placeholder:text-muted-foreground/50"
-                    autoFocus
-                  />
-                  <button onClick={onVideoEditCancel} className="text-muted-foreground hover:text-foreground transition-colors"><X className="w-3.5 h-3.5" /></button>
-                  <button onClick={onVideoEditSave} disabled={isVideoSaving} className="text-primary hover:text-primary/80 transition-colors disabled:opacity-50">
-                    {isVideoSaving ? <div className="w-3.5 h-3.5 border-2 border-primary/30 border-t-primary rounded-full animate-spin" /> : <CheckCircle className="w-3.5 h-3.5" />}
-                  </button>
+                <div className="p-3 space-y-2 bg-primary/5">
+                  <div className="grid grid-cols-2 gap-2">
+                    <VideoInput value={videoEditUrl} onChange={onVideoEditChange} compact />
+                  </div>
+                  <div className="flex items-center gap-2 justify-end">
+                    <button onClick={onVideoEditCancel} className="text-xs text-muted-foreground hover:text-foreground transition-colors px-2 py-1">Cancelar</button>
+                    <button
+                      onClick={onVideoEditSave}
+                      disabled={isVideoSaving}
+                      className="text-xs text-primary hover:text-primary/80 transition-colors font-medium flex items-center gap-1 disabled:opacity-50"
+                    >
+                      {isVideoSaving ? <div className="w-3.5 h-3.5 border-2 border-primary/30 border-t-primary rounded-full animate-spin" /> : <CheckCircle className="w-3.5 h-3.5" />}
+                      Salvar
+                    </button>
+                  </div>
                 </div>
               </motion.div>
             )}

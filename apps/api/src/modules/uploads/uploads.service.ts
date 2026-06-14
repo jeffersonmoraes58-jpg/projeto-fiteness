@@ -2,7 +2,7 @@ import { Injectable, BadRequestException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { v2 as cloudinary, UploadApiResponse } from 'cloudinary';
 
-export type UploadFolder = 'avatars' | 'progress-photos' | 'documents' | 'challenge-covers' | 'lesson-content' | 'lesson-attachments';
+export type UploadFolder = 'avatars' | 'progress-photos' | 'documents' | 'challenge-covers' | 'lesson-content' | 'lesson-attachments' | 'exercise-videos';
 
 @Injectable()
 export class UploadsService {
