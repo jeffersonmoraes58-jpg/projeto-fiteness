@@ -8,14 +8,21 @@ import { memoryStorage } from 'multer';
 import { UploadsService } from './uploads.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
-const MAX_SIZE = 10 * 1024 * 1024; // 10 MB
+const MAX_SIZE = 10 * 1024 * 1024;
 const MAX_SIZE_200MB = 200 * 1024 * 1024;
 const MAX_SIZE_100MB = 100 * 1024 * 1024;
+const MAX_SIZE_500MB = 500 * 1024 * 1024;
 const ALLOWED_TYPES = /^image\/(jpeg|png|webp|gif)$/;
+const ALLOWED_VIDEO_TYPES = /^video\/(mp4|webm|ogg|quicktime|x-msvideo|x-matroska)$/;
 
 function fileFilter(_req: any, file: Express.Multer.File, cb: any) {
   if (ALLOWED_TYPES.test(file.mimetype)) cb(null, true);
   else cb(new BadRequestException('Apenas imagens são permitidas (jpeg, png, webp, gif)'), false);
+}
+
+function videoFilter(_req: any, file: Express.Multer.File, cb: any) {
+  if (ALLOWED_VIDEO_TYPES.test(file.mimetype)) cb(null, true);
+  else cb(new BadRequestException('Apenas vídeos são permitidos (mp4, webm, mov, avi, mkv)'), false);
 }
 
 function allowAllFilter(_req: any, _file: Express.Multer.File, cb: any) {
@@ -23,6 +30,7 @@ function allowAllFilter(_req: any, _file: Express.Multer.File, cb: any) {
 }
 
 const upload = { storage: memoryStorage(), limits: { fileSize: MAX_SIZE }, fileFilter };
+const uploadVideo = { storage: memoryStorage(), limits: { fileSize: MAX_SIZE_500MB }, fileFilter: videoFilter };
 const uploadLessonContent = { storage: memoryStorage(), limits: { fileSize: MAX_SIZE_200MB }, fileFilter: allowAllFilter };
 const uploadLessonAttachment = { storage: memoryStorage(), limits: { fileSize: MAX_SIZE_100MB }, fileFilter: allowAllFilter };
 
@@ -58,6 +66,21 @@ export class UploadsController {
   async uploadDocument(@UploadedFile() file: Express.Multer.File) {
     if (!file) throw new BadRequestException('Arquivo obrigatório');
     return this.service.uploadFile(file.buffer, file.originalname, 'documents');
+  }
+
+  @Post('exercise-video')
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({ schema: { type: 'object', properties: { file: { type: 'string', format: 'binary' } } } })
+  @UseInterceptors(FileInterceptor('file', uploadVideo))
+  async uploadExerciseVideo(@UploadedFile() file: Express.Multer.File) {
+    if (!file) throw new BadRequestException('Arquivo obrigatório');
+    const result = await this.service.uploadFileRaw(file.buffer, file.originalname, 'exercise-videos');
+    return {
+      url: result.secure_url,
+      publicId: result.public_id,
+      duration: (result as any).duration ?? null,
+      size: result.bytes,
+    };
   }
 
   @Post('challenge-cover')
