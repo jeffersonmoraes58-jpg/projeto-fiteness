@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, ForbiddenException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import OpenAI from 'openai';
 import { PrismaService } from '../prisma/prisma.service';
@@ -13,6 +13,104 @@ export class AiService {
     private prisma: PrismaService,
   ) {
     this.openai = new OpenAI({ apiKey: config.get('OPENAI_API_KEY') });
+  }
+
+  async generateWorkout(description: string, userId: string) {
+    const trainer = await this.prisma.trainer.findUnique({ where: { userId } });
+    if (!trainer) throw new ForbiddenException('Apenas trainers podem gerar treinos');
+
+    const exercises = await this.prisma.exercise.findMany({
+      where: { OR: [{ isPublic: true }, { trainerId: trainer.id }] },
+      select: { id: true, name: true, category: true, difficulty: true },
+      take: 150,
+      orderBy: { name: 'asc' },
+    });
+
+    const exerciseList = exercises
+      .map((e) => `- ${e.name} (${e.category})`)
+      .join('\n');
+
+    const prompt = `Você é um personal trainer expert. Crie um treino completo com base na descrição do instrutor.
+
+Descrição: "${description}"
+
+Exercícios disponíveis no sistema (use APENAS estes, pelo nome exato):
+${exerciseList}
+
+Retorne um JSON com:
+{
+  "name": "nome curto e descritivo do treino",
+  "description": "descrição de 1-2 frases",
+  "level": número de 1 a 5 (1=iniciante, 5=elite),
+  "duration": duração estimada em minutos,
+  "tags": ["tag1", "tag2"],
+  "exercises": [
+    {
+      "name": "nome exato do exercício da lista acima",
+      "sets": 3,
+      "reps": "8-12",
+      "restSeconds": 60,
+      "notes": "observação opcional ou null"
+    }
+  ],
+  "tips": ["dica de execução 1", "dica 2"]
+}
+
+Regras:
+- Escolha entre 5 e 10 exercícios
+- Use nomes exatos da lista
+- Adapte séries/repetições ao objetivo descrito
+- Se não encontrar exercício adequado na lista, substitua por um similar disponível`;
+
+    const response = await this.openai.chat.completions.create({
+      model: this.config.get('OPENAI_MODEL', 'gpt-4o'),
+      messages: [{ role: 'user', content: prompt }],
+      response_format: { type: 'json_object' },
+      max_tokens: 2500,
+    });
+
+    const generated = JSON.parse(response.choices[0].message.content || '{}');
+
+    const workout = await this.prisma.workout.create({
+      data: {
+        name: generated.name || 'Treino gerado por IA',
+        description: generated.description,
+        level: Math.min(Math.max(generated.level || 1, 1), 5),
+        duration: generated.duration || 60,
+        tags: generated.tags || [],
+        status: 'DRAFT',
+        trainerId: trainer.id,
+      },
+    });
+
+    const exerciseMap = new Map(exercises.map((e) => [e.name.toLowerCase().trim(), e.id]));
+
+    const workoutExercises = (generated.exercises || [])
+      .map((ex: any, idx: number) => {
+        const exerciseId = exerciseMap.get((ex.name || '').toLowerCase().trim());
+        if (!exerciseId) return null;
+        return {
+          workoutId: workout.id,
+          exerciseId,
+          sets: Number(ex.sets) || 3,
+          reps: String(ex.reps || '10'),
+          restSeconds: Number(ex.restSeconds) || 60,
+          order: idx,
+          notes: ex.notes || null,
+        };
+      })
+      .filter(Boolean);
+
+    if (workoutExercises.length > 0) {
+      await this.prisma.workoutExercise.createMany({ data: workoutExercises });
+    }
+
+    return {
+      workoutId: workout.id,
+      name: workout.name,
+      exercisesAdded: workoutExercises.length,
+      tips: generated.tips || [],
+    };
   }
 
   async suggestWorkout(studentId: string) {

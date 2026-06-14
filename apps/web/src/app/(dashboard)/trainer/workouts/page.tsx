@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Dumbbell, Plus, Search, Copy, Archive, MoreVertical,
   ChevronRight, Clock, Users, Layers, Zap, FileText,
-  ChevronDown, ChevronUp, Sparkles,
+  ChevronDown, ChevronUp, Sparkles, X, Wand2, CheckCircle,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -180,6 +180,15 @@ const WORKOUT_TEMPLATES: WorkoutTemplate[] = [
 
 const CATEGORIES = ['Todos', 'Hipertrofia', 'Emagrecimento'];
 
+const AI_SUGGESTIONS = [
+  'Treino ABC hipertrofia para intermediário, 60 min',
+  'Full body para iniciante 3x por semana, 45 min',
+  'HIIT emagrecimento avançado, 40 min',
+  'Treino de pernas glúteos feminino, 60 min',
+  'Upper/Lower força para avançado',
+  'Treino funcional para idosos, baixo impacto',
+];
+
 export default function TrainerWorkouts() {
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState('Todos');
@@ -187,6 +196,9 @@ export default function TrainerWorkouts() {
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
   const [categoryFilter, setCategoryFilter] = useState('Todos');
   const [usingTemplateId, setUsingTemplateId] = useState<string | null>(null);
+  const [aiModal, setAiModal] = useState(false);
+  const [aiDescription, setAiDescription] = useState('');
+  const [aiResult, setAiResult] = useState<any>(null);
   const queryClient = useQueryClient();
   const router = useRouter();
 
@@ -203,6 +215,16 @@ export default function TrainerWorkouts() {
   const archiveMutation = useMutation({
     mutationFn: (id: string) => api.patch(`/workouts/${id}`, { status: 'ARCHIVED' }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['trainer-workouts'] }),
+  });
+
+  const generateAiMutation = useMutation({
+    mutationFn: (description: string) =>
+      api.post('/ai/generate-workout', { description }).then((r) => r.data?.data ?? r.data),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['trainer-workouts'] });
+      setAiResult(data);
+    },
+    onError: () => toast.error('Erro ao gerar treino. Verifique a chave OpenAI.'),
   });
 
   const useTemplateMutation = useMutation({
@@ -278,10 +300,19 @@ export default function TrainerWorkouts() {
           <h1 className="text-2xl font-bold">Treinos</h1>
           <p className="text-muted-foreground text-sm mt-1">Crie e gerencie planos de treino</p>
         </div>
-        <Link href="/trainer/workouts/new" className="btn-primary flex items-center gap-2 text-sm py-2 self-start sm:self-auto">
-          <Plus className="w-4 h-4" />
-          Novo treino
-        </Link>
+        <div className="flex items-center gap-2 self-start sm:self-auto">
+          <button
+            onClick={() => { setAiModal(true); setAiResult(null); setAiDescription(''); }}
+            className="flex items-center gap-2 text-sm py-2 px-4 rounded-xl border border-violet-500/40 bg-violet-500/10 hover:bg-violet-500/20 text-violet-400 font-medium transition-all"
+          >
+            <Wand2 className="w-4 h-4" />
+            Gerar com IA
+          </button>
+          <Link href="/trainer/workouts/new" className="btn-primary flex items-center gap-2 text-sm py-2">
+            <Plus className="w-4 h-4" />
+            Novo treino
+          </Link>
+        </div>
       </div>
 
       {/* Summary */}
@@ -404,6 +435,145 @@ export default function TrainerWorkouts() {
           ))}
         </div>
       </div>
+
+      {/* AI Generate Modal */}
+      <AnimatePresence>
+        {aiModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => !generateAiMutation.isPending && setAiModal(false)}
+            className="fixed inset-0 z-50 bg-black/70 flex items-end sm:items-center justify-center p-4"
+          >
+            <motion.div
+              initial={{ y: 40, opacity: 0, scale: 0.97 }}
+              animate={{ y: 0, opacity: 1, scale: 1 }}
+              exit={{ y: 40, opacity: 0, scale: 0.97 }}
+              onClick={(e) => e.stopPropagation()}
+              className="w-full max-w-lg bg-card rounded-2xl shadow-2xl overflow-hidden"
+            >
+              {/* Header */}
+              <div className="flex items-center gap-3 px-5 py-4 border-b border-border">
+                <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-violet-600 to-purple-600 flex items-center justify-center flex-shrink-0">
+                  <Wand2 className="w-4 h-4 text-white" />
+                </div>
+                <div className="flex-1">
+                  <p className="font-semibold">Gerar treino com IA</p>
+                  <p className="text-xs text-muted-foreground">Descreva o treino e a IA monta tudo para você</p>
+                </div>
+                {!generateAiMutation.isPending && (
+                  <button onClick={() => setAiModal(false)} className="w-7 h-7 rounded-lg hover:bg-accent flex items-center justify-center">
+                    <X className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+
+              <div className="p-5 space-y-4">
+                {!aiResult ? (
+                  <>
+                    <textarea
+                      value={aiDescription}
+                      onChange={(e) => setAiDescription(e.target.value)}
+                      placeholder="Descreva o treino: objetivo, grupos musculares, nível do aluno, tempo disponível, equipamentos..."
+                      rows={4}
+                      disabled={generateAiMutation.isPending}
+                      className="input-field resize-none w-full text-sm"
+                    />
+
+                    {/* Quick suggestions */}
+                    <div className="space-y-1.5">
+                      <p className="text-xs text-muted-foreground font-medium">Sugestões rápidas:</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {AI_SUGGESTIONS.map((s) => (
+                          <button
+                            key={s}
+                            onClick={() => setAiDescription(s)}
+                            disabled={generateAiMutation.isPending}
+                            className="text-xs px-2.5 py-1 rounded-full glass border border-border hover:border-violet-500/40 hover:text-violet-400 transition-all text-muted-foreground"
+                          >
+                            {s}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {generateAiMutation.isPending && (
+                      <div className="flex flex-col items-center gap-3 py-4">
+                        <div className="relative w-12 h-12">
+                          <div className="absolute inset-0 rounded-full border-2 border-violet-500/20 border-t-violet-500 animate-spin" />
+                          <div className="absolute inset-2 rounded-full border-2 border-purple-500/20 border-t-purple-500 animate-spin" style={{ animationDirection: 'reverse', animationDuration: '0.8s' }} />
+                          <Wand2 className="absolute inset-0 m-auto w-4 h-4 text-violet-400" />
+                        </div>
+                        <p className="text-sm text-muted-foreground animate-pulse">Gerando treino personalizado...</p>
+                      </div>
+                    )}
+
+                    <div className="flex gap-3">
+                      <button
+                        onClick={() => setAiModal(false)}
+                        disabled={generateAiMutation.isPending}
+                        className="btn-secondary flex-1 text-sm py-2.5"
+                      >
+                        Cancelar
+                      </button>
+                      <button
+                        disabled={!aiDescription.trim() || generateAiMutation.isPending}
+                        onClick={() => generateAiMutation.mutate(aiDescription.trim())}
+                        className="flex-1 text-sm py-2.5 bg-gradient-to-r from-violet-600 to-purple-600 text-white rounded-xl font-semibold hover:opacity-90 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                      >
+                        <Wand2 className="w-4 h-4" />
+                        Gerar treino
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  /* Success state */
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-3 p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
+                      <CheckCircle className="w-6 h-6 text-emerald-400 flex-shrink-0" />
+                      <div>
+                        <p className="font-semibold text-emerald-400">{aiResult.name}</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          {aiResult.exercisesAdded} exercício{aiResult.exercisesAdded !== 1 ? 's' : ''} adicionado{aiResult.exercisesAdded !== 1 ? 's' : ''} · Salvo como rascunho
+                        </p>
+                      </div>
+                    </div>
+
+                    {aiResult.tips?.length > 0 && (
+                      <div className="space-y-1.5">
+                        <p className="text-xs font-medium text-muted-foreground">Dicas da IA:</p>
+                        <ul className="space-y-1">
+                          {aiResult.tips.map((tip: string, i: number) => (
+                            <li key={i} className="text-xs text-muted-foreground flex items-start gap-1.5">
+                              <span className="text-violet-400 mt-0.5">•</span>{tip}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
+                    <div className="flex gap-3">
+                      <button
+                        onClick={() => { setAiResult(null); setAiDescription(''); }}
+                        className="btn-secondary flex-1 text-sm py-2.5"
+                      >
+                        Gerar outro
+                      </button>
+                      <button
+                        onClick={() => { setAiModal(false); router.push(`/trainer/workouts/${aiResult.workoutId}`); }}
+                        className="flex-1 text-sm py-2.5 bg-gradient-to-r from-violet-600 to-purple-600 text-white rounded-xl font-semibold hover:opacity-90 transition-all flex items-center justify-center gap-2"
+                      >
+                        Ver treino <ChevronRight className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Workout list */}
       {isLoading ? (
