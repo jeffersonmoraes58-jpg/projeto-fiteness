@@ -29,6 +29,15 @@ export class AiController {
     return this.aiService.getMotivationalMessage(studentId);
   }
 
+  @Post('generate-workout')
+  @ApiOperation({ summary: 'Gerar treino completo com IA a partir de descrição do trainer' })
+  generateWorkout(
+    @CurrentUser('id') userId: string,
+    @Body() body: { description: string },
+  ) {
+    return this.aiService.generateWorkout(body.description, userId);
+  }
+
   @Post('exercise-alternative')
   @ApiOperation({ summary: 'Sugerir exercício alternativo' })
   suggestAlternative(@Body() body: { exerciseName: string; reason: string }) {
