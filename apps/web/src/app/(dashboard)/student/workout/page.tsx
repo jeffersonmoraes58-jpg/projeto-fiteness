@@ -644,15 +644,27 @@ function WorkoutMusicPlayer() {
           </div>
 
           {embedUrl && (
-            <div className="relative rounded-xl overflow-hidden" style={{ paddingBottom: '56.25%' }}>
-              <iframe
-                key={embedUrl}
-                src={embedUrl}
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                allowFullScreen
-                className="absolute inset-0 w-full h-full border-0"
-              />
-            </div>
+            <>
+              <div className="relative rounded-xl overflow-hidden" style={{ paddingBottom: '56.25%' }}>
+                <iframe
+                  key={embedUrl}
+                  src={embedUrl}
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allowFullScreen
+                  className="absolute inset-0 w-full h-full border-0"
+                />
+              </div>
+              <button
+                onClick={() => window.open(activeUrl, '_blank')}
+                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-red-600/20 hover:bg-red-600/30 text-red-400 text-xs font-medium transition-all border border-red-600/20"
+              >
+                <ExternalLink className="w-3.5 h-3.5" />
+                Abrir no YouTube (tela bloqueada)
+              </button>
+              <p className="text-[11px] text-muted-foreground text-center -mt-1">
+                O iframe pausa quando a tela bloqueia. Abra no app do YouTube para ouvir em segundo plano.
+              </p>
+            </>
           )}
         </div>
       )}
