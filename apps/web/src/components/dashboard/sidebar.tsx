@@ -1,12 +1,12 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Dumbbell, Users, Apple, BarChart3, MessageCircle, Bell,
-  Settings, LogOut, ChevronLeft, Menu, Trophy,
+  Settings, LogOut, ChevronLeft, Trophy,
   Calendar, CreditCard, Brain, Home, Utensils,
   Activity, Target, Star, Building2,
 } from 'lucide-react';
@@ -74,6 +74,12 @@ export function DashboardSidebar() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const pathname = usePathname();
   const { user, logout } = useAuthStore();
+
+  useEffect(() => {
+    const handler = () => setMobileOpen((v) => !v);
+    window.addEventListener('toggle-mobile-sidebar', handler);
+    return () => window.removeEventListener('toggle-mobile-sidebar', handler);
+  }, []);
   const navItems = navByRole[user?.role || 'STUDENT'] || [];
 
   const SidebarContent = () => (
@@ -164,14 +170,6 @@ export function DashboardSidebar() {
 
   return (
     <>
-      {/* Mobile toggle */}
-      <button
-        className="lg:hidden fixed top-4 left-4 z-50 w-10 h-10 bg-card border border-border rounded-xl flex items-center justify-center"
-        onClick={() => setMobileOpen(!mobileOpen)}
-      >
-        <Menu className="w-5 h-5" />
-      </button>
-
       {/* Mobile overlay */}
       <AnimatePresence>
         {mobileOpen && (

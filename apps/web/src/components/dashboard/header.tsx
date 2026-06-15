@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { Bell, Search, Sun, Moon, CheckCheck, Trash2, Info, AlertTriangle, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Bell, Search, Sun, Moon, CheckCheck, Trash2, Info, AlertTriangle, CheckCircle2, AlertCircle, Menu } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { useAuthStore } from '@/store/auth';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -74,7 +74,18 @@ export function DashboardHeader() {
   const hasUnread = unreadCount > 0;
 
   return (
-    <header className="h-16 border-b border-border/50 pl-16 pr-4 lg:px-6 flex items-center justify-between bg-background/80 backdrop-blur-xl sticky top-0 z-20 relative">
+    <header className="h-14 sm:h-16 border-b border-border/50 px-3 sm:px-4 lg:px-6 flex items-center gap-3 bg-background/80 backdrop-blur-xl sticky top-0 z-20 relative">
+      {/* Mobile menu button — integrated in header */}
+      <button
+        className="lg:hidden w-9 h-9 rounded-xl hover:bg-accent flex items-center justify-center text-muted-foreground flex-shrink-0"
+        onClick={() => window.dispatchEvent(new CustomEvent('toggle-mobile-sidebar'))}
+      >
+        <Menu className="w-5 h-5" />
+      </button>
+
+      {/* Logo on mobile */}
+      <span className="lg:hidden font-bold gradient-text text-base flex-1">Fitlynutri</span>
+
       <div className="hidden sm:block flex-1 max-w-md">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -86,7 +97,7 @@ export function DashboardHeader() {
         </div>
       </div>
 
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-2 sm:gap-3 ml-auto">
         <button
           onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
           className="w-9 h-9 rounded-xl hover:bg-accent flex items-center justify-center text-muted-foreground hover:text-foreground transition-all"
