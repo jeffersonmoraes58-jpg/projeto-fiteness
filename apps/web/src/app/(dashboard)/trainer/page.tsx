@@ -36,12 +36,12 @@ export default function TrainerDashboard() {
           <h1 className="text-2xl font-bold">Dashboard</h1>
           <p className="text-muted-foreground text-sm mt-1">Segunda-feira, 12 de Maio de 2025</p>
         </div>
-        <div className="flex gap-3">
-          <Link href="/trainer/students/new" className="btn-secondary flex items-center gap-2 text-sm py-2">
+        <div className="flex flex-wrap gap-2 self-start sm:self-auto">
+          <Link href="/trainer/students/new" className="btn-secondary flex items-center gap-2 text-sm py-2 px-4">
             <Plus className="w-4 h-4" />
             Novo aluno
           </Link>
-          <Link href="/trainer/workouts/new" className="btn-primary flex items-center gap-2 text-sm py-2">
+          <Link href="/trainer/workouts/new" className="btn-primary flex items-center gap-2 text-sm py-2 px-4">
             <Dumbbell className="w-4 h-4" />
             Novo treino
           </Link>
@@ -49,7 +49,7 @@ export default function TrainerDashboard() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         {statCards.map((card, i) => (
           <motion.div
             key={card.key}
@@ -59,23 +59,23 @@ export default function TrainerDashboard() {
             className="stat-card"
           >
             <div className="flex items-center justify-between mb-4">
-              <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${card.color} flex items-center justify-center`}>
-                <card.icon className="w-5 h-5 text-white" />
+              <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br ${card.color} flex items-center justify-center flex-shrink-0`}>
+                <card.icon className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
               </div>
               <span className="text-xs text-emerald-500 flex items-center gap-1">
                 <ArrowUpRight className="w-3 h-3" />
                 +12%
               </span>
             </div>
-            <div className="text-2xl font-bold">
+            <div className="text-xl sm:text-2xl font-bold">
               {card.prefix}{stats?.[card.key] ?? '—'}
             </div>
-            <div className="text-xs text-muted-foreground mt-1">{card.label}</div>
+            <div className="text-[11px] sm:text-xs text-muted-foreground mt-1">{card.label}</div>
           </motion.div>
         ))}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
         {/* Students list */}
         <div className="lg:col-span-2">
           <div className="glass-card">
@@ -168,9 +168,9 @@ function StudentRow({ student, index }: { student: any; index: number }) {
   return (
     <Link
       href={`/trainer/students/${student.id}`}
-      className="flex items-center gap-4 p-3 rounded-xl hover:bg-accent transition-all"
+      className="flex items-center gap-3 p-2 sm:p-3 rounded-xl hover:bg-accent transition-all"
     >
-      <div className={`w-9 h-9 rounded-full bg-gradient-to-br ${colors[index % colors.length]} flex items-center justify-center text-white text-xs font-bold flex-shrink-0`}>
+      <div className={`w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-gradient-to-br ${colors[index % colors.length]} flex items-center justify-center text-white text-xs font-bold flex-shrink-0`}>
         {student.user.profile?.avatarUrl ? (
           <img src={student.user.profile.avatarUrl} alt="" className="w-full h-full rounded-full object-cover" />
         ) : (
@@ -183,8 +183,8 @@ function StudentRow({ student, index }: { student: any; index: number }) {
         </div>
         <div className="text-xs text-muted-foreground truncate">{student.goalType || 'Sem objetivo definido'}</div>
       </div>
-      <div className="flex items-center gap-2">
-        <span className="text-xs px-2 py-1 rounded-full bg-emerald-500/10 text-emerald-400">Ativo</span>
+      <div className="flex items-center gap-1.5 flex-shrink-0">
+        <span className="hidden xs:inline text-xs px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400">Ativo</span>
         <span className="text-xs text-muted-foreground">{student.streak || 0}🔥</span>
       </div>
     </Link>
@@ -197,9 +197,9 @@ function WeeklyChart() {
   const max = Math.max(...values);
 
   return (
-    <div className="flex items-end gap-3 h-32">
+    <div className="flex items-end gap-1 sm:gap-3 h-24 sm:h-32">
       {days.map((day, i) => (
-        <div key={day} className="flex-1 flex flex-col items-center gap-2">
+        <div key={day} className="flex-1 flex flex-col items-center gap-1 sm:gap-2">
           <div className="flex-1 w-full flex items-end">
             <motion.div
               initial={{ height: 0 }}
@@ -208,8 +208,8 @@ function WeeklyChart() {
               className="w-full bg-gradient-to-t from-purple-600 to-indigo-600 rounded-t-md opacity-80 hover:opacity-100 transition-opacity"
             />
           </div>
-          <div className="text-xs text-muted-foreground">{day}</div>
-          <div className="text-xs font-medium">{values[i]}</div>
+          <div className="text-[10px] sm:text-xs text-muted-foreground">{day}</div>
+          <div className="text-[10px] sm:text-xs font-medium">{values[i]}</div>
         </div>
       ))}
     </div>
