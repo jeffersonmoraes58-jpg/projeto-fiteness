@@ -27,7 +27,7 @@ function CadastroConvite() {
   useEffect(() => {
     if (!token) { setTokenError('Link de convite inválido ou ausente.'); setValidating(false); return; }
     api.get(`/auth/invite/validate?token=${token}`)
-      .then((r) => { setTrainerName(r.data.trainerName); setTenantId(r.data.tenantId); })
+      .then((r) => { const d = r.data.data ?? r.data; setTrainerName(d.trainerName); setTenantId(d.tenantId); })
       .catch(() => setTokenError('Este link é inválido ou já expirou. Solicite um novo link ao seu personal.'))
       .finally(() => setValidating(false));
   }, [token]);
