@@ -5,12 +5,13 @@ import { motion } from 'framer-motion';
 import {
   Search, Plus, Users, Dumbbell, TrendingUp,
   ChevronRight, MoreVertical, MessageCircle, Flame,
-  Activity, Calendar, Filter,
+  Activity, Calendar, Filter, Link2, X, Copy, Check,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
+import toast from 'react-hot-toast';
 
 const FILTERS = ['Todos', 'Ativos', 'Inativos'];
 const GOAL_LABELS: Record<string, string> = {
@@ -26,6 +27,37 @@ const GOAL_LABELS: Record<string, string> = {
 export default function TrainerStudents() {
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState('Todos');
+  const [inviteModal, setInviteModal] = useState(false);
+  const [inviteLink, setInviteLink] = useState('');
+  const [inviteLoading, setInviteLoading] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  async function handleOpenInvite() {
+    setInviteModal(true);
+    if (inviteLink) return;
+    setInviteLoading(true);
+    try {
+      const res = await api.post('/auth/invite-link');
+      setInviteLink(res.data.link);
+    } catch {
+      toast.error('Erro ao gerar link de convite');
+      setInviteModal(false);
+    } finally {
+      setInviteLoading(false);
+    }
+  }
+
+  async function handleCopy() {
+    await navigator.clipboard.writeText(inviteLink);
+    setCopied(true);
+    toast.success('Link copiado!');
+    setTimeout(() => setCopied(false), 2500);
+  }
+
+  function handleWhatsApp() {
+    const text = encodeURIComponent(`Olá! Clique no link abaixo para se cadastrar e começar seus treinos:\n\n${inviteLink}`);
+    window.open(`https://wa.me/?text=${text}`, '_blank');
+  }
 
   const { data: students, isLoading } = useQuery({
     queryKey: ['trainer-students-list'],
@@ -50,15 +82,81 @@ export default function TrainerStudents() {
 
   return (
     <div className="space-y-6">
+      {/* ── Invite Modal ──────────────────────────────────────── */}
+      {inviteModal && (
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="glass-card w-full max-w-md relative">
+            <button onClick={() => setInviteModal(false)} className="absolute top-4 right-4 w-7 h-7 rounded-lg hover:bg-white/10 flex items-center justify-center">
+              <X className="w-4 h-4" />
+            </button>
+
+            <div className="flex items-center gap-3 mb-5">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-600 to-purple-600 flex items-center justify-center flex-shrink-0">
+                <Link2 className="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <h2 className="font-bold text-base">Link de convite</h2>
+                <p className="text-xs text-muted-foreground">Envie para o aluno se cadastrar automaticamente</p>
+              </div>
+            </div>
+
+            {inviteLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+              </div>
+            ) : (
+              <>
+                <div className="glass rounded-xl p-3 mb-4 flex items-center gap-2">
+                  <p className="text-xs text-muted-foreground flex-1 truncate">{inviteLink}</p>
+                  <button
+                    onClick={handleCopy}
+                    className={cn('flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center transition-all', copied ? 'bg-emerald-500/20 text-emerald-400' : 'hover:bg-white/10')}
+                  >
+                    {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                  </button>
+                </div>
+
+                <div className="space-y-2">
+                  <button onClick={handleCopy} className="btn-primary w-full flex items-center justify-center gap-2 text-sm py-2.5">
+                    <Copy className="w-4 h-4" />
+                    {copied ? 'Copiado!' : 'Copiar link'}
+                  </button>
+                  <button
+                    onClick={handleWhatsApp}
+                    className="w-full flex items-center justify-center gap-2 text-sm py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold transition-all"
+                  >
+                    <MessageCircle className="w-4 h-4" />
+                    Enviar pelo WhatsApp
+                  </button>
+                </div>
+
+                <p className="text-[11px] text-muted-foreground text-center mt-3">
+                  O link expira em 7 dias. Gere um novo quando precisar.
+                </p>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
       <div className="page-header">
         <div>
           <h1 className="text-2xl font-bold">Alunos</h1>
           <p className="text-muted-foreground text-sm mt-1">{totalStudents} alunos cadastrados</p>
         </div>
-        <Link href="/trainer/students/new" className="btn-primary flex items-center gap-2 text-sm py-2 self-start sm:self-auto">
-          <Plus className="w-4 h-4" />
-          Novo aluno
-        </Link>
+        <div className="flex items-center gap-2 flex-shrink-0">
+          <button
+            onClick={handleOpenInvite}
+            className="btn-secondary flex items-center gap-1.5 text-sm py-2 px-3"
+          >
+            <Link2 className="w-4 h-4" />
+            <span className="hidden sm:inline">Enviar </span>Link
+          </button>
+          <Link href="/trainer/students/new" className="btn-primary flex items-center gap-2 text-sm py-2 self-start sm:self-auto">
+            <Plus className="w-4 h-4" />
+            <span className="hidden sm:inline">Novo </span>aluno
+          </Link>
+        </div>
       </div>
 
       {/* Stats */}

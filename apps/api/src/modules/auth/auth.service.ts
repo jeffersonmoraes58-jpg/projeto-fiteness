@@ -71,12 +71,29 @@ export class AuthService {
       include: { profile: true },
     });
 
+    let createdStudentId: string | null = null;
     if (user.role === UserRole.STUDENT) {
-      await this.prisma.student.create({ data: { userId: user.id } });
+      const s = await this.prisma.student.create({ data: { userId: user.id } });
+      createdStudentId = s.id;
     } else if (user.role === UserRole.TRAINER) {
       await this.prisma.trainer.create({ data: { userId: user.id } });
     } else if (user.role === UserRole.NUTRITIONIST) {
       await this.prisma.nutritionist.create({ data: { userId: user.id } });
+    }
+
+    if (dto.inviteToken && createdStudentId) {
+      try {
+        const payload = await this.jwtService.verifyAsync(dto.inviteToken, {
+          secret: this.config.get('JWT_SECRET'),
+        });
+        if (payload.type === 'student-invite') {
+          await this.prisma.trainerStudent.upsert({
+            where: { trainerId_studentId: { trainerId: payload.sub, studentId: createdStudentId } },
+            update: { isActive: true },
+            create: { trainerId: payload.sub, studentId: createdStudentId, isActive: true },
+          });
+        }
+      } catch {} // token expirado ou inválido — cadastro continua normalmente
     }
 
     const tokens = await this.generateTokens(user.id, user.email, user.role, user.tenantId);
@@ -198,6 +215,37 @@ export class AuthService {
     await this.saveRefreshToken(user.id, tokens.refreshToken);
 
     return { user: this.sanitizeUser(user), ...tokens };
+  }
+
+  async generateInviteLink(userId: string) {
+    const trainer = await this.prisma.trainer.findUnique({
+      where: { userId },
+      include: { user: { include: { profile: true } } },
+    });
+    if (!trainer) throw new NotFoundException('Perfil de trainer não encontrado');
+
+    const trainerName = [trainer.user.profile?.firstName, trainer.user.profile?.lastName]
+      .filter(Boolean).join(' ') || 'Personal Trainer';
+
+    const token = await this.jwtService.signAsync(
+      { sub: trainer.id, tenantId: trainer.user.tenantId, trainerName, type: 'student-invite' },
+      { secret: this.config.get('JWT_SECRET'), expiresIn: '7d' },
+    );
+
+    const baseUrl = this.config.get('FRONTEND_URL', 'https://fitlynutri.com.br');
+    return { link: `${baseUrl}/cadastro?invite=${token}`, trainerName };
+  }
+
+  async validateInviteToken(token: string) {
+    try {
+      const payload = await this.jwtService.verifyAsync(token, {
+        secret: this.config.get('JWT_SECRET'),
+      });
+      if (payload.type !== 'student-invite') throw new Error('invalid type');
+      return { valid: true, trainerName: payload.trainerName as string, tenantId: payload.tenantId as string };
+    } catch {
+      throw new BadRequestException('Link inválido ou expirado');
+    }
   }
 
   async forgotPassword(email: string) {

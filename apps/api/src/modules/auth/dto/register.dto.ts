@@ -39,4 +39,9 @@ export class RegisterDto {
   @IsOptional()
   @IsString()
   studioName?: string;
+
+  @ApiPropertyOptional({ description: 'Token de convite gerado pelo personal trainer' })
+  @IsOptional()
+  @IsString()
+  inviteToken?: string;
 }
