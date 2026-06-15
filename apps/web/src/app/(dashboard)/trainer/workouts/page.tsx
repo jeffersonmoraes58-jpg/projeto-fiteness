@@ -346,7 +346,7 @@ export default function TrainerWorkouts() {
       </div>
 
       {/* Templates Section */}
-      <div className="glass-card !p-0 overflow-hidden">
+      <div className="glass-card !p-0">
         <button
           onClick={() => setTemplatesOpen(!templatesOpen)}
           className="w-full flex items-center justify-between px-6 py-4 hover:bg-accent/30 transition-all"
@@ -368,7 +368,7 @@ export default function TrainerWorkouts() {
               animate={{ height: 'auto', opacity: 1 }}
               exit={{ height: 0, opacity: 0 }}
               transition={{ duration: 0.2 }}
-              className="overflow-hidden border-t border-border"
+              className="border-t border-border"
             >
               {/* Category filter */}
               <div className="flex gap-2 px-6 pt-4">
