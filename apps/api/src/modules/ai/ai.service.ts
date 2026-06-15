@@ -1,21 +1,34 @@
 import { Injectable, ForbiddenException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import OpenAI from 'openai';
+import Anthropic from '@anthropic-ai/sdk';
 import { PrismaService } from '../prisma/prisma.service';
 import { GoalType, ActivityLevel } from '@prisma/client';
 
 @Injectable()
 export class AiService {
-  private openai: OpenAI;
+  private anthropic: Anthropic;
 
   constructor(
     private config: ConfigService,
     private prisma: PrismaService,
   ) {
-    this.openai = new OpenAI({
-      apiKey: config.get('GEMINI_API_KEY'),
-      baseURL: 'https://generativelanguage.googleapis.com/v1beta/openai/',
+    this.anthropic = new Anthropic({
+      apiKey: config.get('ANTHROPIC_API_KEY'),
     });
+  }
+
+  private get model(): string {
+    return this.config.get('ANTHROPIC_MODEL', 'claude-haiku-4-5-20251001');
+  }
+
+  private async complete(prompt: string, maxTokens = 1500): Promise<string> {
+    const response = await this.anthropic.messages.create({
+      model: this.model,
+      max_tokens: maxTokens,
+      messages: [{ role: 'user', content: prompt }],
+    });
+    const block = response.content[0];
+    return block.type === 'text' ? block.text : '';
   }
 
   async generateWorkout(description: string, userId: string) {
@@ -40,13 +53,7 @@ Responda APENAS com JSON válido, sem texto extra:
 
 Escolha 5 a 8 exercícios da lista. Adapte séries e repetições ao objetivo.`;
 
-    const response = await this.openai.chat.completions.create({
-      model: this.config.get('GEMINI_MODEL', 'gemini-2.0-flash'),
-      messages: [{ role: 'user', content: prompt }],
-      max_tokens: 1500,
-    });
-
-    const content = (response.choices[0].message.content || '{}').replace(/```json|```/g, '').trim();
+    const content = (await this.complete(prompt)).replace(/```json|```/g, '').trim();
     const generated = JSON.parse(content);
 
     const workout = await this.prisma.workout.create({
@@ -102,42 +109,19 @@ Escolha 5 a 8 exercícios da lista. Adapte séries e repetições ao objetivo.`;
       },
     });
 
-    const prompt = `
-      Você é um personal trainer especialista. Sugira um treino para o seguinte aluno:
+    const prompt = `Você é um personal trainer especialista. Sugira um treino para o seguinte aluno:
 
-      Nome: ${student?.user.profile?.firstName}
-      Objetivo: ${student?.goalType}
-      Nível de atividade: ${student?.activityLevel}
-      Histórico de lesões: ${student?.anamnesis?.previousInjuries || 'Nenhum'}
-      Condições médicas: ${student?.anamnesis?.cardiovascularIssues ? 'Problemas cardiovasculares' : 'Saudável'}
+Nome: ${student?.user.profile?.firstName}
+Objetivo: ${student?.goalType}
+Nível de atividade: ${student?.activityLevel}
+Histórico de lesões: ${student?.anamnesis?.previousInjuries || 'Nenhum'}
+Condições médicas: ${student?.anamnesis?.cardiovascularIssues ? 'Problemas cardiovasculares' : 'Saudável'}
 
-      Retorne um JSON com:
-      {
-        "name": "nome do treino",
-        "description": "descrição",
-        "exercises": [
-          {
-            "name": "nome do exercício",
-            "sets": 3,
-            "reps": "8-12",
-            "rest": 60,
-            "notes": "observações",
-            "muscleGroup": "grupo muscular"
-          }
-        ],
-        "tips": ["dica 1", "dica 2"],
-        "duration": 60
-      }
-    `;
+Retorne APENAS JSON válido:
+{"name":"nome do treino","description":"descrição","exercises":[{"name":"nome","sets":3,"reps":"8-12","rest":60,"notes":"obs","muscleGroup":"grupo"}],"tips":["dica1"],"duration":60}`;
 
-    const response = await this.openai.chat.completions.create({
-      model: this.config.get('GEMINI_MODEL', 'gemini-2.0-flash'),
-      messages: [{ role: 'user', content: prompt }],
-      response_format: { type: 'json_object' },
-      max_tokens: 2000,
-    });
-
-    return JSON.parse(response.choices[0].message.content || '{}');
+    const content = (await this.complete(prompt, 2000)).replace(/```json|```/g, '').trim();
+    return JSON.parse(content);
   }
 
   async suggestDiet(studentId: string) {
@@ -152,46 +136,23 @@ Escolha 5 a 8 exercícios da lista. Adapte séries e repetições ao objetivo.`;
       include: { anamnesis: true },
     });
 
-    const prompt = `
-      Você é nutricionista especialista em fitness. Crie um plano alimentar para:
+    const prompt = `Você é nutricionista especialista em fitness. Crie um plano alimentar para:
 
-      Objetivo: ${student?.goalType}
-      IMC: ${assessment?.bmi || 'N/A'}
-      TMB: ${assessment?.tmb || 'N/A'} kcal
-      GET: ${assessment?.get || 'N/A'} kcal
-      Proteína alvo: ${assessment?.proteinTarget || 'N/A'}g
-      Carboidrato alvo: ${assessment?.carbsTarget || 'N/A'}g
-      Gordura alvo: ${assessment?.fatTarget || 'N/A'}g
-      Restrições: ${assessment?.dietaryRestrictions?.join(', ') || 'Nenhuma'}
-      Alergias: ${assessment?.foodAllergies?.join(', ') || 'Nenhuma'}
+Objetivo: ${student?.goalType}
+IMC: ${assessment?.bmi || 'N/A'}
+TMB: ${assessment?.tmb || 'N/A'} kcal
+GET: ${assessment?.get || 'N/A'} kcal
+Proteína alvo: ${assessment?.proteinTarget || 'N/A'}g
+Carboidrato alvo: ${assessment?.carbsTarget || 'N/A'}g
+Gordura alvo: ${assessment?.fatTarget || 'N/A'}g
+Restrições: ${assessment?.dietaryRestrictions?.join(', ') || 'Nenhuma'}
+Alergias: ${assessment?.foodAllergies?.join(', ') || 'Nenhuma'}
 
-      Retorne um JSON com:
-      {
-        "name": "nome do plano",
-        "totalCalories": 2000,
-        "meals": [
-          {
-            "name": "Café da manhã",
-            "time": "07:00",
-            "calories": 400,
-            "foods": [
-              { "name": "Aveia", "quantity": 80, "unit": "g", "calories": 300, "protein": 10, "carbs": 55, "fat": 5 }
-            ]
-          }
-        ],
-        "tips": ["dica 1"],
-        "shoppingList": ["item 1", "item 2"]
-      }
-    `;
+Retorne APENAS JSON válido:
+{"name":"nome do plano","totalCalories":2000,"meals":[{"name":"Café da manhã","time":"07:00","calories":400,"foods":[{"name":"Aveia","quantity":80,"unit":"g","calories":300,"protein":10,"carbs":55,"fat":5}]}],"tips":["dica1"],"shoppingList":["item1"]}`;
 
-    const response = await this.openai.chat.completions.create({
-      model: this.config.get('GEMINI_MODEL', 'gemini-2.0-flash'),
-      messages: [{ role: 'user', content: prompt }],
-      response_format: { type: 'json_object' },
-      max_tokens: 3000,
-    });
-
-    return JSON.parse(response.choices[0].message.content || '{}');
+    const content = (await this.complete(prompt, 3000)).replace(/```json|```/g, '').trim();
+    return JSON.parse(content);
   }
 
   async getMotivationalMessage(studentId: string) {
@@ -203,46 +164,20 @@ Escolha 5 a 8 exercícios da lista. Adapte séries e repetições ao objetivo.`;
       },
     });
 
-    const prompt = `
-      Gere uma mensagem motivacional curta e personalizada (máximo 2 frases) para ${student?.user.profile?.firstName},
-      que tem ${student?.streak} dias consecutivos de treino e está buscando ${student?.goalType}.
-      Seja encorajador e específico. Responda em português brasileiro.
-    `;
+    const prompt = `Gere uma mensagem motivacional curta e personalizada (máximo 2 frases) para ${student?.user.profile?.firstName}, que tem ${student?.streak} dias consecutivos de treino e está buscando ${student?.goalType}. Seja encorajador e específico. Responda em português brasileiro.`;
 
-    const response = await this.openai.chat.completions.create({
-      model: this.config.get('GEMINI_MODEL', 'gemini-2.0-flash'),
-      messages: [{ role: 'user', content: prompt }],
-      max_tokens: 150,
-    });
-
-    return { message: response.choices[0].message.content };
+    const message = await this.complete(prompt, 150);
+    return { message };
   }
 
   async suggestExerciseAlternative(exerciseName: string, reason: string) {
-    const prompt = `
-      Sugira 3 exercícios alternativos para "${exerciseName}" considerando: ${reason}.
+    const prompt = `Sugira 3 exercícios alternativos para "${exerciseName}" considerando: ${reason}.
 
-      Retorne JSON:
-      {
-        "alternatives": [
-          {
-            "name": "nome",
-            "description": "por que é uma boa alternativa",
-            "difficulty": 1-5,
-            "equipment": ["equipamento necessário"]
-          }
-        ]
-      }
-    `;
+Retorne APENAS JSON válido:
+{"alternatives":[{"name":"nome","description":"por que é boa alternativa","difficulty":3,"equipment":["equipamento"]}]}`;
 
-    const response = await this.openai.chat.completions.create({
-      model: this.config.get('GEMINI_MODEL', 'gemini-2.0-flash'),
-      messages: [{ role: 'user', content: prompt }],
-      response_format: { type: 'json_object' },
-      max_tokens: 1000,
-    });
-
-    return JSON.parse(response.choices[0].message.content || '{}');
+    const content = (await this.complete(prompt, 1000)).replace(/```json|```/g, '').trim();
+    return JSON.parse(content);
   }
 
   async chatWithAssistant(userId: string, message: string, chatHistory: any[] = [], context?: string) {
@@ -261,33 +196,35 @@ Resumo do que foi configurado acima: adapte 100% das suas respostas ao perfil, t
       : basePrompt;
 
     const messages = [
-      { role: 'system' as const, content: systemPrompt },
       ...chatHistory.slice(-10),
       { role: 'user' as const, content: message },
     ];
 
-    const response = await this.openai.chat.completions.create({
-      model: this.config.get('GEMINI_MODEL', 'gemini-2.0-flash'),
-      messages,
+    const response = await this.anthropic.messages.create({
+      model: this.model,
       max_tokens: 1200,
+      system: systemPrompt,
+      messages,
     });
 
+    const block = response.content[0];
     return {
-      reply: response.choices[0].message.content,
+      reply: block.type === 'text' ? block.text : '',
       usage: response.usage,
     };
   }
 
   async analyzeProgressPhoto(photoUrl: string) {
-    const response = await this.openai.chat.completions.create({
-      model: this.config.get('GEMINI_MODEL', 'gemini-2.0-flash'),
+    const response = await this.anthropic.messages.create({
+      model: this.model,
+      max_tokens: 500,
       messages: [
         {
           role: 'user',
           content: [
             {
-              type: 'image_url',
-              image_url: { url: photoUrl },
+              type: 'image',
+              source: { type: 'url', url: photoUrl },
             },
             {
               type: 'text',
@@ -296,10 +233,10 @@ Resumo do que foi configurado acima: adapte 100% das suas respostas ao perfil, t
           ],
         },
       ],
-      max_tokens: 500,
     });
 
-    return { analysis: response.choices[0].message.content };
+    const block = response.content[0];
+    return { analysis: block.type === 'text' ? block.text : '' };
   }
 
   calculateTMB(weight: number, height: number, age: number, gender: string): number {
