@@ -74,7 +74,7 @@ export function DashboardHeader() {
   const hasUnread = unreadCount > 0;
 
   return (
-    <header className="h-16 border-b border-border/50 pl-16 pr-4 lg:px-6 flex items-center justify-between bg-background/80 backdrop-blur-xl sticky top-0 z-20">
+    <header className="h-16 border-b border-border/50 pl-16 pr-4 lg:px-6 flex items-center justify-between bg-background/80 backdrop-blur-xl sticky top-0 z-20 relative">
       <div className="hidden sm:block flex-1 max-w-md">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -95,7 +95,7 @@ export function DashboardHeader() {
         </button>
 
         {/* Notification bell */}
-        <div className="relative" ref={dropdownRef}>
+        <div className="sm:relative" ref={dropdownRef}>
           <button
             onClick={() => setNotifOpen((v) => !v)}
             className="relative w-9 h-9 rounded-xl hover:bg-accent flex items-center justify-center text-muted-foreground hover:text-foreground transition-all"
@@ -115,7 +115,7 @@ export function DashboardHeader() {
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: 8, scale: 0.95 }}
                 transition={{ duration: 0.15 }}
-                className="fixed left-2 right-2 top-[4.25rem] sm:absolute sm:left-auto sm:right-0 sm:top-12 sm:w-80 bg-card border border-border rounded-2xl shadow-2xl z-50 overflow-hidden flex flex-col max-h-[calc(100vh-5rem)] sm:max-h-[calc(100vh-6rem)]"
+                className="absolute left-2 right-2 top-[4.5rem] sm:left-auto sm:right-0 sm:top-12 sm:w-80 bg-card border border-border rounded-2xl shadow-2xl z-50 overflow-hidden flex flex-col max-h-[calc(100vh-6rem)] sm:max-h-96"
               >
                 {/* Header */}
                 <div className="flex items-center justify-between px-4 py-3 border-b border-border/50 flex-shrink-0">
@@ -133,7 +133,7 @@ export function DashboardHeader() {
                 </div>
 
                 {/* List */}
-                <div className="overflow-y-auto scrollbar-hide divide-y divide-border/30 flex-1">
+                <div className="overflow-y-auto scrollbar-hide divide-y divide-border/30 flex-1 min-h-0">
                   {notifList.length === 0 ? (
                     <div className="py-10 flex flex-col items-center gap-2">
                       <Bell className="w-8 h-8 text-muted-foreground" />
