@@ -571,34 +571,66 @@ export default function StudentWorkout() {
 
 // ─── Workout Music Player ────────────────────────────────────────────────────
 
-function getMusicEmbedUrl(rawUrl: string): string | null {
-  if (!rawUrl.trim()) return null;
-  const listMatch = rawUrl.match(/[?&]list=([^&]+)/);
-  const vidMatch = rawUrl.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&\n?#]+)/);
-  if (listMatch && vidMatch) return `https://www.youtube.com/embed/${vidMatch[1]}?list=${listMatch[1]}&autoplay=1&rel=0`;
-  if (listMatch) return `https://www.youtube.com/embed/videoseries?list=${listMatch[1]}&autoplay=1&rel=0`;
-  if (vidMatch) return `https://www.youtube.com/embed/${vidMatch[1]}?autoplay=1&rel=0`;
-  return null;
+declare global {
+  interface Window {
+    YT: any;
+    onYouTubeIframeAPIReady?: () => void;
+  }
 }
 
 const MUSIC_GENRES = [
-  { label: '🔥 Treino', q: 'musculação treino playlist 2024' },
-  { label: '⚡ HIIT', q: 'HIIT workout music playlist' },
-  { label: '🎧 EDM', q: 'EDM gym music playlist 2024' },
+  { label: '🔥 Treino', q: 'musculação treino música 2024' },
+  { label: '⚡ HIIT', q: 'HIIT workout music high energy' },
+  { label: '🎧 EDM', q: 'EDM gym music playlist' },
   { label: '🎸 Rock', q: 'rock workout music playlist' },
   { label: '🇧🇷 Funk', q: 'funk carioca treino playlist' },
 ];
 
 function WorkoutMusicPlayer() {
   const [open, setOpen] = useState(true);
-  const [url, setUrl] = useState('');
-  const [activeUrl, setActiveUrl] = useState('');
+  const [searchInput, setSearchInput] = useState('');
+  const [currentSearch, setCurrentSearch] = useState('');
+  const [playerReady, setPlayerReady] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const playerDivRef = useRef<HTMLDivElement>(null);
+  const playerRef = useRef<any>(null);
 
-  const embedUrl = getMusicEmbedUrl(activeUrl);
+  useEffect(() => {
+    function initPlayer() {
+      if (!playerDivRef.current || playerRef.current) return;
+      playerRef.current = new window.YT.Player(playerDivRef.current, {
+        width: '100%',
+        playerVars: { rel: 0, modestbranding: 1, playsinline: 1 },
+        events: {
+          onReady: (e: any) => {
+            const iframe = e.target.getIframe();
+            iframe.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;border:0;';
+            setPlayerReady(true);
+          },
+          onStateChange: (e: any) => setIsPlaying(e.data === 1),
+        },
+      });
+    }
 
-  function handlePlay() {
-    if (!url.trim()) return;
-    setActiveUrl(url.trim());
+    if (window.YT?.Player) {
+      initPlayer();
+    } else {
+      const prev = window.onYouTubeIframeAPIReady;
+      window.onYouTubeIframeAPIReady = () => { prev?.(); initPlayer(); };
+      if (!document.querySelector('script[src="https://www.youtube.com/iframe_api"]')) {
+        const s = document.createElement('script');
+        s.src = 'https://www.youtube.com/iframe_api';
+        document.head.appendChild(s);
+      }
+    }
+
+    return () => { playerRef.current?.destroy(); playerRef.current = null; };
+  }, []);
+
+  function search(q: string) {
+    if (!q.trim() || !playerRef.current || !playerReady) return;
+    playerRef.current.loadVideosByQuery(q.trim(), 0);
+    setCurrentSearch(q.trim());
   }
 
   return (
@@ -609,65 +641,76 @@ function WorkoutMusicPlayer() {
             <Music className="w-3.5 h-3.5 text-violet-400" />
           </div>
           <span className="text-sm font-semibold">
-            {embedUrl ? '🎵 Em reprodução' : 'Música de treino'}
+            {isPlaying ? '🎵 Em reprodução' : 'Música de treino'}
           </span>
         </div>
         {open ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
       </button>
 
-      {open && (
-        <div className="mt-4 space-y-3">
-          <div className="flex gap-2">
-            <input
-              type="text"
-              placeholder="Cole o link do YouTube aqui..."
-              value={url}
-              onChange={(e) => setUrl(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter') handlePlay(); }}
-              className="input-field flex-1 text-sm"
-            />
-            <button onClick={handlePlay} className="btn-primary text-sm px-3 flex-shrink-0">
-              Tocar
+      {/* Kept in DOM even when collapsed so the player state is preserved */}
+      <div className={cn('mt-4 space-y-3', !open && 'hidden')}>
+        <div className="flex gap-2">
+          <input
+            type="text"
+            placeholder="Pesquisar música no YouTube..."
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') search(searchInput); }}
+            className="input-field flex-1 text-sm"
+          />
+          <button
+            onClick={() => search(searchInput)}
+            disabled={!playerReady}
+            className="btn-primary text-sm px-3 flex-shrink-0 disabled:opacity-50"
+          >
+            Buscar
+          </button>
+        </div>
+
+        <div className="flex flex-wrap gap-1.5">
+          {MUSIC_GENRES.map((g) => (
+            <button
+              key={g.label}
+              disabled={!playerReady}
+              onClick={() => { setSearchInput(g.q); search(g.q); }}
+              className="text-xs px-3 py-1.5 rounded-full glass hover:bg-accent transition-all disabled:opacity-40"
+            >
+              {g.label}
             </button>
-          </div>
+          ))}
+        </div>
 
-          <div className="flex flex-wrap gap-1.5">
-            {MUSIC_GENRES.map((g) => (
-              <button
-                key={g.label}
-                onClick={() => window.open(`https://www.youtube.com/results?search_query=${encodeURIComponent(g.q)}`, '_blank')}
-                className="text-xs px-3 py-1.5 rounded-full glass hover:bg-accent transition-all flex items-center gap-1"
-              >
-                {g.label} <ExternalLink className="w-2.5 h-2.5 opacity-50" />
-              </button>
-            ))}
-          </div>
-
-          {embedUrl && (
-            <>
-              <div className="relative rounded-xl overflow-hidden" style={{ paddingBottom: '56.25%' }}>
-                <iframe
-                  key={embedUrl}
-                  src={embedUrl}
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                  allowFullScreen
-                  className="absolute inset-0 w-full h-full border-0"
-                />
-              </div>
-              <button
-                onClick={() => window.open(activeUrl, '_blank')}
-                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-red-600/20 hover:bg-red-600/30 text-red-400 text-xs font-medium transition-all border border-red-600/20"
-              >
-                <ExternalLink className="w-3.5 h-3.5" />
-                Abrir no YouTube (tela bloqueada)
-              </button>
-              <p className="text-[11px] text-muted-foreground text-center -mt-1">
-                O iframe pausa quando a tela bloqueia. Abra no app do YouTube para ouvir em segundo plano.
-              </p>
-            </>
+        {/* YouTube IFrame Player API container */}
+        <div className="relative rounded-xl overflow-hidden bg-black" style={{ paddingBottom: '56.25%', height: 0 }}>
+          <div ref={playerDivRef} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }} />
+          {!playerReady && (
+            <div className="absolute inset-0 flex items-center justify-center">
+              <p className="text-white/40 text-sm">Carregando player...</p>
+            </div>
+          )}
+          {playerReady && !currentSearch && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-black/90 pointer-events-none">
+              <Music className="w-10 h-10 text-white/20" />
+              <p className="text-white/40 text-sm">Pesquise uma música acima</p>
+            </div>
           )}
         </div>
-      )}
+
+        {currentSearch && (
+          <>
+            <button
+              onClick={() => window.open(`https://www.youtube.com/results?search_query=${encodeURIComponent(currentSearch)}`, '_blank')}
+              className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-red-600/20 hover:bg-red-600/30 text-red-400 text-xs font-medium transition-all border border-red-600/20"
+            >
+              <ExternalLink className="w-3.5 h-3.5" />
+              Abrir no YouTube (tela bloqueada)
+            </button>
+            <p className="text-[11px] text-muted-foreground text-center -mt-1">
+              O player pausa quando a tela bloqueia. Abra no app do YouTube para ouvir em segundo plano.
+            </p>
+          </>
+        )}
+      </div>
     </div>
   );
 }
