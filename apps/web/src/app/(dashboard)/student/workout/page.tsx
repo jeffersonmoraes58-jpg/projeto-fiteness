@@ -1,11 +1,11 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Dumbbell, Play, CheckCircle2, Clock, ChevronLeft,
   Flame, RotateCcw, Timer, ChevronRight,
-  X, PlayCircle, Trophy, Share2, Download,
+  X, PlayCircle, Trophy, Share2, Download, Camera, SwitchCamera,
 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
@@ -683,6 +683,7 @@ function WorkoutSummaryModal({ workoutName, startTime, isPending, onConfirm, onC
   const [comment, setComment] = useState('');
   const [cardUrl, setCardUrl] = useState<string | null>(null);
   const [confirmed, setConfirmed] = useState(false);
+  const [showSelfie, setShowSelfie] = useState(false);
 
   const durationMs = endTime.getTime() - startTime.getTime();
   const mins = Math.floor(durationMs / 60000);
@@ -723,6 +724,15 @@ function WorkoutSummaryModal({ workoutName, startTime, isPending, onConfirm, onC
   };
 
   return (
+    <>
+      {showSelfie && (
+        <SelfieModal
+          workoutName={workoutName}
+          durationStr={durationStr}
+          intensity={intensity}
+          onClose={() => setShowSelfie(false)}
+        />
+      )}
     <div style={{ position: 'fixed', inset: 0, zIndex: 9999, backgroundColor: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(6px)', overflowY: 'auto', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '2rem 1rem' }}>
       <div className="glass-card w-full max-w-md" style={{ position: 'relative' }}>
         <button onClick={onClose} style={{ position: 'absolute', top: 16, right: 16 }} className="w-8 h-8 rounded-lg hover:bg-white/10 flex items-center justify-center transition-all">
@@ -791,11 +801,18 @@ function WorkoutSummaryModal({ workoutName, startTime, isPending, onConfirm, onC
                 </div>
               </div>
             )}
+            <button
+              onClick={() => setShowSelfie(true)}
+              className="w-full flex items-center justify-center gap-2 py-3 mt-2 rounded-xl bg-violet-600 hover:bg-violet-700 active:bg-violet-800 text-white font-semibold transition-all"
+            >
+              <Camera className="w-4 h-4" /> Hora da Self! 📸
+            </button>
             <button onClick={onClose} className="btn-secondary w-full mt-2">Fechar</button>
           </>
         )}
       </div>
     </div>
+    </>
   );
 }
 
@@ -898,4 +915,280 @@ function generateWorkoutCard({ workoutName, dateStr, startStr, endStr, durationS
   ctx.textAlign = 'center'; ctx.fillText('Gerado com Fitlynutri', W / 2, H - 38);
 
   return canvas.toDataURL('image/png');
+}
+
+// ─── Selfie overlay renderer ──────────────────────────────────────────────────
+
+function drawSelfieOverlay(ctx: CanvasRenderingContext2D, w: number, h: number, info: {
+  workoutName: string; durationStr: string; intensity: string;
+  dayName: string; dateStr: string; timeStr: string;
+}) {
+  const scale = w / 1080;
+  const pad = scale * 52;
+
+  // Bottom gradient (covers ~30% of height)
+  const oH = h * 0.30;
+  const oY = h - oH;
+  const grad = ctx.createLinearGradient(0, oY, 0, h);
+  grad.addColorStop(0, 'rgba(0,0,0,0)');
+  grad.addColorStop(0.4, 'rgba(0,0,0,0.74)');
+  grad.addColorStop(1, 'rgba(0,0,0,0.93)');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, oY, w, oH);
+
+  // Purple accent line
+  const lineY = oY + scale * 4;
+  const lg = ctx.createLinearGradient(0, 0, w, 0);
+  lg.addColorStop(0, 'rgba(124,58,237,0)');
+  lg.addColorStop(0.15, '#7c3aed');
+  lg.addColorStop(0.85, '#a78bfa');
+  lg.addColorStop(1, 'rgba(167,139,250,0)');
+  ctx.strokeStyle = lg;
+  ctx.lineWidth = scale * 3.5;
+  ctx.beginPath(); ctx.moveTo(0, lineY); ctx.lineTo(w, lineY); ctx.stroke();
+
+  const y1 = oY + scale * 60;
+  const y2 = y1 + scale * 54;
+  const y3 = y2 + scale * 46;
+
+  // Row 1: App name | status
+  ctx.textAlign = 'left';
+  ctx.fillStyle = 'rgba(167,139,250,0.95)';
+  ctx.font = `600 ${Math.round(scale * 30)}px system-ui,sans-serif`;
+  ctx.fillText('Fitlynutri', pad, y1);
+
+  ctx.textAlign = 'right';
+  ctx.fillStyle = 'rgba(52,211,153,0.95)';
+  ctx.font = `600 ${Math.round(scale * 28)}px system-ui,sans-serif`;
+  ctx.fillText('✓ Treino Concluído', w - pad, y1);
+
+  // Row 2: Workout name | Duration
+  ctx.textAlign = 'left';
+  ctx.fillStyle = '#ffffff';
+  ctx.font = `bold ${Math.round(scale * 46)}px system-ui,sans-serif`;
+  const nameShort = info.workoutName.length > 20 ? info.workoutName.slice(0, 17) + '...' : info.workoutName;
+  ctx.fillText(nameShort, pad, y2);
+
+  ctx.textAlign = 'right';
+  ctx.fillStyle = 'rgba(255,255,255,0.85)';
+  ctx.font = `${Math.round(scale * 34)}px system-ui,sans-serif`;
+  ctx.fillText(`${info.durationStr} min`, w - pad, y2);
+
+  // Row 3: Day + Date + Time | Intensity
+  ctx.textAlign = 'left';
+  ctx.fillStyle = 'rgba(255,255,255,0.65)';
+  ctx.font = `${Math.round(scale * 28)}px system-ui,sans-serif`;
+  ctx.fillText(`${info.dayName}, ${info.dateStr} • ${info.timeStr}`, pad, y3);
+
+  if (info.intensity) {
+    ctx.textAlign = 'right';
+    ctx.fillStyle = 'rgba(255,255,255,0.55)';
+    ctx.font = `${Math.round(scale * 26)}px system-ui,sans-serif`;
+    ctx.fillText(info.intensity, w - pad, y3);
+  }
+}
+
+// ─── Selfie Modal ─────────────────────────────────────────────────────────────
+
+const DAY_NAMES = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
+
+function SelfieModal({ workoutName, durationStr, intensity, onClose }: {
+  workoutName: string;
+  durationStr: string;
+  intensity: string;
+  onClose: () => void;
+}) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const [facingMode, setFacingMode] = useState<'user' | 'environment'>('user');
+  const [capturedUrl, setCapturedUrl] = useState<string | null>(null);
+  const [cameraError, setCameraError] = useState(false);
+  const [isReady, setIsReady] = useState(false);
+
+  async function launchCamera(facing: 'user' | 'environment') {
+    streamRef.current?.getTracks().forEach((t) => t.stop());
+    streamRef.current = null;
+    setIsReady(false);
+    setCameraError(false);
+    if (!navigator.mediaDevices?.getUserMedia) { setCameraError(true); return; }
+    try {
+      const s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: facing }, audio: false });
+      streamRef.current = s;
+      if (videoRef.current) {
+        videoRef.current.srcObject = s;
+        videoRef.current.onloadedmetadata = () => {
+          videoRef.current?.play().then(() => setIsReady(true)).catch(() => setCameraError(true));
+        };
+      }
+    } catch {
+      setCameraError(true);
+    }
+  }
+
+  useEffect(() => {
+    launchCamera('user');
+    return () => streamRef.current?.getTracks().forEach((t) => t.stop());
+  }, []); // eslint-disable-line
+
+  function flipCamera() {
+    const next: 'user' | 'environment' = facingMode === 'user' ? 'environment' : 'user';
+    setFacingMode(next);
+    setCapturedUrl(null);
+    launchCamera(next);
+  }
+
+  function capture() {
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    if (!video || !canvas || !isReady) return;
+    const vw = video.videoWidth;
+    const vh = video.videoHeight;
+    if (!vw || !vh) return;
+    canvas.width = vw;
+    canvas.height = vh;
+    const ctx = canvas.getContext('2d')!;
+    if (facingMode === 'user') { ctx.translate(vw, 0); ctx.scale(-1, 1); }
+    ctx.drawImage(video, 0, 0, vw, vh);
+    if (facingMode === 'user') ctx.setTransform(1, 0, 0, 1, 0, 0);
+    const now = new Date();
+    drawSelfieOverlay(ctx, vw, vh, {
+      workoutName,
+      durationStr,
+      intensity,
+      dayName: DAY_NAMES[now.getDay()],
+      dateStr: now.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' }),
+      timeStr: now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+    });
+    streamRef.current?.getTracks().forEach((t) => t.stop());
+    streamRef.current = null;
+    setCapturedUrl(canvas.toDataURL('image/jpeg', 0.93));
+  }
+
+  function handleDownload() {
+    if (!capturedUrl) return;
+    const a = document.createElement('a');
+    a.href = capturedUrl;
+    a.download = `fitlynutri-self-${new Date().toISOString().split('T')[0]}.jpg`;
+    a.click();
+  }
+
+  async function handleShare() {
+    if (!capturedUrl) return;
+    try {
+      const blob = await fetch(capturedUrl).then((r) => r.blob());
+      const file = new File([blob], 'fitlynutri-self.jpg', { type: 'image/jpeg' });
+      if (navigator.share && navigator.canShare?.({ files: [file] })) {
+        await navigator.share({ files: [file], title: 'Hora da Self! 💪', text: `Finalizei: ${workoutName} — Fitlynutri` });
+        return;
+      }
+    } catch {}
+    handleDownload();
+  }
+
+  function handleClose() {
+    streamRef.current?.getTracks().forEach((t) => t.stop());
+    onClose();
+  }
+
+  return (
+    <div className="fixed inset-0 z-[99999] bg-black flex flex-col select-none">
+      {/* Header */}
+      <div className="absolute top-0 left-0 right-0 z-10 flex items-center justify-between px-4 py-3"
+        style={{ background: 'linear-gradient(to bottom, rgba(0,0,0,0.75) 0%, transparent 100%)' }}>
+        <h2 className="font-bold text-lg flex items-center gap-2 text-white">
+          <Camera className="w-5 h-5 text-violet-400" />
+          Hora da Self!
+        </h2>
+        <button
+          onClick={handleClose}
+          className="w-9 h-9 rounded-full bg-black/40 border border-white/20 flex items-center justify-center"
+        >
+          <X className="w-4 h-4 text-white" />
+        </button>
+      </div>
+
+      {/* Camera / photo view */}
+      <div className="flex-1 relative overflow-hidden">
+        {cameraError ? (
+          <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-8">
+            <Camera className="w-16 h-16 text-white/30 mb-4" />
+            <p className="font-semibold text-white">Câmera não disponível</p>
+            <p className="text-sm text-white/50 mt-2">Permita o acesso à câmera nas configurações do navegador e recarregue a página.</p>
+          </div>
+        ) : capturedUrl ? (
+          <img src={capturedUrl} alt="Sua self" className="absolute inset-0 w-full h-full object-contain" />
+        ) : (
+          <>
+            <video
+              ref={videoRef}
+              autoPlay
+              playsInline
+              muted
+              className="absolute inset-0 w-full h-full object-cover"
+              style={{ transform: facingMode === 'user' ? 'scaleX(-1)' : 'none' }}
+            />
+            {!isReady && (
+              <div className="absolute inset-0 flex items-center justify-center">
+                <p className="text-white/60 text-sm">Iniciando câmera...</p>
+              </div>
+            )}
+          </>
+        )}
+        <canvas ref={canvasRef} className="hidden" />
+      </div>
+
+      {/* Controls */}
+      <div
+        className="px-6 pb-10 pt-4"
+        style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.95) 70%, transparent 100%)' }}
+      >
+        {!capturedUrl ? (
+          <div className="flex items-center justify-between">
+            <div className="w-12" />
+            {/* Capture button */}
+            <button
+              onClick={capture}
+              disabled={!isReady || cameraError}
+              className="w-20 h-20 rounded-full border-4 border-white flex items-center justify-center disabled:opacity-30 active:scale-95 transition-transform"
+            >
+              <div className="w-14 h-14 rounded-full bg-white" />
+            </button>
+            {/* Flip camera */}
+            <button
+              onClick={flipCamera}
+              disabled={cameraError}
+              className="w-12 h-12 rounded-full bg-white/15 border border-white/20 flex items-center justify-center disabled:opacity-30"
+            >
+              <SwitchCamera className="w-5 h-5 text-white" />
+            </button>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            <p className="text-center text-sm text-white/70 mb-2">Sua self está pronta! 💪</p>
+            <div className="flex gap-3">
+              <button
+                onClick={handleDownload}
+                className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl border border-white/20 text-white text-sm font-medium active:bg-white/10 transition-colors"
+              >
+                <Download className="w-4 h-4" /> Salvar
+              </button>
+              <button
+                onClick={handleShare}
+                className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl bg-violet-600 hover:bg-violet-700 text-white text-sm font-medium transition-colors"
+              >
+                <Share2 className="w-4 h-4" /> Compartilhar
+              </button>
+            </div>
+            <button
+              onClick={() => { setCapturedUrl(null); launchCamera(facingMode); }}
+              className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-white/10 text-white text-sm"
+            >
+              <RotateCcw className="w-3.5 h-3.5" /> Tirar novamente
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
 }
