@@ -289,6 +289,11 @@ export default function StudentWorkout() {
         {selectedPlan ? (
           // ── DETAIL VIEW ──────────────────────────────────────────────────
           <>
+            {/* Music player — sticky at top */}
+            <div className="sticky top-0 z-20 -mx-4 sm:-mx-6 px-4 sm:px-6 pt-3 pb-2 bg-background/95 backdrop-blur-sm border-b border-border/40">
+              <WorkoutMusicPlayer />
+            </div>
+
             {/* Header */}
             <div className="flex items-center gap-3">
               <button
@@ -337,9 +342,6 @@ export default function StudentWorkout() {
                 <Timer className="w-4 h-4" />Em andamento
               </div>
             )}
-
-            {/* Music player */}
-            <WorkoutMusicPlayer />
 
             {/* Exercise list */}
             <div className="space-y-3">
@@ -585,35 +587,15 @@ interface MusicResult {
   author: string;
 }
 
-// Public Invidious instances — tried in order until one responds
-const INVIDIOUS = [
-  'https://inv.nadeko.net',
-  'https://invidious.fdn.fr',
-  'https://yt.cdaut.de',
-];
-
 async function searchYouTube(query: string): Promise<MusicResult[]> {
-  for (const base of INVIDIOUS) {
-    try {
-      const ctrl = new AbortController();
-      const tid = setTimeout(() => ctrl.abort(), 5000);
-      const res = await fetch(
-        `${base}/api/v1/search?q=${encodeURIComponent(query)}&type=video&fields=videoId,title,author`,
-        { signal: ctrl.signal },
-      );
-      clearTimeout(tid);
-      if (!res.ok) continue;
-      const data = await res.json();
-      if (!Array.isArray(data) || !data.length) continue;
-      return data.slice(0, 12).map((v: any) => ({
-        videoId: v.videoId ?? '',
-        title: v.title ?? '—',
-        thumbnail: `https://img.youtube.com/vi/${v.videoId}/mqdefault.jpg`,
-        author: v.author ?? '',
-      })).filter((v) => v.videoId);
-    } catch {}
+  try {
+    const res = await api.get(`/music/search?q=${encodeURIComponent(query)}`);
+    const data = res.data.data ?? res.data;
+    if (!Array.isArray(data)) return [];
+    return data.filter((v: any) => v.videoId);
+  } catch {
+    return [];
   }
-  return [];
 }
 
 const MUSIC_GENRES = [
