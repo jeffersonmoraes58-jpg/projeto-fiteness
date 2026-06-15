@@ -4,6 +4,7 @@ import {
   Get,
   Patch,
   Body,
+  Query,
   UseGuards,
   Req,
   HttpCode,
@@ -98,6 +99,22 @@ export class AuthController {
   @ApiOperation({ summary: 'Enviar email de boas-vindas ao aluno' })
   async sendWelcome(@Body() body: { to: string; studentName: string; trainerName: string; tempPassword: string; anamneseType?: string; studentUserId?: string }) {
     return this.emailService.sendStudentWelcome(body);
+  }
+
+  @Post('invite-link')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Gerar link de convite para aluno se cadastrar' })
+  async generateInviteLink(@CurrentUser() user: any) {
+    return this.authService.generateInviteLink(user.id);
+  }
+
+  @Public()
+  @Get('invite/validate')
+  @ApiOperation({ summary: 'Validar token de convite (público)' })
+  async validateInvite(@Query('token') token: string) {
+    return this.authService.validateInviteToken(token);
   }
 
   @Patch('change-password')
