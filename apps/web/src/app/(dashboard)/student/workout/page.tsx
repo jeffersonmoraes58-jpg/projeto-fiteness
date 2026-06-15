@@ -1003,26 +1003,48 @@ function SelfieModal({ workoutName, durationStr, intensity, onClose }: {
   const streamRef = useRef<MediaStream | null>(null);
   const [facingMode, setFacingMode] = useState<'user' | 'environment'>('user');
   const [capturedUrl, setCapturedUrl] = useState<string | null>(null);
-  const [cameraError, setCameraError] = useState(false);
+  const [cameraErrorMsg, setCameraErrorMsg] = useState<string | null>(null);
   const [isReady, setIsReady] = useState(false);
 
   async function launchCamera(facing: 'user' | 'environment') {
     streamRef.current?.getTracks().forEach((t) => t.stop());
     streamRef.current = null;
     setIsReady(false);
-    setCameraError(false);
-    if (!navigator.mediaDevices?.getUserMedia) { setCameraError(true); return; }
+    setCameraErrorMsg(null);
+
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setCameraErrorMsg('Seu navegador não suporta câmera. Tente abrir no Chrome ou Safari.');
+      return;
+    }
+
     try {
-      const s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: facing }, audio: false });
+      // tenta com câmera preferida; se falhar, tenta qualquer câmera disponível
+      let s: MediaStream;
+      try {
+        s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: facing }, audio: false });
+      } catch {
+        s = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+      }
       streamRef.current = s;
       if (videoRef.current) {
         videoRef.current.srcObject = s;
         videoRef.current.onloadedmetadata = () => {
-          videoRef.current?.play().then(() => setIsReady(true)).catch(() => setCameraError(true));
+          videoRef.current?.play()
+            .then(() => setIsReady(true))
+            .catch(() => setCameraErrorMsg('Erro ao iniciar o vídeo. Tente fechar outros apps que usam a câmera.'));
         };
       }
-    } catch {
-      setCameraError(true);
+    } catch (err: any) {
+      const name: string = err?.name ?? '';
+      if (name === 'NotAllowedError' || name === 'PermissionDeniedError') {
+        setCameraErrorMsg('Permissão de câmera negada.\n\nNo Chrome: toque no ícone de câmera 🔒 na barra de endereços e selecione "Permitir".\n\nNo Safari: Ajustes › Safari › Câmera › Permitir.');
+      } else if (name === 'NotFoundError' || name === 'DevicesNotFoundError') {
+        setCameraErrorMsg('Nenhuma câmera encontrada neste dispositivo.');
+      } else if (name === 'NotReadableError' || name === 'TrackStartError') {
+        setCameraErrorMsg('A câmera está em uso por outro aplicativo. Feche-o e tente novamente.');
+      } else {
+        setCameraErrorMsg('Não foi possível acessar a câmera. Verifique as permissões e tente novamente.');
+      }
     }
   }
 
@@ -1110,11 +1132,17 @@ function SelfieModal({ workoutName, durationStr, intensity, onClose }: {
 
       {/* Camera / photo view */}
       <div className="flex-1 relative overflow-hidden">
-        {cameraError ? (
+        {cameraErrorMsg ? (
           <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-8">
-            <Camera className="w-16 h-16 text-white/30 mb-4" />
-            <p className="font-semibold text-white">Câmera não disponível</p>
-            <p className="text-sm text-white/50 mt-2">Permita o acesso à câmera nas configurações do navegador e recarregue a página.</p>
+            <Camera className="w-14 h-14 text-white/25 mb-5" />
+            <p className="font-bold text-white text-base mb-3">Câmera não disponível</p>
+            <p className="text-sm text-white/60 whitespace-pre-line leading-relaxed">{cameraErrorMsg}</p>
+            <button
+              onClick={() => launchCamera(facingMode)}
+              className="mt-6 px-5 py-2.5 rounded-xl bg-violet-600 text-white text-sm font-semibold"
+            >
+              Tentar novamente
+            </button>
           </div>
         ) : capturedUrl ? (
           <img src={capturedUrl} alt="Sua self" className="absolute inset-0 w-full h-full object-contain" />
@@ -1128,7 +1156,7 @@ function SelfieModal({ workoutName, durationStr, intensity, onClose }: {
               className="absolute inset-0 w-full h-full object-cover"
               style={{ transform: facingMode === 'user' ? 'scaleX(-1)' : 'none' }}
             />
-            {!isReady && (
+            {!isReady && !cameraErrorMsg && (
               <div className="absolute inset-0 flex items-center justify-center">
                 <p className="text-white/60 text-sm">Iniciando câmera...</p>
               </div>
@@ -1149,7 +1177,7 @@ function SelfieModal({ workoutName, durationStr, intensity, onClose }: {
             {/* Capture button */}
             <button
               onClick={capture}
-              disabled={!isReady || cameraError}
+              disabled={!isReady || !!cameraErrorMsg}
               className="w-20 h-20 rounded-full border-4 border-white flex items-center justify-center disabled:opacity-30 active:scale-95 transition-transform"
             >
               <div className="w-14 h-14 rounded-full bg-white" />
@@ -1157,7 +1185,7 @@ function SelfieModal({ workoutName, durationStr, intensity, onClose }: {
             {/* Flip camera */}
             <button
               onClick={flipCamera}
-              disabled={cameraError}
+              disabled={!!cameraErrorMsg}
               className="w-12 h-12 rounded-full bg-white/15 border border-white/20 flex items-center justify-center disabled:opacity-30"
             >
               <SwitchCamera className="w-5 h-5 text-white" />
