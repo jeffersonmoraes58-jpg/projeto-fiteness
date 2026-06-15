@@ -3,12 +3,14 @@ import '@fontsource-variable/inter';
 import { ThemeProvider } from '@/components/providers/theme-provider';
 import { QueryProvider } from '@/components/providers/query-provider';
 import { Toaster } from 'react-hot-toast';
+import { PwaRegister } from '@/components/pwa-register';
 import './globals.css';
 
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
   maximumScale: 1,
+  themeColor: '#7c3aed',
 };
 
 export const metadata: Metadata = {
@@ -20,6 +22,12 @@ export const metadata: Metadata = {
     'Plataforma SaaS completa para personal trainers, nutricionistas e academias. Gerencie treinos, dietas e evolução dos seus alunos com IA.',
   keywords: ['fitness', 'personal trainer', 'nutricionista', 'academia', 'treino', 'dieta'],
   authors: [{ name: 'Fitlynutri' }],
+  manifest: '/manifest.json',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'black-translucent',
+    title: 'Fitlynutri',
+  },
   openGraph: {
     type: 'website',
     locale: 'pt_BR',
@@ -34,6 +42,10 @@ export const metadata: Metadata = {
     description: 'Plataforma SaaS Fitness com IA',
   },
   robots: { index: true, follow: true },
+  icons: {
+    apple: '/icons/icon-192.png',
+    icon: '/icons/icon-192.png',
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -56,6 +68,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             />
           </QueryProvider>
         </ThemeProvider>
+        <PwaRegister />
       </body>
     </html>
   );
