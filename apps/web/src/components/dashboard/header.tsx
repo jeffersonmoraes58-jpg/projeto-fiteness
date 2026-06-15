@@ -115,10 +115,10 @@ export function DashboardHeader() {
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: 8, scale: 0.95 }}
                 transition={{ duration: 0.15 }}
-                className="absolute right-0 top-12 w-80 max-w-[calc(100vw-2rem)] bg-card border border-border rounded-2xl shadow-2xl z-50 overflow-hidden"
+                className="fixed left-2 right-2 top-[4.25rem] sm:absolute sm:left-auto sm:right-0 sm:top-12 sm:w-80 bg-card border border-border rounded-2xl shadow-2xl z-50 overflow-hidden flex flex-col max-h-[calc(100vh-5rem)] sm:max-h-[calc(100vh-6rem)]"
               >
                 {/* Header */}
-                <div className="flex items-center justify-between px-4 py-3 border-b border-border/50">
+                <div className="flex items-center justify-between px-4 py-3 border-b border-border/50 flex-shrink-0">
                   <span className="font-semibold text-sm">Notificações</span>
                   {hasUnread && (
                     <button
@@ -133,7 +133,7 @@ export function DashboardHeader() {
                 </div>
 
                 {/* List */}
-                <div className="max-h-80 overflow-y-auto scrollbar-hide divide-y divide-border/30">
+                <div className="overflow-y-auto scrollbar-hide divide-y divide-border/30 flex-1">
                   {notifList.length === 0 ? (
                     <div className="py-10 flex flex-col items-center gap-2">
                       <Bell className="w-8 h-8 text-muted-foreground" />
