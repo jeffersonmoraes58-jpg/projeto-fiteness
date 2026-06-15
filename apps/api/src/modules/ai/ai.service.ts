@@ -12,7 +12,10 @@ export class AiService {
     private config: ConfigService,
     private prisma: PrismaService,
   ) {
-    this.openai = new OpenAI({ apiKey: config.get('OPENAI_API_KEY') });
+    this.openai = new OpenAI({
+      apiKey: config.get('GEMINI_API_KEY'),
+      baseURL: 'https://generativelanguage.googleapis.com/v1beta/openai/',
+    });
   }
 
   async generateWorkout(description: string, userId: string) {
@@ -63,7 +66,7 @@ Regras:
 - Se não encontrar exercício adequado na lista, substitua por um similar disponível`;
 
     const response = await this.openai.chat.completions.create({
-      model: this.config.get('OPENAI_MODEL', 'gpt-4o'),
+      model: this.config.get('GEMINI_MODEL', 'gemini-2.0-flash'),
       messages: [{ role: 'user', content: prompt }],
       response_format: { type: 'json_object' },
       max_tokens: 2500,
@@ -153,7 +156,7 @@ Regras:
     `;
 
     const response = await this.openai.chat.completions.create({
-      model: this.config.get('OPENAI_MODEL', 'gpt-4o'),
+      model: this.config.get('GEMINI_MODEL', 'gemini-2.0-flash'),
       messages: [{ role: 'user', content: prompt }],
       response_format: { type: 'json_object' },
       max_tokens: 2000,
@@ -207,7 +210,7 @@ Regras:
     `;
 
     const response = await this.openai.chat.completions.create({
-      model: this.config.get('OPENAI_MODEL', 'gpt-4o'),
+      model: this.config.get('GEMINI_MODEL', 'gemini-2.0-flash'),
       messages: [{ role: 'user', content: prompt }],
       response_format: { type: 'json_object' },
       max_tokens: 3000,
@@ -232,7 +235,7 @@ Regras:
     `;
 
     const response = await this.openai.chat.completions.create({
-      model: this.config.get('OPENAI_MODEL', 'gpt-4o'),
+      model: this.config.get('GEMINI_MODEL', 'gemini-2.0-flash'),
       messages: [{ role: 'user', content: prompt }],
       max_tokens: 150,
     });
@@ -258,7 +261,7 @@ Regras:
     `;
 
     const response = await this.openai.chat.completions.create({
-      model: this.config.get('OPENAI_MODEL', 'gpt-4o'),
+      model: this.config.get('GEMINI_MODEL', 'gemini-2.0-flash'),
       messages: [{ role: 'user', content: prompt }],
       response_format: { type: 'json_object' },
       max_tokens: 1000,
@@ -289,7 +292,7 @@ Resumo do que foi configurado acima: adapte 100% das suas respostas ao perfil, t
     ];
 
     const response = await this.openai.chat.completions.create({
-      model: this.config.get('OPENAI_MODEL', 'gpt-4o'),
+      model: this.config.get('GEMINI_MODEL', 'gemini-2.0-flash'),
       messages,
       max_tokens: 1200,
     });
@@ -302,7 +305,7 @@ Resumo do que foi configurado acima: adapte 100% das suas respostas ao perfil, t
 
   async analyzeProgressPhoto(photoUrl: string) {
     const response = await this.openai.chat.completions.create({
-      model: 'gpt-4o',
+      model: this.config.get('GEMINI_MODEL', 'gemini-2.0-flash'),
       messages: [
         {
           role: 'user',
