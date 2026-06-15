@@ -390,7 +390,7 @@ export default function TrainerWorkouts() {
 
               {/* Template cards — horizontal scroll */}
               <div className="relative">
-                <div className="overflow-x-auto px-6 pb-5 pt-3 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
+                <div className="overflow-x-auto px-6 pb-5 pt-3 scrollbar-hide">
                   <div className="flex gap-4" style={{ width: 'max-content' }}>
                     {visibleTemplates.map((template, i) => (
                       <TemplateCard
