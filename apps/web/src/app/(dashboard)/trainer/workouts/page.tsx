@@ -346,7 +346,7 @@ export default function TrainerWorkouts() {
       </div>
 
       {/* Templates Section */}
-      <div className="glass-card !p-0">
+      <div className="glass-card !p-0 overflow-hidden">
         <button
           onClick={() => setTemplatesOpen(!templatesOpen)}
           className="w-full flex items-center justify-between px-6 py-4 hover:bg-accent/30 transition-all"
@@ -392,7 +392,7 @@ export default function TrainerWorkouts() {
               <div className="relative">
                 <div
                   className="overflow-x-auto px-4 sm:px-6 pb-4 pt-3 scrollbar-hide"
-                  style={{ WebkitOverflowScrolling: 'touch' }}
+                  style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-x' }}
                 >
                   <div className="flex gap-3 sm:gap-4" style={{ width: 'max-content' }}>
                     {visibleTemplates.map((template, i) => (
