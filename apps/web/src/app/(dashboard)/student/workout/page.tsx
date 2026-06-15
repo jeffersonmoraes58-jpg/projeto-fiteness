@@ -6,6 +6,7 @@ import {
   Dumbbell, Play, CheckCircle2, Clock, ChevronLeft,
   Flame, RotateCcw, Timer, ChevronRight,
   X, PlayCircle, Trophy, Share2, Download, Camera, SwitchCamera,
+  Music, ChevronUp, ChevronDown, ExternalLink,
 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
@@ -337,6 +338,9 @@ export default function StudentWorkout() {
               </div>
             )}
 
+            {/* Music player */}
+            <WorkoutMusicPlayer />
+
             {/* Exercise list */}
             <div className="space-y-3">
               {groupExercises(planExercises).map((group, gi) => {
@@ -562,6 +566,97 @@ export default function StudentWorkout() {
         )}
       </div>
     </>
+  );
+}
+
+// ─── Workout Music Player ────────────────────────────────────────────────────
+
+function getMusicEmbedUrl(rawUrl: string): string | null {
+  if (!rawUrl.trim()) return null;
+  const listMatch = rawUrl.match(/[?&]list=([^&]+)/);
+  const vidMatch = rawUrl.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&\n?#]+)/);
+  if (listMatch && vidMatch) return `https://www.youtube.com/embed/${vidMatch[1]}?list=${listMatch[1]}&autoplay=1&rel=0`;
+  if (listMatch) return `https://www.youtube.com/embed/videoseries?list=${listMatch[1]}&autoplay=1&rel=0`;
+  if (vidMatch) return `https://www.youtube.com/embed/${vidMatch[1]}?autoplay=1&rel=0`;
+  return null;
+}
+
+const MUSIC_GENRES = [
+  { label: '🔥 Treino', q: 'musculação treino playlist 2024' },
+  { label: '⚡ HIIT', q: 'HIIT workout music playlist' },
+  { label: '🎧 EDM', q: 'EDM gym music playlist 2024' },
+  { label: '🎸 Rock', q: 'rock workout music playlist' },
+  { label: '🇧🇷 Funk', q: 'funk carioca treino playlist' },
+];
+
+function WorkoutMusicPlayer() {
+  const [open, setOpen] = useState(true);
+  const [url, setUrl] = useState('');
+  const [activeUrl, setActiveUrl] = useState('');
+
+  const embedUrl = getMusicEmbedUrl(activeUrl);
+
+  function handlePlay() {
+    if (!url.trim()) return;
+    setActiveUrl(url.trim());
+  }
+
+  return (
+    <div className="glass-card overflow-hidden">
+      <button onClick={() => setOpen((o) => !o)} className="w-full flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <div className="w-7 h-7 rounded-lg bg-violet-500/20 flex items-center justify-center">
+            <Music className="w-3.5 h-3.5 text-violet-400" />
+          </div>
+          <span className="text-sm font-semibold">
+            {embedUrl ? '🎵 Em reprodução' : 'Música de treino'}
+          </span>
+        </div>
+        {open ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
+      </button>
+
+      {open && (
+        <div className="mt-4 space-y-3">
+          <div className="flex gap-2">
+            <input
+              type="text"
+              placeholder="Cole o link do YouTube aqui..."
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') handlePlay(); }}
+              className="input-field flex-1 text-sm"
+            />
+            <button onClick={handlePlay} className="btn-primary text-sm px-3 flex-shrink-0">
+              Tocar
+            </button>
+          </div>
+
+          <div className="flex flex-wrap gap-1.5">
+            {MUSIC_GENRES.map((g) => (
+              <button
+                key={g.label}
+                onClick={() => window.open(`https://www.youtube.com/results?search_query=${encodeURIComponent(g.q)}`, '_blank')}
+                className="text-xs px-3 py-1.5 rounded-full glass hover:bg-accent transition-all flex items-center gap-1"
+              >
+                {g.label} <ExternalLink className="w-2.5 h-2.5 opacity-50" />
+              </button>
+            ))}
+          </div>
+
+          {embedUrl && (
+            <div className="relative rounded-xl overflow-hidden" style={{ paddingBottom: '56.25%' }}>
+              <iframe
+                key={embedUrl}
+                src={embedUrl}
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
+                className="absolute inset-0 w-full h-full border-0"
+              />
+            </div>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
 
