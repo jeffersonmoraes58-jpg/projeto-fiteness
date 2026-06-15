@@ -389,22 +389,26 @@ export default function TrainerWorkouts() {
               </div>
 
               {/* Template cards — horizontal scroll */}
-              <div className="overflow-x-auto px-6 pb-5 pt-3 scrollbar-hide">
-                <div className="flex gap-4" style={{ width: 'max-content' }}>
-                  {visibleTemplates.map((template, i) => (
-                    <TemplateCard
-                      key={template.id}
-                      template={template}
-                      index={i}
-                      isExpanded={selectedTemplateId === template.id}
-                      isLoading={usingTemplateId === template.id}
-                      onToggle={() => setSelectedTemplateId(
-                        selectedTemplateId === template.id ? null : template.id
-                      )}
-                      onUse={() => handleUseTemplate(template)}
-                    />
-                  ))}
+              <div className="relative">
+                <div className="overflow-x-auto px-6 pb-5 pt-3 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
+                  <div className="flex gap-4" style={{ width: 'max-content' }}>
+                    {visibleTemplates.map((template, i) => (
+                      <TemplateCard
+                        key={template.id}
+                        template={template}
+                        index={i}
+                        isExpanded={selectedTemplateId === template.id}
+                        isLoading={usingTemplateId === template.id}
+                        onToggle={() => setSelectedTemplateId(
+                          selectedTemplateId === template.id ? null : template.id
+                        )}
+                        onUse={() => handleUseTemplate(template)}
+                      />
+                    ))}
+                  </div>
                 </div>
+                {/* fade hint right edge */}
+                <div className="pointer-events-none absolute top-0 right-0 h-full w-12 bg-gradient-to-l from-card to-transparent" />
               </div>
             </motion.div>
           )}
@@ -633,10 +637,14 @@ function TemplateCard({
     <motion.div
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: index * 0.05 }}
+      whileHover={!isExpanded ? { y: -4, scale: 1.02 } : {}}
+      transition={{ delay: index * 0.05, type: 'spring', stiffness: 300, damping: 20 }}
       className={cn(
-        'w-52 rounded-2xl flex-shrink-0 overflow-hidden border transition-all cursor-pointer',
-        isExpanded ? 'border-primary/40 bg-primary/5' : 'glass border-border/40 hover:border-border',
+        'w-52 rounded-2xl flex-shrink-0 overflow-hidden border cursor-pointer',
+        'transition-colors duration-200',
+        isExpanded
+          ? 'border-primary/50 bg-primary/5 shadow-lg shadow-primary/10'
+          : 'glass border-border/40 hover:border-primary/30 hover:shadow-lg hover:shadow-black/20',
       )}
       onClick={onToggle}
     >
