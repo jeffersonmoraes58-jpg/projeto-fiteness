@@ -51,7 +51,8 @@
     "socket.io": "^4.7.5",
     "stripe": "^15.9.0",
     "swagger-ui-express": "^5.0.1",
-    "uuid": "^10.0.0"
+    "uuid": "^10.0.0",
+    "yt-search": "^2.13.1"
   },
   "devDependencies": {
     "@nestjs/cli": "^10.3.2",

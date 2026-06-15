@@ -25,6 +25,7 @@ import { TenantsModule } from './modules/tenants/tenants.module';
 import { UploadsModule } from './modules/uploads/uploads.module';
 import { BillingModule } from './modules/billing/billing.module';
 import { EmailModule } from './modules/email/email.module';
+import { MusicModule } from './modules/music/music.module';
 
 @Module({
   imports: [
@@ -72,6 +73,7 @@ import { EmailModule } from './modules/email/email.module';
     UploadsModule,
     BillingModule,
     EmailModule,
+    MusicModule,
   ],
 })
 export class AppModule {}
