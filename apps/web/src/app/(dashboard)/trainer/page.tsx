@@ -34,7 +34,9 @@ export default function TrainerDashboard() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold">Dashboard</h1>
-          <p className="text-muted-foreground text-sm mt-1">Segunda-feira, 12 de Maio de 2025</p>
+          <p className="text-muted-foreground text-sm mt-1 capitalize">
+            {new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+          </p>
         </div>
         <div className="flex flex-wrap gap-2 self-start sm:self-auto">
           <Link href="/trainer/students/new" className="btn-secondary flex items-center gap-2 text-sm py-2 px-4">
