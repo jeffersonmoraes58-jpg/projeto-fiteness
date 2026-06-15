@@ -6,7 +6,7 @@ import {
   Dumbbell, Play, CheckCircle2, Clock, ChevronLeft,
   Flame, RotateCcw, Timer, ChevronRight,
   X, PlayCircle, Trophy, Share2, Download, Camera, SwitchCamera,
-  Music, ChevronUp, ChevronDown, ExternalLink,
+  Music, ChevronUp, ChevronDown, ExternalLink, Loader2,
 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
@@ -578,6 +578,44 @@ declare global {
   }
 }
 
+interface MusicResult {
+  videoId: string;
+  title: string;
+  thumbnail: string;
+  author: string;
+}
+
+// Public Invidious instances — tried in order until one responds
+const INVIDIOUS = [
+  'https://inv.nadeko.net',
+  'https://invidious.fdn.fr',
+  'https://yt.cdaut.de',
+];
+
+async function searchYouTube(query: string): Promise<MusicResult[]> {
+  for (const base of INVIDIOUS) {
+    try {
+      const ctrl = new AbortController();
+      const tid = setTimeout(() => ctrl.abort(), 5000);
+      const res = await fetch(
+        `${base}/api/v1/search?q=${encodeURIComponent(query)}&type=video&fields=videoId,title,author`,
+        { signal: ctrl.signal },
+      );
+      clearTimeout(tid);
+      if (!res.ok) continue;
+      const data = await res.json();
+      if (!Array.isArray(data) || !data.length) continue;
+      return data.slice(0, 12).map((v: any) => ({
+        videoId: v.videoId ?? '',
+        title: v.title ?? '—',
+        thumbnail: `https://img.youtube.com/vi/${v.videoId}/mqdefault.jpg`,
+        author: v.author ?? '',
+      })).filter((v) => v.videoId);
+    } catch {}
+  }
+  return [];
+}
+
 const MUSIC_GENRES = [
   { label: '🔥 Treino', q: 'musculação treino música 2024' },
   { label: '⚡ HIIT', q: 'HIIT workout music high energy' },
@@ -589,7 +627,11 @@ const MUSIC_GENRES = [
 function WorkoutMusicPlayer() {
   const [open, setOpen] = useState(true);
   const [searchInput, setSearchInput] = useState('');
-  const [currentSearch, setCurrentSearch] = useState('');
+  const [results, setResults] = useState<MusicResult[]>([]);
+  const [searching, setSearching] = useState(false);
+  const [searchErr, setSearchErr] = useState(false);
+  const [currentId, setCurrentId] = useState('');
+  const [currentTitle, setCurrentTitle] = useState('');
   const [playerReady, setPlayerReady] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const playerDivRef = useRef<HTMLDivElement>(null);
@@ -627,10 +669,24 @@ function WorkoutMusicPlayer() {
     return () => { playerRef.current?.destroy(); playerRef.current = null; };
   }, []);
 
-  function search(q: string) {
-    if (!q.trim() || !playerRef.current || !playerReady) return;
-    playerRef.current.loadVideosByQuery(q.trim(), 0);
-    setCurrentSearch(q.trim());
+  async function handleSearch(q: string) {
+    if (!q.trim()) return;
+    setSearching(true);
+    setSearchErr(false);
+    setResults([]);
+    const found = await searchYouTube(q.trim());
+    setResults(found);
+    setSearchErr(found.length === 0);
+    setSearching(false);
+    if (found.length > 0) playVideo(found[0]);
+  }
+
+  function playVideo(v: MusicResult) {
+    setCurrentId(v.videoId);
+    setCurrentTitle(v.title);
+    if (playerRef.current && playerReady) {
+      playerRef.current.loadVideoById(v.videoId);
+    }
   }
 
   return (
@@ -640,39 +696,42 @@ function WorkoutMusicPlayer() {
           <div className="w-7 h-7 rounded-lg bg-violet-500/20 flex items-center justify-center">
             <Music className="w-3.5 h-3.5 text-violet-400" />
           </div>
-          <span className="text-sm font-semibold">
-            {isPlaying ? '🎵 Em reprodução' : 'Música de treino'}
+          <span className="text-sm font-semibold truncate max-w-[200px]">
+            {isPlaying && currentTitle ? `🎵 ${currentTitle}` : 'Música de treino'}
           </span>
         </div>
-        {open ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
+        {open ? <ChevronUp className="w-4 h-4 text-muted-foreground flex-shrink-0" /> : <ChevronDown className="w-4 h-4 text-muted-foreground flex-shrink-0" />}
       </button>
 
-      {/* Kept in DOM even when collapsed so the player state is preserved */}
+      {/* Kept in DOM even when collapsed to preserve player state */}
       <div className={cn('mt-4 space-y-3', !open && 'hidden')}>
+        {/* Search input */}
         <div className="flex gap-2">
           <input
             type="text"
-            placeholder="Pesquisar música no YouTube..."
+            placeholder="Pesquisar músicas ou artistas..."
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter') search(searchInput); }}
+            onKeyDown={(e) => { if (e.key === 'Enter') handleSearch(searchInput); }}
             className="input-field flex-1 text-sm"
           />
           <button
-            onClick={() => search(searchInput)}
-            disabled={!playerReady}
-            className="btn-primary text-sm px-3 flex-shrink-0 disabled:opacity-50"
+            onClick={() => handleSearch(searchInput)}
+            disabled={searching}
+            className="btn-primary text-sm px-3 flex-shrink-0 disabled:opacity-50 flex items-center gap-1.5"
           >
+            {searching && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
             Buscar
           </button>
         </div>
 
+        {/* Genre chips */}
         <div className="flex flex-wrap gap-1.5">
           {MUSIC_GENRES.map((g) => (
             <button
               key={g.label}
-              disabled={!playerReady}
-              onClick={() => { setSearchInput(g.q); search(g.q); }}
+              disabled={searching}
+              onClick={() => { setSearchInput(g.q); handleSearch(g.q); }}
               className="text-xs px-3 py-1.5 rounded-full glass hover:bg-accent transition-all disabled:opacity-40"
             >
               {g.label}
@@ -680,7 +739,43 @@ function WorkoutMusicPlayer() {
           ))}
         </div>
 
-        {/* YouTube IFrame Player API container */}
+        {/* Search status */}
+        {searching && (
+          <div className="flex items-center justify-center gap-2 py-3 text-muted-foreground text-sm">
+            <Loader2 className="w-4 h-4 animate-spin" /> Buscando...
+          </div>
+        )}
+        {searchErr && !searching && (
+          <p className="text-xs text-center text-muted-foreground py-2">
+            Nenhum resultado. Tente outro termo.
+          </p>
+        )}
+
+        {/* Result thumbnails — horizontal scroll */}
+        {results.length > 0 && !searching && (
+          <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' } as React.CSSProperties}>
+            {results.map((v) => (
+              <button
+                key={v.videoId}
+                onClick={() => playVideo(v)}
+                className={cn(
+                  'flex-shrink-0 w-36 rounded-xl overflow-hidden text-left transition-all border',
+                  currentId === v.videoId
+                    ? 'border-primary/60 ring-1 ring-primary/40'
+                    : 'border-transparent opacity-65 hover:opacity-100',
+                )}
+              >
+                <img src={v.thumbnail} alt={v.title} className="w-full aspect-video object-cover" loading="lazy" />
+                <div className="px-2 py-1.5 bg-white/5">
+                  <p className="text-[11px] font-medium line-clamp-2 leading-tight">{v.title}</p>
+                  <p className="text-[10px] text-muted-foreground mt-0.5 truncate">{v.author}</p>
+                </div>
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* YouTube IFrame Player */}
         <div className="relative rounded-xl overflow-hidden bg-black" style={{ paddingBottom: '56.25%', height: 0 }}>
           <div ref={playerDivRef} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }} />
           {!playerReady && (
@@ -688,7 +783,7 @@ function WorkoutMusicPlayer() {
               <p className="text-white/40 text-sm">Carregando player...</p>
             </div>
           )}
-          {playerReady && !currentSearch && (
+          {playerReady && !currentId && (
             <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-black/90 pointer-events-none">
               <Music className="w-10 h-10 text-white/20" />
               <p className="text-white/40 text-sm">Pesquise uma música acima</p>
@@ -696,10 +791,11 @@ function WorkoutMusicPlayer() {
           )}
         </div>
 
-        {currentSearch && (
+        {/* Open in YouTube for locked-screen background play */}
+        {currentId && (
           <>
             <button
-              onClick={() => window.open(`https://www.youtube.com/results?search_query=${encodeURIComponent(currentSearch)}`, '_blank')}
+              onClick={() => window.open(`https://www.youtube.com/watch?v=${currentId}`, '_blank')}
               className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-red-600/20 hover:bg-red-600/30 text-red-400 text-xs font-medium transition-all border border-red-600/20"
             >
               <ExternalLink className="w-3.5 h-3.5" />
