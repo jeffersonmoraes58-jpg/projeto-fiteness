@@ -224,7 +224,12 @@ export default function TrainerWorkouts() {
       queryClient.invalidateQueries({ queryKey: ['trainer-workouts'] });
       setAiResult(data);
     },
-    onError: () => toast.error('Erro ao gerar treino. Verifique a chave OpenAI.'),
+    onError: (err: any) => {
+      const status = err?.response?.status;
+      if (status === 429) toast.error('Limite de requisições da IA atingido. Aguarde 1 minuto e tente novamente.');
+      else if (status === 401 || status === 403) toast.error('Chave da API de IA inválida. Verifique a configuração.');
+      else toast.error('Erro ao gerar treino. Tente novamente.');
+    },
   });
 
   const useTemplateMutation = useMutation({

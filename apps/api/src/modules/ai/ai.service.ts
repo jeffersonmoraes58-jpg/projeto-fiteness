@@ -24,55 +24,30 @@ export class AiService {
 
     const exercises = await this.prisma.exercise.findMany({
       where: { OR: [{ isPublic: true }, { trainerId: trainer.id }] },
-      select: { id: true, name: true, category: true, difficulty: true },
-      take: 150,
+      select: { id: true, name: true, category: true },
+      take: 60,
       orderBy: { name: 'asc' },
     });
 
-    const exerciseList = exercises
-      .map((e) => `- ${e.name} (${e.category})`)
-      .join('\n');
+    const exerciseList = exercises.map((e) => e.name).join(', ');
 
-    const prompt = `Você é um personal trainer expert. Crie um treino completo com base na descrição do instrutor.
+    const prompt = `Você é personal trainer expert. Crie um treino baseado na descrição: "${description}"
 
-Descrição: "${description}"
+Exercícios disponíveis (use nomes exatos): ${exerciseList}
 
-Exercícios disponíveis no sistema (use APENAS estes, pelo nome exato):
-${exerciseList}
+Responda APENAS com JSON válido, sem texto extra:
+{"name":"nome do treino","description":"descrição breve","level":2,"duration":60,"tags":["tag1"],"exercises":[{"name":"Nome Exato","sets":3,"reps":"10-12","restSeconds":60,"notes":null}],"tips":["dica1"]}
 
-Retorne um JSON com:
-{
-  "name": "nome curto e descritivo do treino",
-  "description": "descrição de 1-2 frases",
-  "level": número de 1 a 5 (1=iniciante, 5=elite),
-  "duration": duração estimada em minutos,
-  "tags": ["tag1", "tag2"],
-  "exercises": [
-    {
-      "name": "nome exato do exercício da lista acima",
-      "sets": 3,
-      "reps": "8-12",
-      "restSeconds": 60,
-      "notes": "observação opcional ou null"
-    }
-  ],
-  "tips": ["dica de execução 1", "dica 2"]
-}
-
-Regras:
-- Escolha entre 5 e 10 exercícios
-- Use nomes exatos da lista
-- Adapte séries/repetições ao objetivo descrito
-- Se não encontrar exercício adequado na lista, substitua por um similar disponível`;
+Escolha 5 a 8 exercícios da lista. Adapte séries e repetições ao objetivo.`;
 
     const response = await this.openai.chat.completions.create({
       model: this.config.get('GEMINI_MODEL', 'gemini-2.0-flash'),
       messages: [{ role: 'user', content: prompt }],
-      response_format: { type: 'json_object' },
-      max_tokens: 2500,
+      max_tokens: 1500,
     });
 
-    const generated = JSON.parse(response.choices[0].message.content || '{}');
+    const content = (response.choices[0].message.content || '{}').replace(/```json|```/g, '').trim();
+    const generated = JSON.parse(content);
 
     const workout = await this.prisma.workout.create({
       data: {
