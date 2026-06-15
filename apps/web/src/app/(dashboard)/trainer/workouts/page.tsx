@@ -390,8 +390,11 @@ export default function TrainerWorkouts() {
 
               {/* Template cards — horizontal scroll */}
               <div className="relative">
-                <div className="overflow-x-auto px-6 pb-5 pt-3 scrollbar-hide">
-                  <div className="flex gap-4" style={{ width: 'max-content' }}>
+                <div
+                  className="overflow-x-auto px-4 sm:px-6 pb-4 pt-3 scrollbar-hide"
+                  style={{ WebkitOverflowScrolling: 'touch' }}
+                >
+                  <div className="flex gap-3 sm:gap-4" style={{ width: 'max-content' }}>
                     {visibleTemplates.map((template, i) => (
                       <TemplateCard
                         key={template.id}
@@ -640,7 +643,7 @@ function TemplateCard({
       whileHover={!isExpanded ? { y: -4, scale: 1.02 } : {}}
       transition={{ delay: index * 0.05, type: 'spring', stiffness: 300, damping: 20 }}
       className={cn(
-        'w-52 rounded-2xl flex-shrink-0 overflow-hidden border cursor-pointer',
+        'w-44 sm:w-52 rounded-2xl flex-shrink-0 overflow-hidden border cursor-pointer',
         'transition-colors duration-200',
         isExpanded
           ? 'border-primary/50 bg-primary/5 shadow-lg shadow-primary/10'
