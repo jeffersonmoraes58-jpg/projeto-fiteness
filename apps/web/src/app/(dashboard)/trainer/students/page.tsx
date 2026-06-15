@@ -38,7 +38,7 @@ export default function TrainerStudents() {
     setInviteLoading(true);
     try {
       const res = await api.post('/auth/invite-link');
-      setInviteLink(res.data.link);
+      setInviteLink(res.data.data?.link ?? res.data.link);
     } catch {
       toast.error('Erro ao gerar link de convite');
       setInviteModal(false);
