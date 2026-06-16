@@ -7,9 +7,11 @@ import {
   ChevronRight, MoreVertical, MessageCircle, Calendar,
 } from 'lucide-react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
+import toast from 'react-hot-toast';
 
 const FILTERS = ['Todos', 'Ativos', 'Inativos'];
 const GOAL_LABELS: Record<string, string> = {
@@ -161,8 +163,19 @@ export default function NutritionistPatients() {
 const COLORS = ['from-emerald-600 to-teal-600', 'from-cyan-600 to-blue-600', 'from-purple-600 to-indigo-600', 'from-orange-600 to-amber-600', 'from-pink-600 to-rose-600'];
 
 function PatientCard({ patient, index }: { patient: any; index: number }) {
+  const router = useRouter();
   const initials = `${patient.user?.profile?.firstName?.[0] || ''}${patient.user?.profile?.lastName?.[0] || ''}`;
   const color = COLORS[index % COLORS.length];
+
+  async function handleStartChat() {
+    try {
+      const res = await api.post(`/chat/direct/${patient.userId}`);
+      const chatId = res.data.data?.id ?? res.data.id;
+      router.push(`/nutritionist/chat?chatId=${chatId}`);
+    } catch {
+      toast.error('Erro ao abrir chat');
+    }
+  }
 
   return (
     <motion.div
@@ -221,12 +234,12 @@ function PatientCard({ patient, index }: { patient: any; index: number }) {
           {patient.isActive ? 'Ativo' : 'Inativo'}
         </span>
         <div className="flex items-center gap-1">
-          <Link
-            href={`/nutritionist/chat`}
+          <button
+            onClick={handleStartChat}
             className="w-7 h-7 rounded-lg hover:bg-accent flex items-center justify-center transition-all"
           >
             <MessageCircle className="w-3.5 h-3.5 text-muted-foreground" />
-          </Link>
+          </button>
           <Link
             href={`/nutritionist/schedule`}
             className="w-7 h-7 rounded-lg hover:bg-accent flex items-center justify-center transition-all"

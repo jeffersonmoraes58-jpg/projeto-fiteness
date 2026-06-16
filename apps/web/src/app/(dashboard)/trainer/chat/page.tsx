@@ -7,6 +7,7 @@ import {
   Smile, Paperclip, Mic, ChevronLeft, Wifi, WifiOff,
 } from 'lucide-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useSearchParams } from 'next/navigation';
 import { api } from '@/lib/api';
 import { useAuthStore } from '@/store/auth';
 import { useChatSocket, ChatSocketMessage } from '@/hooks/useChatSocket';
@@ -14,10 +15,12 @@ import { cn } from '@/lib/utils';
 
 export default function TrainerChat() {
   const { user } = useAuthStore();
-  const [selectedChat, setSelectedChat] = useState<string | null>(null);
+  const searchParams = useSearchParams();
+  const [selectedChat, setSelectedChat] = useState<string | null>(searchParams.get('chatId'));
   const [localMessages, setLocalMessages] = useState<ChatSocketMessage[]>([]);
   const [message, setMessage] = useState('');
   const [typingUsers, setTypingUsers] = useState<Set<string>>(new Set());
+  const [onlineUsers, setOnlineUsers] = useState<Set<string>>(new Set());
   const [search, setSearch] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const typingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -36,6 +39,12 @@ export default function TrainerChat() {
     },
     onTypingStop: (userId) => {
       setTypingUsers((s) => { const n = new Set(s); n.delete(userId); return n; });
+    },
+    onUserOnline: (userId) => setOnlineUsers((s) => new Set(s).add(userId)),
+    onUserOffline: (userId) => setOnlineUsers((s) => { const n = new Set(s); n.delete(userId); return n; }),
+    onNotificationMessage: () => {
+      queryClient.invalidateQueries({ queryKey: ['chat-unread-count'] });
+      queryClient.invalidateQueries({ queryKey: ['trainer-chats'] });
     },
   });
 
@@ -61,9 +70,10 @@ export default function TrainerChat() {
     if (selectedChat) {
       joinChat(selectedChat);
       markAsRead(selectedChat);
+      queryClient.invalidateQueries({ queryKey: ['chat-unread-count'] });
     }
     return () => { if (selectedChat) leaveChat(selectedChat); };
-  }, [selectedChat, joinChat, leaveChat, markAsRead]);
+  }, [selectedChat, joinChat, leaveChat, markAsRead, queryClient]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -106,6 +116,7 @@ export default function TrainerChat() {
   };
 
   const isTyping = typingUsers.size > 0;
+  const isOtherOnline = otherUser?.id ? onlineUsers.has(otherUser.id) : false;
 
   return (
     <div className="h-[calc(100vh-8rem)] flex gap-4">
@@ -201,12 +212,21 @@ export default function TrainerChat() {
             <button onClick={() => setSelectedChat(null)} className="lg:hidden w-8 h-8 rounded-xl hover:bg-accent flex items-center justify-center transition-all">
               <ChevronLeft className="w-5 h-5" />
             </button>
-            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-600 to-indigo-600 flex items-center justify-center text-white text-sm font-bold">
-              {otherUser?.profile?.firstName?.[0]}{otherUser?.profile?.lastName?.[0]}
+            <div className="relative">
+              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-600 to-indigo-600 flex items-center justify-center text-white text-sm font-bold overflow-hidden">
+                {otherUser?.profile?.avatarUrl
+                  ? <img src={otherUser.profile.avatarUrl} alt="" className="w-full h-full object-cover" />
+                  : `${otherUser?.profile?.firstName?.[0] || ''}${otherUser?.profile?.lastName?.[0] || ''}`}
+              </div>
+              {isOtherOnline && (
+                <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-400 rounded-full border-2 border-card" />
+              )}
             </div>
             <div className="flex-1">
               <div className="font-medium text-sm">{otherUser?.profile?.firstName} {otherUser?.profile?.lastName}</div>
-              <div className="text-xs text-emerald-400">Aluno</div>
+              <div className="text-xs">
+                {isOtherOnline ? <span className="text-emerald-400">Online</span> : <span className="text-muted-foreground">Aluno</span>}
+              </div>
             </div>
             <div className="flex items-center gap-1">
               <button className="w-8 h-8 rounded-xl hover:bg-accent flex items-center justify-center transition-all">

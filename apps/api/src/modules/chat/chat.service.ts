@@ -10,9 +10,10 @@ export class ChatService {
     const existingChat = await this.prisma.chat.findFirst({
       where: {
         type: 'DIRECT',
-        participants: {
-          every: { userId: { in: [userId1, userId2] } },
-        },
+        AND: [
+          { participants: { some: { userId: userId1 } } },
+          { participants: { some: { userId: userId2 } } },
+        ],
       },
       include: {
         participants: { include: { user: { include: { profile: true } } } },
@@ -40,7 +41,7 @@ export class ChatService {
   }
 
   async getUserChats(userId: string) {
-    return this.prisma.chat.findMany({
+    const chats = await this.prisma.chat.findMany({
       where: { participants: { some: { userId } } },
       include: {
         participants: {
@@ -53,6 +54,23 @@ export class ChatService {
       },
       orderBy: { updatedAt: 'desc' },
     });
+
+    const unreadCounts = await this.prisma.message.groupBy({
+      by: ['chatId'],
+      where: {
+        chatId: { in: chats.map((c) => c.id) },
+        senderId: { not: userId },
+        isRead: false,
+      },
+      _count: { id: true },
+    });
+
+    const unreadMap = new Map(unreadCounts.map((u) => [u.chatId, u._count.id]));
+
+    return chats.map((chat) => ({
+      ...chat,
+      unreadCount: unreadMap.get(chat.id) ?? 0,
+    }));
   }
 
   async getChatMessages(chatId: string, userId: string, page = 1, limit = 50) {
@@ -122,6 +140,14 @@ export class ChatService {
       where: { chatId, senderId: { not: userId }, isRead: false },
       data: { isRead: true },
     });
+  }
+
+  async getChatParticipantIds(chatId: string): Promise<string[]> {
+    const participants = await this.prisma.chatParticipant.findMany({
+      where: { chatId },
+      select: { userId: true },
+    });
+    return participants.map((p) => p.userId);
   }
 
   async getUnreadCount(userId: string) {

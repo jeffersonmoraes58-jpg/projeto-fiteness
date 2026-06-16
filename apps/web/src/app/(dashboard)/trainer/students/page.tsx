@@ -8,6 +8,7 @@ import {
   Activity, Calendar, Filter, Link2, X, Copy, Check,
 } from 'lucide-react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
@@ -259,11 +260,22 @@ export default function TrainerStudents() {
 const COLORS = ['from-purple-600 to-indigo-600', 'from-cyan-600 to-blue-600', 'from-emerald-600 to-teal-600', 'from-orange-600 to-amber-600', 'from-pink-600 to-rose-600'];
 
 function StudentCard({ student, index }: { student: any; index: number }) {
+  const router = useRouter();
   const initials = `${student.user?.profile?.firstName?.[0] || ''}${student.user?.profile?.lastName?.[0] || ''}`;
   const color = COLORS[index % COLORS.length];
   const lastCheckin = student.lastCheckinAt
     ? new Date(student.lastCheckinAt).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })
     : 'Nunca';
+
+  async function handleStartChat() {
+    try {
+      const res = await api.post(`/chat/direct/${student.userId}`);
+      const chatId = res.data.data?.id ?? res.data.id;
+      router.push(`/trainer/chat?chatId=${chatId}`);
+    } catch {
+      toast.error('Erro ao abrir chat');
+    }
+  }
 
   return (
     <motion.div
@@ -318,9 +330,9 @@ function StudentCard({ student, index }: { student: any; index: number }) {
           <span className="text-xs text-muted-foreground">último: {lastCheckin}</span>
         </div>
         <div className="flex items-center gap-1">
-          <Link href="/trainer/chat" className="w-7 h-7 rounded-lg hover:bg-accent flex items-center justify-center transition-all">
+          <button onClick={handleStartChat} className="w-7 h-7 rounded-lg hover:bg-accent flex items-center justify-center transition-all">
             <MessageCircle className="w-3.5 h-3.5 text-muted-foreground" />
-          </Link>
+          </button>
           <Link href={`/trainer/workouts`} className="w-7 h-7 rounded-lg hover:bg-accent flex items-center justify-center transition-all">
             <Dumbbell className="w-3.5 h-3.5 text-muted-foreground" />
           </Link>

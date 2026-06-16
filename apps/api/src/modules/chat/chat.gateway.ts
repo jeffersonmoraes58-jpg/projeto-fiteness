@@ -87,6 +87,16 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
     this.server.to(`chat:${data.chatId}`).emit('message:received', message);
 
+    const participantIds = await this.chatService.getChatParticipantIds(data.chatId);
+    for (const participantId of participantIds) {
+      if (participantId !== userId) {
+        this.server.to(`user:${participantId}`).emit('notification:message', {
+          chatId: data.chatId,
+          senderId: userId,
+        });
+      }
+    }
+
     return message;
   }
 
