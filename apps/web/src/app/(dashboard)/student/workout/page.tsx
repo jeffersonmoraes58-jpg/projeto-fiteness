@@ -1242,7 +1242,6 @@ function SelfieModal({ workoutName, durationStr, intensity, onClose }: {
     }
 
     try {
-      // tenta com câmera preferida; se falhar, tenta qualquer câmera disponível
       let s: MediaStream;
       try {
         s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: facing }, audio: false });
@@ -1250,13 +1249,39 @@ function SelfieModal({ workoutName, durationStr, intensity, onClose }: {
         s = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
       }
       streamRef.current = s;
-      if (videoRef.current) {
-        videoRef.current.srcObject = s;
-        videoRef.current.onloadedmetadata = () => {
-          videoRef.current?.play()
-            .then(() => setIsReady(true))
-            .catch(() => setCameraErrorMsg('Erro ao iniciar o vídeo. Tente fechar outros apps que usam a câmera.'));
-        };
+
+      // Aguarda o videoRef estar disponível (pode não estar na primeira renderização)
+      let video = videoRef.current;
+      if (!video) {
+        await new Promise((r) => setTimeout(r, 150));
+        video = videoRef.current;
+      }
+
+      if (!video) {
+        setCameraErrorMsg('Erro ao iniciar a câmera. Tente novamente.');
+        return;
+      }
+
+      // Garantir atributos essenciais para mobile antes do play()
+      video.srcObject = s;
+      video.muted = true;
+      video.setAttribute('playsinline', 'true');
+      video.setAttribute('webkit-playsinline', 'true');
+
+      // Tenta play() direto; se falhar, aguarda loadedmetadata
+      try {
+        await video.play();
+        setIsReady(true);
+      } catch {
+        await new Promise<void>((resolve, reject) => {
+          const timeout = setTimeout(() => reject(new Error('timeout')), 8000);
+          video!.onloadedmetadata = () => {
+            clearTimeout(timeout);
+            video!.play().then(() => { setIsReady(true); resolve(); }).catch(reject);
+          };
+        }).catch(() => {
+          setCameraErrorMsg('Erro ao iniciar o vídeo. Tente fechar outros apps que usam a câmera.');
+        });
       }
     } catch (err: any) {
       const name: string = err?.name ?? '';
