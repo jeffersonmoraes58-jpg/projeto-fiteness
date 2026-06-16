@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSearchParams } from 'next/navigation';
+import toast from 'react-hot-toast';
 import { api } from '@/lib/api';
 import { useAuthStore } from '@/store/auth';
 import { useChatSocket, ChatSocketMessage } from '@/hooks/useChatSocket';
@@ -117,6 +118,16 @@ function TrainerChatInner() {
 
   const isTyping = typingUsers.size > 0;
   const isOtherOnline = otherUser?.id ? onlineUsers.has(otherUser.id) : false;
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClick = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false);
+    };
+    if (menuOpen) document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [menuOpen]);
 
   return (
     <div className="h-[calc(100vh-8rem)] flex gap-4">
@@ -229,15 +240,34 @@ function TrainerChatInner() {
               </div>
             </div>
             <div className="flex items-center gap-1">
-              <button className="w-8 h-8 rounded-xl hover:bg-accent flex items-center justify-center transition-all">
+              <button onClick={() => toast('Chamadas de voz em breve', { icon: '📞' })} className="w-8 h-8 rounded-xl hover:bg-accent flex items-center justify-center transition-all">
                 <Phone className="w-4 h-4 text-muted-foreground" />
               </button>
-              <button className="w-8 h-8 rounded-xl hover:bg-accent flex items-center justify-center transition-all">
+              <button onClick={() => toast('Chamadas de vídeo em breve', { icon: '🎥' })} className="w-8 h-8 rounded-xl hover:bg-accent flex items-center justify-center transition-all">
                 <Video className="w-4 h-4 text-muted-foreground" />
               </button>
-              <button className="w-8 h-8 rounded-xl hover:bg-accent flex items-center justify-center transition-all">
-                <MoreVertical className="w-4 h-4 text-muted-foreground" />
-              </button>
+              <div className="relative" ref={menuRef}>
+                <button onClick={() => setMenuOpen((v) => !v)} className="w-8 h-8 rounded-xl hover:bg-accent flex items-center justify-center transition-all">
+                  <MoreVertical className="w-4 h-4 text-muted-foreground" />
+                </button>
+                <AnimatePresence>
+                  {menuOpen && (
+                    <motion.div
+                      initial={{ opacity: 0, scale: 0.95, y: -4 }}
+                      animate={{ opacity: 1, scale: 1, y: 0 }}
+                      exit={{ opacity: 0, scale: 0.95, y: -4 }}
+                      className="absolute right-0 top-10 w-44 glass rounded-xl border border-border/50 shadow-xl z-20 overflow-hidden"
+                    >
+                      <button onClick={() => { setMenuOpen(false); toast('Em breve', { icon: '📄' }); }} className="w-full text-left px-4 py-2.5 text-sm hover:bg-accent transition-all">
+                        Exportar conversa
+                      </button>
+                      <button onClick={() => { setMenuOpen(false); setSelectedChat(null); setLocalMessages([]); }} className="w-full text-left px-4 py-2.5 text-sm hover:bg-accent transition-all text-destructive">
+                        Fechar conversa
+                      </button>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
             </div>
           </div>
 
