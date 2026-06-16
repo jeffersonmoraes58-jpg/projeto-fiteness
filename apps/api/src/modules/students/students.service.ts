@@ -14,6 +14,38 @@ export class StudentsService {
     return student;
   }
 
+  async getContacts(userId: string) {
+    const student = await this.getStudent(userId);
+
+    const [trainerRelations, nutritionistRelations] = await Promise.all([
+      this.prisma.trainerStudent.findMany({
+        where: { studentId: student.id, isActive: true },
+        include: { trainer: { include: { user: { include: { profile: true } } } } },
+      }),
+      this.prisma.nutritionistPatient.findMany({
+        where: { studentId: student.id, isActive: true },
+        include: { nutritionist: { include: { user: { include: { profile: true } } } } },
+      }),
+    ]);
+
+    return {
+      trainers: trainerRelations.map((r) => ({
+        userId: r.trainer.userId,
+        firstName: r.trainer.user.profile?.firstName ?? '',
+        lastName: r.trainer.user.profile?.lastName ?? '',
+        avatarUrl: r.trainer.user.profile?.avatarUrl ?? null,
+        role: 'TRAINER',
+      })),
+      nutritionists: nutritionistRelations.map((r) => ({
+        userId: r.nutritionist.userId,
+        firstName: r.nutritionist.user.profile?.firstName ?? '',
+        lastName: r.nutritionist.user.profile?.lastName ?? '',
+        avatarUrl: r.nutritionist.user.profile?.avatarUrl ?? null,
+        role: 'NUTRITIONIST',
+      })),
+    };
+  }
+
   async getDashboard(userId: string) {
     const student = await this.getStudent(userId);
     const today = new Date();

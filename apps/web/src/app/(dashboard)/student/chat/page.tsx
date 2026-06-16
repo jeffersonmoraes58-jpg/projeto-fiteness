@@ -5,25 +5,30 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Send, Search, Phone, Video, MoreVertical,
   Smile, Paperclip, Mic, ChevronLeft, Wifi, WifiOff,
+  Dumbbell, Apple, X,
 } from 'lucide-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
 import { useAuthStore } from '@/store/auth';
 import { useChatSocket, ChatSocketMessage } from '@/hooks/useChatSocket';
 import { cn } from '@/lib/utils';
+import toast from 'react-hot-toast';
 
 function StudentChatInner() {
   const { user } = useAuthStore();
   const searchParams = useSearchParams();
+  const router = useRouter();
   const [selectedChat, setSelectedChat] = useState<string | null>(searchParams.get('chatId'));
   const [localMessages, setLocalMessages] = useState<ChatSocketMessage[]>([]);
   const [message, setMessage] = useState('');
   const [typingUsers, setTypingUsers] = useState<Set<string>>(new Set());
   const [onlineUsers, setOnlineUsers] = useState<Set<string>>(new Set());
   const [search, setSearch] = useState('');
+  const [menuOpen, setMenuOpen] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const typingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
   const queryClient = useQueryClient();
 
   const { connected, joinChat, leaveChat, sendMessage, markAsRead, startTyping, stopTyping } = useChatSocket({
@@ -54,6 +59,11 @@ function StudentChatInner() {
     refetchInterval: 15000,
   });
 
+  const { data: contacts } = useQuery({
+    queryKey: ['student-contacts'],
+    queryFn: () => api.get('/students/me/contacts').then((r) => r.data.data),
+  });
+
   const { data: initialMessages } = useQuery({
     queryKey: ['chat-messages', selectedChat],
     queryFn: () => api.get(`/chat/${selectedChat}/messages`).then((r) => r.data.data),
@@ -79,14 +89,31 @@ function StudentChatInner() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [localMessages]);
 
+  useEffect(() => {
+    const handleClick = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false);
+    };
+    if (menuOpen) document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [menuOpen]);
+
   const filteredChats = (chats || []).filter((c: any) => {
     const other = c.participants?.find((p: any) => p.userId !== user?.id);
     const name = `${other?.user?.profile?.firstName || ''} ${other?.user?.profile?.lastName || ''}`.toLowerCase();
     return name.includes(search.toLowerCase());
   });
 
+  // Contatos que ainda não têm chat iniciado
+  const allContacts = [...(contacts?.trainers || []), ...(contacts?.nutritionists || [])];
+  const contactsWithoutChat = allContacts.filter((contact: any) =>
+    !(chats || []).some((c: any) =>
+      c.participants?.some((p: any) => p.userId === contact.userId),
+    ),
+  );
+
   const activeChat = (chats || []).find((c: any) => c.id === selectedChat);
   const otherUser = activeChat?.participants?.find((p: any) => p.userId !== user?.id)?.user;
+  const isOtherOnline = otherUser?.id ? onlineUsers.has(otherUser.id) : false;
 
   const handleTyping = useCallback(() => {
     if (!selectedChat) return;
@@ -112,7 +139,19 @@ function StudentChatInner() {
   const handleSelectChat = (chatId: string) => {
     setLocalMessages([]);
     setTypingUsers(new Set());
+    setMenuOpen(false);
     setSelectedChat(chatId);
+  };
+
+  const handleStartChatWithContact = async (contactUserId: string) => {
+    try {
+      const res = await api.post(`/chat/direct/${contactUserId}`);
+      const chatId = res.data.data?.id ?? res.data.id;
+      queryClient.invalidateQueries({ queryKey: ['student-chats'] });
+      handleSelectChat(chatId);
+    } catch {
+      toast.error('Erro ao abrir conversa');
+    }
   };
 
   return (
@@ -143,62 +182,101 @@ function StudentChatInner() {
         </div>
 
         <div className="flex-1 overflow-y-auto scrollbar-hide">
-          {filteredChats.length > 0 ? (
-            filteredChats.map((chat: any) => {
-              const other = chat.participants?.find((p: any) => p.userId !== user?.id)?.user;
-              const lastMsg = chat.messages?.[0];
-              const initials = `${other?.profile?.firstName?.[0] || ''}${other?.profile?.lastName?.[0] || ''}`;
-              const colors = ['from-purple-600 to-indigo-600', 'from-cyan-600 to-blue-600', 'from-emerald-600 to-teal-600'];
-              const ci = chat.id.charCodeAt(0) % colors.length;
-              const hasUnread = chat.unreadCount > 0;
-
-              return (
-                <button
-                  key={chat.id}
-                  onClick={() => handleSelectChat(chat.id)}
-                  className={cn(
-                    'w-full flex items-center gap-3 p-4 hover:bg-accent transition-all text-left border-b border-border/20',
-                    selectedChat === chat.id && 'bg-primary/10',
-                  )}
-                >
-                  <div className="relative">
-                    <div className={`w-11 h-11 rounded-full bg-gradient-to-br ${colors[ci]} flex items-center justify-center text-white text-sm font-bold flex-shrink-0`}>
-                      {other?.profile?.avatarUrl
-                        ? <img src={other.profile.avatarUrl} alt="" className="w-full h-full rounded-full object-cover" />
+          {/* Contatos disponíveis (sem chat iniciado) */}
+          {contactsWithoutChat.length > 0 && (
+            <div className="p-3 border-b border-border/20">
+              <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium mb-2 px-1">Seus profissionais</p>
+              {contactsWithoutChat.map((contact: any) => {
+                const initials = `${contact.firstName?.[0] || ''}${contact.lastName?.[0] || ''}`;
+                const isTrainer = contact.role === 'TRAINER';
+                return (
+                  <button
+                    key={contact.userId}
+                    onClick={() => handleStartChatWithContact(contact.userId)}
+                    className="w-full flex items-center gap-3 p-3 hover:bg-accent transition-all text-left rounded-xl"
+                  >
+                    <div className={`w-10 h-10 rounded-full bg-gradient-to-br ${isTrainer ? 'from-purple-600 to-indigo-600' : 'from-emerald-600 to-teal-600'} flex items-center justify-center text-white text-sm font-bold flex-shrink-0 overflow-hidden`}>
+                      {contact.avatarUrl
+                        ? <img src={contact.avatarUrl} alt="" className="w-full h-full object-cover" />
                         : initials}
                     </div>
-                    {hasUnread && (
-                      <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-primary rounded-full text-[9px] text-white flex items-center justify-center font-bold">
-                        {chat.unreadCount}
-                      </span>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-medium truncate">{contact.firstName} {contact.lastName}</div>
+                      <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
+                        {isTrainer ? <Dumbbell className="w-3 h-3" /> : <Apple className="w-3 h-3" />}
+                        {isTrainer ? 'Personal Trainer' : 'Nutricionista'}
+                      </div>
+                    </div>
+                    <span className="text-[10px] text-primary font-medium">Iniciar</span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Chats existentes */}
+          {filteredChats.length > 0 ? (
+            <>
+              {contactsWithoutChat.length > 0 && (
+                <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium px-4 py-2">Conversas</p>
+              )}
+              {filteredChats.map((chat: any) => {
+                const other = chat.participants?.find((p: any) => p.userId !== user?.id)?.user;
+                const lastMsg = chat.messages?.[0];
+                const initials = `${other?.profile?.firstName?.[0] || ''}${other?.profile?.lastName?.[0] || ''}`;
+                const colors = ['from-purple-600 to-indigo-600', 'from-cyan-600 to-blue-600', 'from-emerald-600 to-teal-600'];
+                const ci = chat.id.charCodeAt(0) % colors.length;
+                const hasUnread = chat.unreadCount > 0;
+
+                return (
+                  <button
+                    key={chat.id}
+                    onClick={() => handleSelectChat(chat.id)}
+                    className={cn(
+                      'w-full flex items-center gap-3 p-4 hover:bg-accent transition-all text-left border-b border-border/20',
+                      selectedChat === chat.id && 'bg-primary/10',
                     )}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between">
-                      <span className={cn('text-sm truncate', hasUnread ? 'font-semibold' : 'font-medium')}>
-                        {other?.profile?.firstName} {other?.profile?.lastName}
-                      </span>
-                      {lastMsg && (
-                        <span className="text-[10px] text-muted-foreground flex-shrink-0 ml-1">
-                          {new Date(lastMsg.createdAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                  >
+                    <div className="relative">
+                      <div className={`w-11 h-11 rounded-full bg-gradient-to-br ${colors[ci]} flex items-center justify-center text-white text-sm font-bold flex-shrink-0 overflow-hidden`}>
+                        {other?.profile?.avatarUrl
+                          ? <img src={other.profile.avatarUrl} alt="" className="w-full h-full rounded-full object-cover" />
+                          : initials}
+                      </div>
+                      {hasUnread && (
+                        <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-primary rounded-full text-[9px] text-white flex items-center justify-center font-bold">
+                          {chat.unreadCount}
                         </span>
                       )}
                     </div>
-                    <div className={cn('text-xs truncate mt-0.5', hasUnread ? 'text-foreground' : 'text-muted-foreground')}>
-                      {lastMsg?.content || 'Nenhuma mensagem ainda'}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between">
+                        <span className={cn('text-sm truncate', hasUnread ? 'font-semibold' : 'font-medium')}>
+                          {other?.profile?.firstName} {other?.profile?.lastName}
+                        </span>
+                        {lastMsg && (
+                          <span className="text-[10px] text-muted-foreground flex-shrink-0 ml-1">
+                            {new Date(lastMsg.createdAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                        )}
+                      </div>
+                      <div className={cn('text-xs truncate mt-0.5', hasUnread ? 'text-foreground' : 'text-muted-foreground')}>
+                        {lastMsg?.content || 'Nenhuma mensagem ainda'}
+                      </div>
                     </div>
-                  </div>
-                </button>
-              );
-            })
-          ) : (
+                  </button>
+                );
+              })}
+            </>
+          ) : contactsWithoutChat.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full text-center p-6">
               <div className="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center mb-3">
                 <Send className="w-6 h-6 text-muted-foreground" />
               </div>
               <p className="text-sm text-muted-foreground">Nenhuma conversa ainda</p>
+              <p className="text-xs text-muted-foreground/60 mt-1">Seu trainer ou nutricionista irá entrar em contato</p>
             </div>
-          )}
+          ) : null}
         </div>
       </div>
 
@@ -215,22 +293,66 @@ function StudentChatInner() {
                   ? <img src={otherUser.profile.avatarUrl} alt="" className="w-full h-full object-cover" />
                   : `${otherUser?.profile?.firstName?.[0] || ''}${otherUser?.profile?.lastName?.[0] || ''}`}
               </div>
-              {otherUser?.id && onlineUsers.has(otherUser.id) && (
+              {isOtherOnline && (
                 <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-400 rounded-full border-2 border-card" />
               )}
             </div>
             <div className="flex-1">
               <div className="font-medium text-sm">{otherUser?.profile?.firstName} {otherUser?.profile?.lastName}</div>
-              <div className="text-xs text-muted-foreground">
-                {otherUser?.id && onlineUsers.has(otherUser.id)
+              <div className="text-xs">
+                {isOtherOnline
                   ? <span className="text-emerald-400">Online</span>
-                  : otherUser?.role === 'TRAINER' ? 'Trainer' : 'Nutricionista'}
+                  : <span className="text-muted-foreground">{otherUser?.role === 'TRAINER' ? 'Personal Trainer' : 'Nutricionista'}</span>}
               </div>
             </div>
             <div className="flex items-center gap-1">
-              <button className="w-8 h-8 rounded-xl hover:bg-accent flex items-center justify-center transition-all"><Phone className="w-4 h-4 text-muted-foreground" /></button>
-              <button className="w-8 h-8 rounded-xl hover:bg-accent flex items-center justify-center transition-all"><Video className="w-4 h-4 text-muted-foreground" /></button>
-              <button className="w-8 h-8 rounded-xl hover:bg-accent flex items-center justify-center transition-all"><MoreVertical className="w-4 h-4 text-muted-foreground" /></button>
+              <button
+                onClick={() => toast('Chamadas de voz em breve', { icon: '📞' })}
+                className="w-8 h-8 rounded-xl hover:bg-accent flex items-center justify-center transition-all"
+              >
+                <Phone className="w-4 h-4 text-muted-foreground" />
+              </button>
+              <button
+                onClick={() => toast('Chamadas de vídeo em breve', { icon: '🎥' })}
+                className="w-8 h-8 rounded-xl hover:bg-accent flex items-center justify-center transition-all"
+              >
+                <Video className="w-4 h-4 text-muted-foreground" />
+              </button>
+              <div className="relative" ref={menuRef}>
+                <button
+                  onClick={() => setMenuOpen((v) => !v)}
+                  className="w-8 h-8 rounded-xl hover:bg-accent flex items-center justify-center transition-all"
+                >
+                  <MoreVertical className="w-4 h-4 text-muted-foreground" />
+                </button>
+                <AnimatePresence>
+                  {menuOpen && (
+                    <motion.div
+                      initial={{ opacity: 0, scale: 0.95, y: -4 }}
+                      animate={{ opacity: 1, scale: 1, y: 0 }}
+                      exit={{ opacity: 0, scale: 0.95, y: -4 }}
+                      className="absolute right-0 top-10 w-44 glass rounded-xl border border-border/50 shadow-xl z-20 overflow-hidden"
+                    >
+                      <button
+                        onClick={() => { setMenuOpen(false); toast('Histórico exportado em breve', { icon: '📄' }); }}
+                        className="w-full text-left px-4 py-2.5 text-sm hover:bg-accent transition-all"
+                      >
+                        Exportar conversa
+                      </button>
+                      <button
+                        onClick={() => {
+                          setMenuOpen(false);
+                          setSelectedChat(null);
+                          setLocalMessages([]);
+                        }}
+                        className="w-full text-left px-4 py-2.5 text-sm hover:bg-accent transition-all text-destructive"
+                      >
+                        Fechar conversa
+                      </button>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
             </div>
           </div>
 
@@ -270,7 +392,9 @@ function StudentChatInner() {
 
           <div className="p-4 border-t border-border/50">
             <div className="flex items-center gap-2">
-              <button className="w-9 h-9 rounded-xl hover:bg-accent flex items-center justify-center transition-all flex-shrink-0"><Paperclip className="w-4 h-4 text-muted-foreground" /></button>
+              <button className="w-9 h-9 rounded-xl hover:bg-accent flex items-center justify-center transition-all flex-shrink-0">
+                <Paperclip className="w-4 h-4 text-muted-foreground" />
+              </button>
               <input
                 type="text"
                 placeholder="Digite uma mensagem..."
@@ -279,13 +403,17 @@ function StudentChatInner() {
                 onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleSend()}
                 className="input-field flex-1 py-2.5 text-sm"
               />
-              <button className="w-9 h-9 rounded-xl hover:bg-accent flex items-center justify-center transition-all flex-shrink-0"><Smile className="w-4 h-4 text-muted-foreground" /></button>
+              <button className="w-9 h-9 rounded-xl hover:bg-accent flex items-center justify-center transition-all flex-shrink-0">
+                <Smile className="w-4 h-4 text-muted-foreground" />
+              </button>
               {message.trim() ? (
                 <button onClick={handleSend} className="w-9 h-9 rounded-xl bg-primary flex items-center justify-center hover:bg-primary/80 transition-all flex-shrink-0">
                   <Send className="w-4 h-4 text-white" />
                 </button>
               ) : (
-                <button className="w-9 h-9 rounded-xl hover:bg-accent flex items-center justify-center transition-all flex-shrink-0"><Mic className="w-4 h-4 text-muted-foreground" /></button>
+                <button className="w-9 h-9 rounded-xl hover:bg-accent flex items-center justify-center transition-all flex-shrink-0">
+                  <Mic className="w-4 h-4 text-muted-foreground" />
+                </button>
               )}
             </div>
           </div>
