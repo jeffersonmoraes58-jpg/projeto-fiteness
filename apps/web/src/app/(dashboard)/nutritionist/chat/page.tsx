@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, Suspense } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Send, Search, Phone, Video, MoreVertical,
@@ -13,7 +13,7 @@ import { useAuthStore } from '@/store/auth';
 import { useChatSocket, ChatSocketMessage } from '@/hooks/useChatSocket';
 import { cn } from '@/lib/utils';
 
-export default function NutritionistChat() {
+function NutritionistChatInner() {
   const { user } = useAuthStore();
   const searchParams = useSearchParams();
   const [selectedChat, setSelectedChat] = useState<string | null>(searchParams.get('chatId'));
@@ -301,5 +301,13 @@ export default function NutritionistChat() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function NutritionistChat() {
+  return (
+    <Suspense>
+      <NutritionistChatInner />
+    </Suspense>
   );
 }
