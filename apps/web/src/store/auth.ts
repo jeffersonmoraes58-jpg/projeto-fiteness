@@ -71,6 +71,7 @@ export const useAuthStore = create<AuthState>()(
           delete api.defaults.headers.Authorization;
           document.cookie = 'fitlynutri-role=;path=/;max-age=0';
           document.cookie = 'fitlynutri-auth=;path=/;max-age=0';
+          window.location.replace('/login');
         }
       },
 
