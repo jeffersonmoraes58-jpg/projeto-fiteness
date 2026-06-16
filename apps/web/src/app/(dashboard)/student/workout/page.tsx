@@ -908,6 +908,8 @@ function WorkoutSummaryModal({ workoutName, startTime, isPending, onConfirm, onC
   const [cardUrl, setCardUrl] = useState<string | null>(null);
   const [confirmed, setConfirmed] = useState(false);
   const [showSelfie, setShowSelfie] = useState(false);
+  const [selfieStream, setSelfieStream] = useState<MediaStream | null>(null);
+  const [selfieErr, setSelfieErr] = useState('');
 
   const durationMs = endTime.getTime() - startTime.getTime();
   const mins = Math.floor(durationMs / 60000);
@@ -947,14 +949,44 @@ function WorkoutSummaryModal({ workoutName, startTime, isPending, onConfirm, onC
     }
   };
 
+  async function handleSelfieClick() {
+    setSelfieErr('');
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setSelfieErr('Câmera não suportada. Abra no Chrome ou Safari.');
+      return;
+    }
+    try {
+      let s: MediaStream;
+      try {
+        s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false });
+      } catch {
+        s = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+      }
+      setSelfieStream(s);
+      setShowSelfie(true);
+    } catch (err: any) {
+      const name: string = err?.name ?? '';
+      if (name === 'NotAllowedError' || name === 'PermissionDeniedError') {
+        setSelfieErr('Câmera bloqueada.\nToque no 🔒 na barra de endereços e selecione "Permitir câmera".\n\nNo Safari: Ajustes › Safari › Câmera › Permitir.');
+      } else if (name === 'NotFoundError' || name === 'DevicesNotFoundError') {
+        setSelfieErr('Nenhuma câmera encontrada neste dispositivo.');
+      } else if (name === 'NotReadableError' || name === 'TrackStartError') {
+        setSelfieErr('A câmera está em uso por outro app. Feche-o e tente novamente.');
+      } else {
+        setSelfieErr('Não foi possível acessar a câmera. Tente novamente.');
+      }
+    }
+  }
+
   return (
     <>
-      {showSelfie && (
+      {showSelfie && selfieStream && (
         <SelfieModal
           workoutName={workoutName}
           durationStr={durationStr}
           intensity={intensity}
-          onClose={() => setShowSelfie(false)}
+          initialStream={selfieStream}
+          onClose={() => { setShowSelfie(false); setSelfieStream(null); }}
         />
       )}
     <div style={{ position: 'fixed', inset: 0, zIndex: 9999, backgroundColor: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(6px)', overflowY: 'auto', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '2rem 1rem' }}>
@@ -1026,11 +1058,14 @@ function WorkoutSummaryModal({ workoutName, startTime, isPending, onConfirm, onC
               </div>
             )}
             <button
-              onClick={() => setShowSelfie(true)}
+              onClick={handleSelfieClick}
               className="w-full flex items-center justify-center gap-2 py-3 mt-2 rounded-xl bg-violet-600 hover:bg-violet-700 active:bg-violet-800 text-white font-semibold transition-all"
             >
               <Camera className="w-4 h-4" /> Hora da Self! 📸
             </button>
+            {selfieErr && (
+              <p className="text-xs text-center text-destructive mt-2 whitespace-pre-line leading-relaxed">{selfieErr}</p>
+            )}
             <button onClick={onClose} className="btn-secondary w-full mt-2">Fechar</button>
           </>
         )}
@@ -1216,10 +1251,11 @@ function drawSelfieOverlay(ctx: CanvasRenderingContext2D, w: number, h: number, 
 
 const DAY_NAMES = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
 
-function SelfieModal({ workoutName, durationStr, intensity, onClose }: {
+function SelfieModal({ workoutName, durationStr, intensity, initialStream, onClose }: {
   workoutName: string;
   durationStr: string;
   intensity: string;
+  initialStream: MediaStream;
   onClose: () => void;
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -1230,17 +1266,50 @@ function SelfieModal({ workoutName, durationStr, intensity, onClose }: {
   const [cameraErrorMsg, setCameraErrorMsg] = useState<string | null>(null);
   const [isReady, setIsReady] = useState(false);
 
-  async function launchCamera(facing: 'user' | 'environment') {
+  async function attachStream(s: MediaStream) {
     streamRef.current?.getTracks().forEach((t) => t.stop());
-    streamRef.current = null;
+    streamRef.current = s;
     setIsReady(false);
     setCameraErrorMsg(null);
 
-    if (!navigator.mediaDevices?.getUserMedia) {
-      setCameraErrorMsg('Seu navegador não suporta câmera. Tente abrir no Chrome ou Safari.');
+    let video = videoRef.current;
+    if (!video) {
+      await new Promise((r) => setTimeout(r, 150));
+      video = videoRef.current;
+    }
+    if (!video) {
+      setCameraErrorMsg('Erro ao iniciar a câmera. Tente novamente.');
       return;
     }
 
+    video.srcObject = s;
+    video.muted = true;
+    video.setAttribute('playsinline', 'true');
+    video.setAttribute('webkit-playsinline', 'true');
+
+    try {
+      await video.play();
+      setIsReady(true);
+    } catch {
+      await new Promise<void>((resolve, reject) => {
+        const timeout = setTimeout(() => reject(new Error('timeout')), 8000);
+        video!.onloadedmetadata = () => {
+          clearTimeout(timeout);
+          video!.play().then(() => { setIsReady(true); resolve(); }).catch(reject);
+        };
+      }).catch(() => {
+        setCameraErrorMsg('Erro ao iniciar o vídeo. Tente fechar outros apps que usam a câmera.');
+      });
+    }
+  }
+
+  useEffect(() => {
+    attachStream(initialStream);
+    return () => streamRef.current?.getTracks().forEach((t) => t.stop());
+  }, []); // eslint-disable-line
+
+  async function startCamera(facing: 'user' | 'environment') {
+    setCapturedUrl(null);
     try {
       let s: MediaStream;
       try {
@@ -1248,65 +1317,21 @@ function SelfieModal({ workoutName, durationStr, intensity, onClose }: {
       } catch {
         s = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
       }
-      streamRef.current = s;
-
-      // Aguarda o videoRef estar disponível (pode não estar na primeira renderização)
-      let video = videoRef.current;
-      if (!video) {
-        await new Promise((r) => setTimeout(r, 150));
-        video = videoRef.current;
-      }
-
-      if (!video) {
-        setCameraErrorMsg('Erro ao iniciar a câmera. Tente novamente.');
-        return;
-      }
-
-      // Garantir atributos essenciais para mobile antes do play()
-      video.srcObject = s;
-      video.muted = true;
-      video.setAttribute('playsinline', 'true');
-      video.setAttribute('webkit-playsinline', 'true');
-
-      // Tenta play() direto; se falhar, aguarda loadedmetadata
-      try {
-        await video.play();
-        setIsReady(true);
-      } catch {
-        await new Promise<void>((resolve, reject) => {
-          const timeout = setTimeout(() => reject(new Error('timeout')), 8000);
-          video!.onloadedmetadata = () => {
-            clearTimeout(timeout);
-            video!.play().then(() => { setIsReady(true); resolve(); }).catch(reject);
-          };
-        }).catch(() => {
-          setCameraErrorMsg('Erro ao iniciar o vídeo. Tente fechar outros apps que usam a câmera.');
-        });
-      }
+      await attachStream(s);
     } catch (err: any) {
       const name: string = err?.name ?? '';
       if (name === 'NotAllowedError' || name === 'PermissionDeniedError') {
-        setCameraErrorMsg('Permissão de câmera negada.\n\nNo Chrome: toque no ícone de câmera 🔒 na barra de endereços e selecione "Permitir".\n\nNo Safari: Ajustes › Safari › Câmera › Permitir.');
-      } else if (name === 'NotFoundError' || name === 'DevicesNotFoundError') {
-        setCameraErrorMsg('Nenhuma câmera encontrada neste dispositivo.');
-      } else if (name === 'NotReadableError' || name === 'TrackStartError') {
-        setCameraErrorMsg('A câmera está em uso por outro aplicativo. Feche-o e tente novamente.');
+        setCameraErrorMsg('Permissão de câmera negada.');
       } else {
-        setCameraErrorMsg('Não foi possível acessar a câmera. Verifique as permissões e tente novamente.');
+        setCameraErrorMsg('Não foi possível acessar a câmera. Tente novamente.');
       }
     }
   }
 
-  useEffect(() => {
-    launchCamera('user');
-    return () => streamRef.current?.getTracks().forEach((t) => t.stop());
-  }, []); // eslint-disable-line
-
   function flipCamera() {
     const next: 'user' | 'environment' = facingMode === 'user' ? 'environment' : 'user';
     setFacingMode(next);
-    setCapturedUrl(null);
-    launchCamera(next);
+    startCamera(next);
   }
 
   function capture() {
@@ -1387,7 +1412,7 @@ function SelfieModal({ workoutName, durationStr, intensity, onClose }: {
             <p className="font-bold text-white text-base mb-3">Câmera não disponível</p>
             <p className="text-sm text-white/60 whitespace-pre-line leading-relaxed">{cameraErrorMsg}</p>
             <button
-              onClick={() => launchCamera(facingMode)}
+              onClick={() => startCamera(facingMode)}
               className="mt-6 px-5 py-2.5 rounded-xl bg-violet-600 text-white text-sm font-semibold"
             >
               Tentar novamente
@@ -1458,7 +1483,7 @@ function SelfieModal({ workoutName, durationStr, intensity, onClose }: {
               </button>
             </div>
             <button
-              onClick={() => { setCapturedUrl(null); launchCamera(facingMode); }}
+              onClick={() => startCamera(facingMode)}
               className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-white/10 text-white text-sm"
             >
               <RotateCcw className="w-3.5 h-3.5" /> Tirar novamente
