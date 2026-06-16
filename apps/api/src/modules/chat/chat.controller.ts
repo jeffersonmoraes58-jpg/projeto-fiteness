@@ -1,6 +1,7 @@
 import { Controller, Get, Post, Body, Param, Query, UseGuards, BadRequestException } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { ChatService } from './chat.service';
+import { ChatGateway } from './chat.gateway';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../../decorators/current-user.decorator';
 
@@ -9,7 +10,7 @@ import { CurrentUser } from '../../decorators/current-user.decorator';
 @UseGuards(JwtAuthGuard)
 @Controller('chat')
 export class ChatController {
-  constructor(private chatService: ChatService) {}
+  constructor(private chatService: ChatService, private chatGateway: ChatGateway) {}
 
   @Post('direct/:targetUserId')
   @ApiOperation({ summary: 'Criar ou buscar chat direto' })
@@ -45,13 +46,21 @@ export class ChatController {
 
   @Post(':chatId/messages')
   @ApiOperation({ summary: 'Enviar mensagem via HTTP (fallback)' })
-  sendMessage(
+  async sendMessage(
     @Param('chatId') chatId: string,
     @CurrentUser('id') userId: string,
-    @Body() body: { content: string; type?: string },
+    @Body() body: { content?: string; type?: string; fileUrl?: string; fileName?: string },
   ) {
-    if (!body.content?.trim()) throw new BadRequestException('Conteúdo obrigatório');
-    return this.chatService.sendMessage(userId, chatId, body as any);
+    if (!body.content?.trim() && !body.fileUrl) throw new BadRequestException('Conteúdo ou arquivo obrigatório');
+    const message = await this.chatService.sendMessage(userId, chatId, body as any);
+    this.chatGateway.server.to(`chat:${chatId}`).emit('message:received', message);
+    const participantIds = await this.chatService.getChatParticipantIds(chatId);
+    for (const participantId of participantIds) {
+      if (participantId !== userId) {
+        this.chatGateway.server.to(`user:${participantId}`).emit('notification:message', { chatId, senderId: userId });
+      }
+    }
+    return message;
   }
 
   @Post(':chatId/mark-read')

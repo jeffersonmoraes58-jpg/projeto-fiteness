@@ -21,6 +21,8 @@ export interface ChatSocketMessage {
   senderId: string;
   content: string;
   type: string;
+  fileUrl?: string;
+  fileName?: string;
   createdAt: string;
   sender?: any;
 }
@@ -31,6 +33,7 @@ interface UseChatSocketOptions {
   onTypingStop?: (userId: string) => void;
   onUserOnline?: (userId: string) => void;
   onUserOffline?: (userId: string) => void;
+  onInitialOnlineUsers?: (userIds: string[]) => void;
   onNotificationMessage?: (data: { chatId: string; senderId: string }) => void;
 }
 
@@ -74,6 +77,10 @@ export function useChatSocket(options: UseChatSocketOptions = {}) {
 
     socket.on('user:offline', ({ userId }: { userId: string }) => {
       optionsRef.current.onUserOffline?.(userId);
+    });
+
+    socket.on('users:online', ({ userIds }: { userIds: string[] }) => {
+      optionsRef.current.onInitialOnlineUsers?.(userIds);
     });
 
     socket.on('notification:message', (data: { chatId: string; senderId: string }) => {

@@ -49,6 +49,9 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
       this.logger.log(`Client connected: ${client.id} (user: ${payload.sub})`);
       this.server.emit('user:online', { userId: payload.sub });
+
+      // Envia lista de usuários já online para o cliente que acabou de conectar
+      client.emit('users:online', { userIds: Array.from(this.connectedUsers.keys()) });
     } catch {
       client.disconnect();
     }

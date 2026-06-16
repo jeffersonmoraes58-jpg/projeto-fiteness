@@ -126,6 +126,27 @@ export class UploadsController {
     };
   }
 
+  @Post('chat')
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({ schema: { type: 'object', properties: { file: { type: 'string', format: 'binary' } } } })
+  @UseInterceptors(FileInterceptor('file', {
+    storage: memoryStorage(),
+    limits: { fileSize: 20 * 1024 * 1024 },
+    fileFilter: allowAllFilter,
+  }))
+  async uploadChatFile(@UploadedFile() file: Express.Multer.File) {
+    if (!file) throw new BadRequestException('Arquivo obrigatório');
+    const result = await this.service.uploadFileRaw(file.buffer, file.originalname, 'chat-files');
+    return {
+      url: result.secure_url,
+      publicId: result.public_id,
+      resourceType: result.resource_type,
+      originalName: file.originalname,
+      mimeType: file.mimetype,
+      size: result.bytes,
+    };
+  }
+
   @Delete(':publicId')
   async deleteFile(@Param('publicId') publicId: string) {
     await this.service.deleteFile(publicId);
