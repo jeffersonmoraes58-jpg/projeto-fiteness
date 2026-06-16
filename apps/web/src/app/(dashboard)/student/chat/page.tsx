@@ -4,7 +4,7 @@ import { useState, useRef, useEffect, useCallback, Suspense } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Send, Search, Phone, Video, MoreVertical,
-  Smile, Paperclip, Mic, ChevronLeft, Wifi, WifiOff,
+  ChevronLeft, Wifi, WifiOff,
   Dumbbell, Apple, X,
 } from 'lucide-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -12,6 +12,8 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
 import { useAuthStore } from '@/store/auth';
 import { useChatSocket, ChatSocketMessage } from '@/hooks/useChatSocket';
+import { ChatInput } from '@/components/chat/ChatInput';
+import { ChatBubble } from '@/components/chat/ChatBubble';
 import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
 
@@ -21,7 +23,6 @@ function StudentChatInner() {
   const router = useRouter();
   const [selectedChat, setSelectedChat] = useState<string | null>(searchParams.get('chatId'));
   const [localMessages, setLocalMessages] = useState<ChatSocketMessage[]>([]);
-  const [message, setMessage] = useState('');
   const [typingUsers, setTypingUsers] = useState<Set<string>>(new Set());
   const [onlineUsers, setOnlineUsers] = useState<Set<string>>(new Set());
   const [search, setSearch] = useState('');
@@ -47,6 +48,7 @@ function StudentChatInner() {
     },
     onUserOnline: (userId) => setOnlineUsers((s) => new Set(s).add(userId)),
     onUserOffline: (userId) => setOnlineUsers((s) => { const n = new Set(s); n.delete(userId); return n; }),
+    onInitialOnlineUsers: (userIds) => setOnlineUsers(new Set(userIds)),
     onNotificationMessage: () => {
       queryClient.invalidateQueries({ queryKey: ['chat-unread-count'] });
       queryClient.invalidateQueries({ queryKey: ['student-chats'] });
@@ -122,17 +124,20 @@ function StudentChatInner() {
     typingTimerRef.current = setTimeout(() => stopTyping(selectedChat), 2000);
   }, [selectedChat, startTyping, stopTyping]);
 
-  const handleSend = async () => {
-    if (!message.trim() || !selectedChat) return;
-    const content = message.trim();
-    setMessage('');
+  const handleSend = async (content: string, type = 'TEXT', fileUrl?: string, fileName?: string) => {
+    if (!selectedChat) return;
     stopTyping(selectedChat);
-    try {
-      await sendMessage(selectedChat, content);
-    } catch {
-      api.post(`/chat/${selectedChat}/messages`, { content, type: 'TEXT' }).then(() =>
-        queryClient.invalidateQueries({ queryKey: ['chat-messages', selectedChat] }),
-      );
+    if (type === 'TEXT') {
+      try {
+        await sendMessage(selectedChat, content);
+      } catch {
+        const res = await api.post(`/chat/${selectedChat}/messages`, { content, type });
+        setLocalMessages((prev) => [...prev, res.data.data]);
+        queryClient.invalidateQueries({ queryKey: ['chat-messages', selectedChat] });
+      }
+    } else {
+      const res = await api.post(`/chat/${selectedChat}/messages`, { content, type, fileUrl, fileName });
+      setLocalMessages((prev) => [...prev, res.data.data]);
     }
   };
 
@@ -243,6 +248,7 @@ function StudentChatInner() {
                           ? <img src={other.profile.avatarUrl} alt="" className="w-full h-full rounded-full object-cover" />
                           : initials}
                       </div>
+                      <span className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-card ${onlineUsers.has(other?.id) ? 'bg-emerald-400' : 'bg-red-500'}`} />
                       {hasUnread && (
                         <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-primary rounded-full text-[9px] text-white flex items-center justify-center font-bold">
                           {chat.unreadCount}
@@ -358,21 +364,9 @@ function StudentChatInner() {
 
           <div className="flex-1 overflow-y-auto scrollbar-hide p-4 space-y-3">
             <AnimatePresence initial={false}>
-              {localMessages.map((msg: any) => {
-                const isMine = msg.senderId === user?.id;
-                return (
-                  <motion.div key={msg.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
-                    className={cn('flex', isMine ? 'justify-end' : 'justify-start')}>
-                    <div className={cn('max-w-[75%] px-4 py-2.5 rounded-2xl text-sm',
-                      isMine ? 'bg-primary text-primary-foreground rounded-br-sm' : 'glass rounded-bl-sm')}>
-                      <p>{msg.content}</p>
-                      <div className={cn('text-[10px] mt-1', isMine ? 'text-primary-foreground/70 text-right' : 'text-muted-foreground')}>
-                        {new Date(msg.createdAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-                      </div>
-                    </div>
-                  </motion.div>
-                );
-              })}
+              {localMessages.map((msg: any) => (
+                <ChatBubble key={msg.id} msg={msg} isMine={msg.senderId === user?.id} />
+              ))}
             </AnimatePresence>
             {typingUsers.size > 0 && (
               <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} className="flex justify-start">
@@ -390,33 +384,7 @@ function StudentChatInner() {
             <div ref={messagesEndRef} />
           </div>
 
-          <div className="p-4 border-t border-border/50">
-            <div className="flex items-center gap-2">
-              <button className="w-9 h-9 rounded-xl hover:bg-accent flex items-center justify-center transition-all flex-shrink-0">
-                <Paperclip className="w-4 h-4 text-muted-foreground" />
-              </button>
-              <input
-                type="text"
-                placeholder="Digite uma mensagem..."
-                value={message}
-                onChange={(e) => { setMessage(e.target.value); handleTyping(); }}
-                onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleSend()}
-                className="input-field flex-1 py-2.5 text-sm"
-              />
-              <button className="w-9 h-9 rounded-xl hover:bg-accent flex items-center justify-center transition-all flex-shrink-0">
-                <Smile className="w-4 h-4 text-muted-foreground" />
-              </button>
-              {message.trim() ? (
-                <button onClick={handleSend} className="w-9 h-9 rounded-xl bg-primary flex items-center justify-center hover:bg-primary/80 transition-all flex-shrink-0">
-                  <Send className="w-4 h-4 text-white" />
-                </button>
-              ) : (
-                <button className="w-9 h-9 rounded-xl hover:bg-accent flex items-center justify-center transition-all flex-shrink-0">
-                  <Mic className="w-4 h-4 text-muted-foreground" />
-                </button>
-              )}
-            </div>
-          </div>
+          <ChatInput selectedChat={selectedChat} onSend={handleSend} onTyping={handleTyping} />
         </div>
       ) : (
         <div className="hidden lg:flex flex-1 glass rounded-2xl items-center justify-center">
