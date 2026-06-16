@@ -623,14 +623,11 @@ function WorkoutMusicPlayer() {
     function initPlayer() {
       if (!playerDivRef.current || playerRef.current) return;
       playerRef.current = new window.YT.Player(playerDivRef.current, {
-        width: '100%',
-        playerVars: { rel: 0, modestbranding: 1, playsinline: 1 },
+        width: '1',
+        height: '1',
+        playerVars: { rel: 0, playsinline: 1 },
         events: {
-          onReady: (e: any) => {
-            const iframe = e.target.getIframe();
-            iframe.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;border:0;';
-            setPlayerReady(true);
-          },
+          onReady: () => setPlayerReady(true),
           onStateChange: (e: any) => setIsPlaying(e.data === 1),
         },
       });
@@ -673,19 +670,26 @@ function WorkoutMusicPlayer() {
 
   return (
     <div className="glass-card overflow-hidden">
+      {/* Hidden audio-only player — stays in DOM regardless of open state */}
+      <div className="sr-only" aria-hidden="true">
+        <div ref={playerDivRef} />
+      </div>
+
+      {/* Header toggle */}
       <button onClick={() => setOpen((o) => !o)} className="w-full flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-lg bg-violet-500/20 flex items-center justify-center">
+        <div className="flex items-center gap-2 min-w-0">
+          <div className="w-7 h-7 rounded-lg bg-violet-500/20 flex items-center justify-center flex-shrink-0">
             <Music className="w-3.5 h-3.5 text-violet-400" />
           </div>
-          <span className="text-sm font-semibold truncate max-w-[200px]">
+          <span className="text-sm font-semibold truncate">
             {isPlaying && currentTitle ? `🎵 ${currentTitle}` : 'Música de treino'}
           </span>
         </div>
-        {open ? <ChevronUp className="w-4 h-4 text-muted-foreground flex-shrink-0" /> : <ChevronDown className="w-4 h-4 text-muted-foreground flex-shrink-0" />}
+        {open
+          ? <ChevronUp className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+          : <ChevronDown className="w-4 h-4 text-muted-foreground flex-shrink-0" />}
       </button>
 
-      {/* Kept in DOM even when collapsed to preserve player state */}
       <div className={cn('mt-4 space-y-3', !open && 'hidden')}>
         {/* Search input */}
         <div className="flex gap-2">
@@ -728,65 +732,57 @@ function WorkoutMusicPlayer() {
           </div>
         )}
         {searchErr && !searching && (
-          <p className="text-xs text-center text-muted-foreground py-2">
-            Nenhum resultado. Tente outro termo.
-          </p>
+          <p className="text-xs text-center text-muted-foreground py-2">Nenhum resultado. Tente outro termo.</p>
         )}
 
         {/* Result thumbnails — horizontal scroll */}
         {results.length > 0 && !searching && (
-          <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' } as React.CSSProperties}>
+          <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1" style={{ scrollbarWidth: 'none' } as React.CSSProperties}>
             {results.map((v) => (
               <button
                 key={v.videoId}
                 onClick={() => playVideo(v)}
                 className={cn(
-                  'flex-shrink-0 w-36 rounded-xl overflow-hidden text-left transition-all border',
+                  'flex-shrink-0 w-32 rounded-xl overflow-hidden text-left transition-all border',
                   currentId === v.videoId
                     ? 'border-primary/60 ring-1 ring-primary/40'
-                    : 'border-transparent opacity-65 hover:opacity-100',
+                    : 'border-transparent opacity-60 hover:opacity-100',
                 )}
               >
                 <img src={v.thumbnail} alt={v.title} className="w-full aspect-video object-cover" loading="lazy" />
-                <div className="px-2 py-1.5 bg-white/5">
-                  <p className="text-[11px] font-medium line-clamp-2 leading-tight">{v.title}</p>
-                  <p className="text-[10px] text-muted-foreground mt-0.5 truncate">{v.author}</p>
+                <div className="px-1.5 py-1 bg-white/5">
+                  <p className="text-[10px] font-medium line-clamp-2 leading-tight">{v.title}</p>
+                  <p className="text-[9px] text-muted-foreground mt-0.5 truncate">{v.author}</p>
                 </div>
               </button>
             ))}
           </div>
         )}
 
-        {/* YouTube IFrame Player */}
-        <div className="relative rounded-xl overflow-hidden bg-black" style={{ paddingBottom: '56.25%', height: 0 }}>
-          <div ref={playerDivRef} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }} />
-          {!playerReady && (
-            <div className="absolute inset-0 flex items-center justify-center">
-              <p className="text-white/40 text-sm">Carregando player...</p>
-            </div>
-          )}
-          {playerReady && !currentId && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-black/90 pointer-events-none">
-              <Music className="w-10 h-10 text-white/20" />
-              <p className="text-white/40 text-sm">Pesquise uma música acima</p>
-            </div>
-          )}
-        </div>
-
-        {/* Open in YouTube for locked-screen background play */}
+        {/* Now playing bar */}
         {currentId && (
-          <>
+          <div className="flex items-center gap-3 p-2.5 rounded-xl bg-violet-500/10 border border-violet-500/20">
+            <img
+              src={`https://img.youtube.com/vi/${currentId}/mqdefault.jpg`}
+              alt=""
+              className="w-10 h-10 rounded-lg object-cover flex-shrink-0"
+            />
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-medium truncate">{currentTitle}</p>
+              <p className="text-[10px] text-muted-foreground flex items-center gap-1 mt-0.5">
+                {isPlaying
+                  ? <><span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse inline-block" /> Em reprodução</>
+                  : 'Pausado'}
+              </p>
+            </div>
             <button
               onClick={() => window.open(`https://www.youtube.com/watch?v=${currentId}`, '_blank')}
-              className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-red-600/20 hover:bg-red-600/30 text-red-400 text-xs font-medium transition-all border border-red-600/20"
+              title="Abrir no YouTube para ouvir com tela bloqueada"
+              className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-white/10 transition-all flex-shrink-0 text-muted-foreground"
             >
               <ExternalLink className="w-3.5 h-3.5" />
-              Abrir no YouTube (tela bloqueada)
             </button>
-            <p className="text-[11px] text-muted-foreground text-center -mt-1">
-              O player pausa quando a tela bloqueia. Abra no app do YouTube para ouvir em segundo plano.
-            </p>
-          </>
+          </div>
         )}
       </div>
     </div>
