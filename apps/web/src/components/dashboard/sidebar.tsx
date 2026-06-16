@@ -10,7 +10,9 @@ import {
   Calendar, CreditCard, Brain, Home, Utensils,
   Activity, Target, Star, Building2,
 } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
 import { useAuthStore } from '@/store/auth';
+import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
 
 const navByRole: Record<string, NavItem[]> = {
@@ -21,7 +23,7 @@ const navByRole: Record<string, NavItem[]> = {
     { icon: Activity, label: 'Exercícios', href: '/trainer/exercises' },
     { icon: Trophy, label: 'Desafios', href: '/trainer/challenges' },
     { icon: Calendar, label: 'Agenda', href: '/trainer/schedule' },
-    { icon: MessageCircle, label: 'Chat', href: '/trainer/chat', badge: 3 },
+    { icon: MessageCircle, label: 'Chat', href: '/trainer/chat', isChat: true },
     { icon: BarChart3, label: 'Relatórios', href: '/trainer/reports' },
     { icon: Brain, label: 'IA Fitness', href: '/trainer/ai' },
     { icon: CreditCard, label: 'Pagamentos', href: '/trainer/payments' },
@@ -33,7 +35,7 @@ const navByRole: Record<string, NavItem[]> = {
     { icon: Apple, label: 'Dietas', href: '/nutritionist/diets' },
     { icon: Utensils, label: 'Alimentos', href: '/nutritionist/foods' },
     { icon: Calendar, label: 'Agenda', href: '/nutritionist/schedule' },
-    { icon: MessageCircle, label: 'Chat', href: '/nutritionist/chat', badge: 2 },
+    { icon: MessageCircle, label: 'Chat', href: '/nutritionist/chat', isChat: true },
     { icon: BarChart3, label: 'Relatórios', href: '/nutritionist/reports' },
     { icon: Brain, label: 'IA Nutrição', href: '/nutritionist/ai' },
     { icon: Settings, label: 'Configurações', href: '/nutritionist/settings' },
@@ -46,7 +48,7 @@ const navByRole: Record<string, NavItem[]> = {
     { icon: Target, label: 'Metas', href: '/student/goals' },
     { icon: Trophy, label: 'Conquistas', href: '/student/achievements' },
     { icon: Star, label: 'Desafios', href: '/student/challenges' },
-    { icon: MessageCircle, label: 'Chat', href: '/student/chat', badge: 1 },
+    { icon: MessageCircle, label: 'Chat', href: '/student/chat', isChat: true },
     { icon: CreditCard, label: 'Pagamentos', href: '/student/billing' },
     { icon: Settings, label: 'Perfil', href: '/student/profile' },
   ],
@@ -67,6 +69,7 @@ interface NavItem {
   label: string;
   href: string;
   badge?: number;
+  isChat?: boolean;
 }
 
 export function DashboardSidebar() {
@@ -74,6 +77,13 @@ export function DashboardSidebar() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const pathname = usePathname();
   const { user, logout } = useAuthStore();
+
+  const { data: unreadCount = 0 } = useQuery<number>({
+    queryKey: ['chat-unread-count'],
+    queryFn: () => api.get('/chat/unread/count').then((r) => r.data.data ?? 0),
+    refetchInterval: 20000,
+    enabled: !!user,
+  });
 
   useEffect(() => {
     const handler = () => setMobileOpen((v) => !v);
@@ -107,6 +117,7 @@ export function DashboardSidebar() {
       <nav className="flex-1 p-3 space-y-1 overflow-y-auto scrollbar-hide">
         {navItems.map((item) => {
           const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
+          const badge = item.isChat ? unreadCount : (item.badge ?? 0);
           return (
             <Link
               key={item.href}
@@ -131,12 +142,12 @@ export function DashboardSidebar() {
                   </motion.span>
                 )}
               </AnimatePresence>
-              {item.badge && !collapsed && (
-                <span className="ml-auto bg-primary text-primary-foreground text-xs rounded-full w-5 h-5 flex items-center justify-center">
-                  {item.badge}
+              {badge > 0 && !collapsed && (
+                <span className="ml-auto bg-primary text-primary-foreground text-xs rounded-full min-w-[20px] h-5 px-1 flex items-center justify-center">
+                  {badge > 99 ? '99+' : badge}
                 </span>
               )}
-              {item.badge && collapsed && (
+              {badge > 0 && collapsed && (
                 <span className="absolute top-1 right-1 bg-primary rounded-full w-2 h-2" />
               )}
             </Link>

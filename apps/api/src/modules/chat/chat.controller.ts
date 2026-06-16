@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Param, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Query, UseGuards, BadRequestException } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { ChatService } from './chat.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -26,6 +26,12 @@ export class ChatController {
     return this.chatService.getUserChats(userId);
   }
 
+  @Get('unread/count')
+  @ApiOperation({ summary: 'Total de mensagens não lidas' })
+  getUnreadCount(@CurrentUser('id') userId: string) {
+    return this.chatService.getUnreadCount(userId);
+  }
+
   @Get(':chatId/messages')
   @ApiOperation({ summary: 'Mensagens do chat' })
   getChatMessages(
@@ -37,9 +43,23 @@ export class ChatController {
     return this.chatService.getChatMessages(chatId, userId, page, limit);
   }
 
-  @Get('unread/count')
-  @ApiOperation({ summary: 'Total de mensagens não lidas' })
-  getUnreadCount(@CurrentUser('id') userId: string) {
-    return this.chatService.getUnreadCount(userId);
+  @Post(':chatId/messages')
+  @ApiOperation({ summary: 'Enviar mensagem via HTTP (fallback)' })
+  sendMessage(
+    @Param('chatId') chatId: string,
+    @CurrentUser('id') userId: string,
+    @Body() body: { content: string; type?: string },
+  ) {
+    if (!body.content?.trim()) throw new BadRequestException('Conteúdo obrigatório');
+    return this.chatService.sendMessage(userId, chatId, body as any);
+  }
+
+  @Post(':chatId/mark-read')
+  @ApiOperation({ summary: 'Marcar mensagens como lidas (fallback HTTP)' })
+  markAsRead(
+    @Param('chatId') chatId: string,
+    @CurrentUser('id') userId: string,
+  ) {
+    return this.chatService.markAsRead(userId, chatId);
   }
 }
