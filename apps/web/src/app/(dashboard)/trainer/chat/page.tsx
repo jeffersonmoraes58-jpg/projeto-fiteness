@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, Suspense } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Send, Search, Phone, Video, MoreVertical,
@@ -13,7 +13,7 @@ import { useAuthStore } from '@/store/auth';
 import { useChatSocket, ChatSocketMessage } from '@/hooks/useChatSocket';
 import { cn } from '@/lib/utils';
 
-export default function TrainerChat() {
+function TrainerChatInner() {
   const { user } = useAuthStore();
   const searchParams = useSearchParams();
   const [selectedChat, setSelectedChat] = useState<string | null>(searchParams.get('chatId'));
@@ -326,5 +326,13 @@ export default function TrainerChat() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function TrainerChat() {
+  return (
+    <Suspense>
+      <TrainerChatInner />
+    </Suspense>
   );
 }
