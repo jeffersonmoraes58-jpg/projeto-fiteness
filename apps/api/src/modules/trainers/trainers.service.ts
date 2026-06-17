@@ -85,25 +85,51 @@ export class TrainersService {
 
   async getAppointments(userId: string) {
     const trainer = await this.getTrainer(userId);
-    return this.prisma.appointment.findMany({
+    const appointments = await this.prisma.appointment.findMany({
       where: { trainerId: trainer.id },
       orderBy: { scheduledAt: 'asc' },
     });
+
+    const studentIds = [...new Set(appointments.map((a) => a.studentId).filter(Boolean))];
+    const students = studentIds.length
+      ? await this.prisma.student.findMany({
+          where: { id: { in: studentIds } },
+          include: { user: { include: { profile: true } } },
+        })
+      : [];
+    const studentMap = new Map(students.map((s) => [s.id, s]));
+
+    return appointments.map((a) => ({ ...a, student: studentMap.get(a.studentId) ?? null }));
   }
 
   async createAppointment(userId: string, data: any) {
     const trainer = await this.getTrainer(userId);
-    return this.prisma.appointment.create({ data: { trainerId: trainer.id, ...data } });
+    const appt = await this.prisma.appointment.create({ data: { trainerId: trainer.id, ...data } });
+    const student = appt.studentId
+      ? await this.prisma.student.findUnique({
+          where: { id: appt.studentId },
+          include: { user: { include: { profile: true } } },
+        })
+      : null;
+    return { ...appt, student };
   }
 
   async updateAppointment(userId: string, id: string, data: any) {
     const trainer = await this.getTrainer(userId);
-    return this.prisma.appointment.update({ where: { id, trainerId: trainer.id }, data });
+    const appt = await this.prisma.appointment.update({ where: { id, trainerId: trainer.id }, data });
+    const student = appt.studentId
+      ? await this.prisma.student.findUnique({
+          where: { id: appt.studentId },
+          include: { user: { include: { profile: true } } },
+        })
+      : null;
+    return { ...appt, student };
   }
 
   async deleteAppointment(userId: string, id: string) {
     const trainer = await this.getTrainer(userId);
-    return this.prisma.appointment.delete({ where: { id, trainerId: trainer.id } });
+    await this.prisma.appointment.delete({ where: { id, trainerId: trainer.id } });
+    return { message: 'Agendamento excluído' };
   }
 
   async getReports(userId: string) {
