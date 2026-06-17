@@ -1,15 +1,15 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import {
-  Search, Plus, Users, Dumbbell, TrendingUp,
+  Search, Plus, Users, Dumbbell,
   ChevronRight, MoreVertical, MessageCircle, Flame,
-  Activity, Calendar, Filter, Link2, X, Copy, Check,
+  Activity, Link2, X, Copy, Check, UserMinus, Eye,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
@@ -269,11 +269,22 @@ const COLORS = ['from-purple-600 to-indigo-600', 'from-cyan-600 to-blue-600', 'f
 
 function StudentCard({ student, index }: { student: any; index: number }) {
   const router = useRouter();
+  const qc = useQueryClient();
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
   const initials = `${student.user?.profile?.firstName?.[0] || ''}${student.user?.profile?.lastName?.[0] || ''}`;
   const color = COLORS[index % COLORS.length];
   const lastCheckin = student.lastCheckinAt
     ? new Date(student.lastCheckinAt).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })
     : 'Nunca';
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false);
+    }
+    if (menuOpen) document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [menuOpen]);
 
   async function handleStartChat() {
     try {
@@ -282,6 +293,18 @@ function StudentCard({ student, index }: { student: any; index: number }) {
       router.push(`/trainer/chat?chatId=${chatId}`);
     } catch {
       toast.error('Erro ao abrir chat');
+    }
+  }
+
+  async function handleRemove() {
+    setMenuOpen(false);
+    if (!confirm(`Remover ${student.user?.profile?.firstName} da sua lista de alunos?`)) return;
+    try {
+      await api.delete(`/trainers/me/students/${student.id}`);
+      toast.success('Aluno removido');
+      qc.invalidateQueries({ queryKey: ['trainer-students-list'] });
+    } catch {
+      toast.error('Erro ao remover aluno');
     }
   }
 
@@ -301,12 +324,56 @@ function StudentCard({ student, index }: { student: any; index: number }) {
           </div>
           <div>
             <div className="font-semibold">{student.user?.profile?.firstName} {student.user?.profile?.lastName}</div>
-            <div className="text-xs text-muted-foreground">{GOAL_LABELS[student.goalType] || 'Sem objetivo'}</div>
+            <div className="text-xs text-muted-foreground">
+              {GOAL_LABELS[student.goalType] || (student.anamnesis?.mainGoal ? student.anamnesis.mainGoal.slice(0, 30) : 'Sem objetivo definido')}
+            </div>
           </div>
         </div>
-        <button className="w-7 h-7 rounded-lg hover:bg-accent flex items-center justify-center transition-all">
-          <MoreVertical className="w-4 h-4 text-muted-foreground" />
-        </button>
+
+        {/* Three dots menu */}
+        <div className="relative" ref={menuRef}>
+          <button
+            onClick={() => setMenuOpen((o) => !o)}
+            className="w-7 h-7 rounded-lg hover:bg-accent flex items-center justify-center transition-all"
+          >
+            <MoreVertical className="w-4 h-4 text-muted-foreground" />
+          </button>
+          {menuOpen && (
+            <div className="absolute right-0 top-8 z-20 w-44 glass-card p-1 shadow-xl border border-border/50 rounded-xl space-y-0.5">
+              <Link
+                href={`/trainer/students/${student.id}`}
+                onClick={() => setMenuOpen(false)}
+                className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-accent text-sm transition-all"
+              >
+                <Eye className="w-3.5 h-3.5 text-muted-foreground" />
+                Ver perfil
+              </Link>
+              <button
+                onClick={() => { setMenuOpen(false); handleStartChat(); }}
+                className="w-full flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-accent text-sm transition-all"
+              >
+                <MessageCircle className="w-3.5 h-3.5 text-muted-foreground" />
+                Enviar mensagem
+              </button>
+              <Link
+                href={`/trainer/students/${student.id}#treinos`}
+                onClick={() => setMenuOpen(false)}
+                className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-accent text-sm transition-all"
+              >
+                <Dumbbell className="w-3.5 h-3.5 text-muted-foreground" />
+                Ver treinos
+              </Link>
+              <div className="border-t border-border/40 my-0.5" />
+              <button
+                onClick={handleRemove}
+                className="w-full flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-red-500/10 text-sm text-red-400 transition-all"
+              >
+                <UserMinus className="w-3.5 h-3.5" />
+                Remover aluno
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Stats row */}
@@ -318,25 +385,22 @@ function StudentCard({ student, index }: { student: any; index: number }) {
           <div className="text-[10px] text-muted-foreground">Sequência</div>
         </div>
         <div className="glass rounded-xl p-2 text-center">
-          <div className="text-sm font-bold">{student.weeklyCheckins || 0}</div>
-          <div className="text-[10px] text-muted-foreground">Treinos/sem</div>
-        </div>
-        <div className="glass rounded-xl p-2 text-center">
           <div className="text-sm font-bold">{student.level || 1}</div>
           <div className="text-[10px] text-muted-foreground">Nível</div>
+        </div>
+        <div className="glass rounded-xl p-2 text-center">
+          <div className="text-sm font-bold">{lastCheckin}</div>
+          <div className="text-[10px] text-muted-foreground">Último treino</div>
         </div>
       </div>
 
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-1.5">
-          <span className={cn(
-            'text-xs px-2 py-0.5 rounded-full',
-            student.isActive ? 'bg-emerald-500/10 text-emerald-400' : 'bg-muted text-muted-foreground',
-          )}>
-            {student.isActive ? 'Ativo' : 'Inativo'}
-          </span>
-          <span className="text-xs text-muted-foreground">último: {lastCheckin}</span>
-        </div>
+        <span className={cn(
+          'text-xs px-2 py-0.5 rounded-full',
+          student.isActive ? 'bg-emerald-500/10 text-emerald-400' : 'bg-muted text-muted-foreground',
+        )}>
+          {student.isActive ? 'Ativo' : 'Inativo'}
+        </span>
         <div className="flex items-center gap-1">
           {(() => {
             const rawPhone = student.user?.profile?.phone?.replace(/\D/g, '');
@@ -357,9 +421,6 @@ function StudentCard({ student, index }: { student: any; index: number }) {
           <button onClick={handleStartChat} className="w-7 h-7 rounded-lg hover:bg-accent flex items-center justify-center transition-all">
             <MessageCircle className="w-3.5 h-3.5 text-muted-foreground" />
           </button>
-          <Link href={`/trainer/workouts`} className="w-7 h-7 rounded-lg hover:bg-accent flex items-center justify-center transition-all">
-            <Dumbbell className="w-3.5 h-3.5 text-muted-foreground" />
-          </Link>
           <Link href={`/trainer/students/${student.id}`} className="w-7 h-7 rounded-lg hover:bg-accent flex items-center justify-center transition-all">
             <ChevronRight className="w-3.5 h-3.5 text-muted-foreground" />
           </Link>
