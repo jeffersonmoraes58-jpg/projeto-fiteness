@@ -137,6 +137,7 @@ export default function StudentWorkout() {
   const [videoModal, setVideoModal] = useState<{ url: string; title: string } | null>(null);
   const [startTime, setStartTime] = useState<Date | null>(null);
   const [showSummary, setShowSummary] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
   const queryClient = useQueryClient();
 
   const { data: workoutPlans } = useQuery({
@@ -273,7 +274,7 @@ export default function StudentWorkout() {
           workoutName={activePlan.workout?.name || 'Treino'}
           startTime={startTime}
           isPending={logMutation.isPending}
-          onConfirm={(intensity, comment) => logMutation.mutate({ workoutPlanId: activePlan.id, intensity, comment })}
+          onConfirm={(intensity, comment, duration) => logMutation.mutate({ workoutPlanId: activePlan.id, intensity, comment, duration })}
           onClose={() => {
             setShowSummary(false);
             setActiveWorkout(false);
@@ -543,25 +544,38 @@ export default function StudentWorkout() {
             {/* Recent logs */}
             {workoutLogs?.length > 0 && (
               <div className="glass-card">
-                <h2 className="font-semibold mb-4 flex items-center gap-2">
-                  <RotateCcw className="w-4 h-4 text-muted-foreground" />Histórico Recente
-                </h2>
-                <div className="space-y-2">
-                  {workoutLogs.map((log: any, i: number) => (
-                    <div key={i} className="flex items-center gap-3 p-3 rounded-xl hover:bg-accent transition-all">
-                      <div className="w-9 h-9 rounded-xl bg-emerald-600/10 flex items-center justify-center">
-                        <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                      </div>
-                      <div className="flex-1">
-                        <div className="text-sm font-medium">{log.workoutPlan?.workout?.name || 'Treino'}</div>
-                        <div className="text-xs text-muted-foreground">
-                          {new Date(log.startedAt || log.completedAt).toLocaleDateString('pt-BR')} • {log.duration} min
+                <button
+                  onClick={() => setShowHistory((v) => !v)}
+                  className="w-full flex items-center justify-between"
+                >
+                  <h2 className="font-semibold flex items-center gap-2">
+                    <RotateCcw className="w-4 h-4 text-muted-foreground" />Histórico Recente
+                  </h2>
+                  {showHistory
+                    ? <ChevronUp className="w-4 h-4 text-muted-foreground" />
+                    : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
+                </button>
+                {showHistory && (
+                  <div className="space-y-2 mt-4">
+                    {workoutLogs.map((log: any, i: number) => (
+                      <div key={i} className="flex items-center gap-3 p-3 rounded-xl hover:bg-accent transition-all">
+                        <div className="w-9 h-9 rounded-xl bg-emerald-600/10 flex items-center justify-center">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-400" />
                         </div>
+                        <div className="flex-1">
+                          <div className="text-sm font-medium">{log.workoutPlan?.workout?.name || 'Treino'}</div>
+                          <div className="text-xs text-muted-foreground flex items-center gap-1">
+                            {new Date(log.startedAt || log.completedAt).toLocaleDateString('pt-BR')}
+                            {log.duration != null && (
+                              <><span className="mx-0.5">•</span><Clock className="w-3 h-3" />{log.duration} min</>
+                            )}
+                          </div>
+                        </div>
+                        <ChevronRight className="w-4 h-4 text-muted-foreground" />
                       </div>
-                      <ChevronRight className="w-4 h-4 text-muted-foreground" />
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
           </>
@@ -899,7 +913,7 @@ function WorkoutSummaryModal({ workoutName, startTime, isPending, onConfirm, onC
   workoutName: string;
   startTime: Date;
   isPending: boolean;
-  onConfirm: (intensity: string, comment: string) => void;
+  onConfirm: (intensity: string, comment: string, duration: number) => void;
   onClose: () => void;
 }) {
   const [endTime] = useState(() => new Date());
@@ -932,7 +946,7 @@ function WorkoutSummaryModal({ workoutName, startTime, isPending, onConfirm, onC
   const endStr = endTime.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
 
   const handleConcluir = () => {
-    onConfirm(intensity, comment);
+    onConfirm(intensity, comment, mins);
     setConfirmed(true);
     setCardUrl(generateWorkoutCard({ workoutName, dateStr, startStr, endStr, durationStr, intensity, comment }));
   };
@@ -994,27 +1008,42 @@ function WorkoutSummaryModal({ workoutName, startTime, isPending, onConfirm, onC
     setFacingMode('user');
 
     if (!navigator.mediaDevices?.getUserMedia) {
-      setSelfieErr('Câmera não suportada neste navegador.');
+      setSelfieErr('Câmera não suportada neste navegador.\nTente no Chrome.');
       return;
     }
     try {
-      const s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false });
+      // Try with facingMode first, fall back to plain video:true
+      let s: MediaStream;
+      try {
+        s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false });
+      } catch {
+        s = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+      }
       streamRef.current?.getTracks().forEach((t) => t.stop());
       streamRef.current = s;
       const video = videoRef.current!;
       video.srcObject = s;
-      video.play().catch(() => {}); // fire-and-forget; onPlaying event sets isVideoReady
-      setShowSelfie(true); // show overlay immediately — don't wait for play()
+      video.play().catch(() => {});
+      setShowSelfie(true);
     } catch (err: any) {
       const name: string = err?.name ?? '';
+      const isBrave = !!(navigator as any).brave;
       if (name === 'NotAllowedError' || name === 'PermissionDeniedError') {
-        setSelfieErr('Câmera bloqueada.\nToque no 🔒 na barra de endereços → "Permitir câmera".\n\nNo Safari: Ajustes › Safari › Câmera › Permitir.');
+        const braveMsg = isBrave
+          ? '\n\n🦁 Brave detectado:\n• Toque no ícone do leão na barra de endereços\n• Mude "Bloqueio de impressão digital" para Padrão\n• Ou desative os Shields para este site'
+          : '';
+        setSelfieErr(
+          `Câmera bloqueada (NotAllowedError).\n\n` +
+          `1. Toque no 🔒 na barra → Permissões → Câmera → Permitir\n` +
+          `2. Android: Configurações → Apps → ${isBrave ? 'Brave' : 'Navegador'} → Permissões → Câmera → Permitir` +
+          braveMsg
+        );
       } else if (name === 'NotFoundError' || name === 'DevicesNotFoundError') {
         setSelfieErr('Nenhuma câmera encontrada neste dispositivo.');
       } else if (name === 'NotReadableError' || name === 'TrackStartError') {
         setSelfieErr('A câmera está em uso por outro app. Feche-o e tente novamente.');
       } else {
-        setSelfieErr(`Erro ao abrir câmera: ${name || 'desconhecido'} — ${err?.message || ''}`);
+        setSelfieErr(`Erro: ${name || 'desconhecido'} — ${err?.message || '(sem mensagem)'}`);
       }
     }
   }
