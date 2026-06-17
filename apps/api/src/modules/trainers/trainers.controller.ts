@@ -60,9 +60,9 @@ export class TrainersController {
   }
 
   @Get('me/reports')
-  @ApiOperation({ summary: 'Relatórios dos últimos 30 dias' })
-  getReports(@CurrentUser() user: any) {
-    return this.service.getReports(user.id);
+  @ApiOperation({ summary: 'Relatórios por período' })
+  getReports(@CurrentUser() user: any, @Query('days') days?: string) {
+    return this.service.getReports(user.id, days ? Number(days) : 30);
   }
 
   @Get('me/payments')
