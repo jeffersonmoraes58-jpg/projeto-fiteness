@@ -82,6 +82,13 @@ export class WorkoutsController {
     return this.workoutsService.assignToStudent(workoutId, dto);
   }
 
+  @Patch('plans/:planId')
+  @Roles(UserRole.TRAINER, UserRole.NUTRITIONIST)
+  @ApiOperation({ summary: 'Atualizar plano de treino atribuído ao aluno' })
+  updatePlan(@Param('planId') planId: string, @Body() body: any) {
+    return this.workoutsService.updatePlan(planId, body);
+  }
+
   @Delete('plans/:planId')
   @Roles(UserRole.TRAINER, UserRole.NUTRITIONIST)
   @ApiOperation({ summary: 'Remover plano de treino do aluno' })

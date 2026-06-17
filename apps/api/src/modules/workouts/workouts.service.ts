@@ -164,6 +164,20 @@ export class WorkoutsService {
     });
   }
 
+  async updatePlan(planId: string, data: { notes?: string; division?: string; startDate?: string; endDate?: string; isActive?: boolean }) {
+    return this.prisma.workoutPlan.update({
+      where: { id: planId },
+      data: {
+        ...(data.notes !== undefined && { notes: data.notes }),
+        ...(data.division !== undefined && { division: data.division }),
+        ...(data.startDate && { startDate: new Date(data.startDate) }),
+        ...(data.endDate !== undefined && { endDate: data.endDate ? new Date(data.endDate) : null }),
+        ...(data.isActive !== undefined && { isActive: data.isActive }),
+      },
+      include: { workout: true },
+    });
+  }
+
   async removePlan(planId: string) {
     await this.prisma.workoutPlan.delete({ where: { id: planId } });
     return { message: 'Plano removido com sucesso' };
