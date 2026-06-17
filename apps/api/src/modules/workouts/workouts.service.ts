@@ -52,6 +52,7 @@ export class WorkoutsService {
     return this.prisma.workout.findMany({
       where: {
         trainerId: trainer.id,
+        NOT: { tags: { has: '__personalized' } },
         ...(search && { name: { contains: search, mode: 'insensitive' } }),
       },
       include: {
@@ -226,6 +227,71 @@ export class WorkoutsService {
         },
       },
     });
+  }
+
+  async forkPlan(planId: string) {
+    const plan = await this.prisma.workoutPlan.findUnique({
+      where: { id: planId },
+      include: {
+        workout: {
+          include: {
+            exercises: { orderBy: { order: 'asc' } },
+            _count: { select: { plans: true } },
+          },
+        },
+      },
+    });
+
+    if (!plan) throw new NotFoundException('Plano não encontrado');
+
+    if (plan.workout._count.plans <= 1) {
+      const workout = await this.prisma.workout.findUnique({
+        where: { id: plan.workoutId },
+        include: { exercises: { include: { exercise: true }, orderBy: { order: 'asc' } } },
+      });
+      return { workoutId: plan.workoutId, forked: false, workout };
+    }
+
+    const { workout } = plan;
+    const cloned = await this.prisma.$transaction(async (tx) => {
+      const newWorkout = await tx.workout.create({
+        data: {
+          name: workout.name,
+          description: workout.description,
+          status: workout.status,
+          level: workout.level,
+          duration: workout.duration,
+          tags: [...(workout.tags || []), '__personalized'],
+          isTemplate: false,
+          trainerId: workout.trainerId,
+          exercises: {
+            create: workout.exercises.map((ex) => ({
+              exerciseId: ex.exerciseId,
+              order: ex.order,
+              sets: ex.sets,
+              reps: ex.reps,
+              weight: ex.weight,
+              restSeconds: ex.restSeconds,
+              tempo: ex.tempo,
+              notes: ex.notes,
+              isDropSet: ex.isDropSet,
+              isSuperSet: ex.isSuperSet,
+              superSetGroupId: ex.superSetGroupId,
+            })),
+          },
+        },
+        include: { exercises: { include: { exercise: true }, orderBy: { order: 'asc' } } },
+      });
+
+      await tx.workoutPlan.update({
+        where: { id: planId },
+        data: { workoutId: newWorkout.id },
+      });
+
+      return newWorkout;
+    });
+
+    return { workoutId: cloned.id, forked: true, workout: cloned };
   }
 
   async logWorkout(data: any, userId: string) {
