@@ -1110,128 +1110,120 @@ function WorkoutSummaryModal({ workoutName, startTime, isPending, onConfirm, onC
     handleSelfieDownload();
   }
 
-  // When in selfie mode and not yet captured: show the video fullscreen
-  const inLiveCamera = showSelfie && !capturedUrl && !cameraError;
-
   return (
     <>
-      {/* Selfie fullscreen overlay */}
-      {showSelfie && (
-        <div className="fixed inset-0 z-[99999] bg-black flex flex-col select-none">
-          <div
-            className="absolute top-0 left-0 right-0 z-10 flex items-center justify-between px-4 py-3"
-            style={{ background: 'linear-gradient(to bottom, rgba(0,0,0,0.75) 0%, transparent 100%)' }}
-          >
-            <h2 className="font-bold text-lg flex items-center gap-2 text-white">
-              <Camera className="w-5 h-5 text-violet-400" />
-              Hora da Self!
-            </h2>
-            <button
-              onClick={closeSelfie}
-              className="w-9 h-9 rounded-full bg-black/40 border border-white/20 flex items-center justify-center"
-            >
-              <X className="w-4 h-4 text-white" />
-            </button>
-          </div>
-
-          <div className="flex-1 relative overflow-hidden">
-            {cameraError ? (
-              <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-8">
-                <Camera className="w-14 h-14 text-white/25 mb-5" />
-                <p className="font-bold text-white text-base mb-3">Câmera não disponível</p>
-                <p className="text-sm text-white/60 whitespace-pre-line leading-relaxed">{cameraError}</p>
-                <button
-                  onClick={() => startCamera(facingMode)}
-                  className="mt-6 px-5 py-2.5 rounded-xl bg-violet-600 text-white text-sm font-semibold"
-                >
-                  Tentar novamente
-                </button>
-              </div>
-            ) : capturedUrl ? (
-              <img src={capturedUrl} alt="Sua self" className="absolute inset-0 w-full h-full object-contain" />
-            ) : !isVideoReady ? (
-              <div className="absolute inset-0 flex items-center justify-center">
-                <p className="text-white/60 text-sm">Iniciando câmera...</p>
-              </div>
-            ) : null}
-          </div>
-
-          <div
-            className="px-6 pb-10 pt-4 relative z-10"
-            style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.95) 70%, transparent 100%)' }}
-          >
-            {!capturedUrl ? (
-              <div className="flex items-center justify-between">
-                <div className="w-12" />
-                <button
-                  onClick={capture}
-                  disabled={!isVideoReady || !!cameraError}
-                  className="w-20 h-20 rounded-full border-4 border-white flex items-center justify-center disabled:opacity-30 active:scale-95 transition-transform"
-                >
-                  <div className="w-14 h-14 rounded-full bg-white" />
-                </button>
-                <button
-                  onClick={flipCamera}
-                  disabled={!!cameraError}
-                  className="w-12 h-12 rounded-full bg-white/15 border border-white/20 flex items-center justify-center disabled:opacity-30"
-                >
-                  <SwitchCamera className="w-5 h-5 text-white" />
-                </button>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                <p className="text-center text-sm text-white/70 mb-2">Sua self está pronta! 💪</p>
-                <div className="flex gap-3">
-                  <button
-                    onClick={handleSelfieDownload}
-                    className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl border border-white/20 text-white text-sm font-medium active:bg-white/10 transition-colors"
-                  >
-                    <Download className="w-4 h-4" /> Salvar
-                  </button>
-                  <button
-                    onClick={handleSelfieShare}
-                    className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl bg-violet-600 hover:bg-violet-700 text-white text-sm font-medium transition-colors"
-                  >
-                    <Share2 className="w-4 h-4" /> Compartilhar
-                  </button>
-                </div>
-                <button
-                  onClick={() => { setCapturedUrl(null); startCamera(facingMode); }}
-                  className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-white/10 text-white text-sm"
-                >
-                  <RotateCcw className="w-3.5 h-3.5" /> Tirar novamente
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
       {/*
-        Always in the DOM — critical for iOS Safari.
-        video.play() is called in handleSelfieClick (within the gesture chain),
-        BEFORE setShowSelfie(true). When inLiveCamera becomes true, we just
-        make this element visible; playback is already running.
+        Selfie overlay — ALWAYS in the DOM (never conditionally unmounted).
+        Hiding via CSS (visibility + z-index) keeps videoRef.current alive so
+        video.play() can be called within the gesture chain in handleSelfieClick,
+        before setShowSelfie(true) makes it visible.
       */}
-      <video
-        ref={videoRef}
-        autoPlay
-        playsInline
-        muted
-        style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          width: inLiveCamera ? '100%' : '1px',
-          height: inLiveCamera ? '100%' : '1px',
-          objectFit: 'cover',
-          zIndex: inLiveCamera ? 99998 : -1,
-          opacity: inLiveCamera ? 1 : 0,
-          transform: facingMode === 'user' ? 'scaleX(-1)' : 'none',
-          pointerEvents: 'none',
-        }}
-      />
-      <canvas ref={canvasRef} style={{ display: 'none' }} />
+      <div
+        className="fixed inset-0 flex flex-col select-none bg-black"
+        style={{ zIndex: showSelfie ? 99999 : -1, visibility: showSelfie ? 'visible' : 'hidden' }}
+      >
+        {/* Header */}
+        <div
+          className="absolute top-0 left-0 right-0 z-10 flex items-center justify-between px-4 py-3"
+          style={{ background: 'linear-gradient(to bottom, rgba(0,0,0,0.75) 0%, transparent 100%)' }}
+        >
+          <h2 className="font-bold text-lg flex items-center gap-2 text-white">
+            <Camera className="w-5 h-5 text-violet-400" />
+            Hora da Self!
+          </h2>
+          <button
+            onClick={closeSelfie}
+            className="w-9 h-9 rounded-full bg-black/40 border border-white/20 flex items-center justify-center"
+          >
+            <X className="w-4 h-4 text-white" />
+          </button>
+        </div>
+
+        {/* Camera view — video is always inside here, never removed from DOM */}
+        <div className="flex-1 relative overflow-hidden">
+          <video
+            ref={videoRef}
+            autoPlay
+            playsInline
+            muted
+            className="absolute inset-0 w-full h-full object-cover"
+            style={{
+              transform: facingMode === 'user' ? 'scaleX(-1)' : 'none',
+              visibility: capturedUrl || cameraError ? 'hidden' : 'visible',
+            }}
+          />
+          {cameraError ? (
+            <div className="absolute inset-0 bg-black flex flex-col items-center justify-center text-center p-8">
+              <Camera className="w-14 h-14 text-white/25 mb-5" />
+              <p className="font-bold text-white text-base mb-3">Câmera não disponível</p>
+              <p className="text-sm text-white/60 whitespace-pre-line leading-relaxed">{cameraError}</p>
+              <button
+                onClick={() => startCamera(facingMode)}
+                className="mt-6 px-5 py-2.5 rounded-xl bg-violet-600 text-white text-sm font-semibold"
+              >
+                Tentar novamente
+              </button>
+            </div>
+          ) : capturedUrl ? (
+            <img src={capturedUrl} alt="Sua self" className="absolute inset-0 w-full h-full object-contain" />
+          ) : !isVideoReady ? (
+            <div className="absolute inset-0 flex items-center justify-center">
+              <p className="text-white/60 text-sm">Iniciando câmera...</p>
+            </div>
+          ) : null}
+          <canvas ref={canvasRef} className="hidden" />
+        </div>
+
+        {/* Controls */}
+        <div
+          className="px-6 pb-10 pt-4 relative z-10"
+          style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.95) 70%, transparent 100%)' }}
+        >
+          {!capturedUrl ? (
+            <div className="flex items-center justify-between">
+              <div className="w-12" />
+              <button
+                onClick={capture}
+                disabled={!isVideoReady || !!cameraError}
+                className="w-20 h-20 rounded-full border-4 border-white flex items-center justify-center disabled:opacity-30 active:scale-95 transition-transform"
+              >
+                <div className="w-14 h-14 rounded-full bg-white" />
+              </button>
+              <button
+                onClick={flipCamera}
+                disabled={!!cameraError}
+                className="w-12 h-12 rounded-full bg-white/15 border border-white/20 flex items-center justify-center disabled:opacity-30"
+              >
+                <SwitchCamera className="w-5 h-5 text-white" />
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <p className="text-center text-sm text-white/70 mb-2">Sua self está pronta! 💪</p>
+              <div className="flex gap-3">
+                <button
+                  onClick={handleSelfieDownload}
+                  className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl border border-white/20 text-white text-sm font-medium active:bg-white/10 transition-colors"
+                >
+                  <Download className="w-4 h-4" /> Salvar
+                </button>
+                <button
+                  onClick={handleSelfieShare}
+                  className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl bg-violet-600 hover:bg-violet-700 text-white text-sm font-medium transition-colors"
+                >
+                  <Share2 className="w-4 h-4" /> Compartilhar
+                </button>
+              </div>
+              <button
+                onClick={() => { setCapturedUrl(null); startCamera(facingMode); }}
+                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-white/10 text-white text-sm"
+              >
+                <RotateCcw className="w-3.5 h-3.5" /> Tirar novamente
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
 
       <div style={{ position: 'fixed', inset: 0, zIndex: 9999, backgroundColor: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(6px)', overflowY: 'auto', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '2rem 1rem' }}>
         <div className="glass-card w-full max-w-md" style={{ position: 'relative' }}>
