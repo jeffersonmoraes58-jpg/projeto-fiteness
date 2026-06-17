@@ -490,13 +490,12 @@ function PlanEditForm({ plan, isPending, onSave, onCancel, onPlansChange }: {
     setSavingEx(true);
     try {
       await api.patch(`/workouts/${workoutId}`, {
-        exercises: exercises.map((ex, i) => ({
+        exercises: exercises.map((ex) => ({
           exerciseId: ex.exerciseId,
-          order: i,
-          sets: Number(ex.sets) || 0,
+          sets: Number(ex.sets) || 1,
           reps: ex.reps || null,
-          weight: ex.weight !== '' ? Number(ex.weight) : null,
-          restSeconds: ex.restSeconds !== '' ? Number(ex.restSeconds) : null,
+          weight: ex.weight !== '' && ex.weight != null ? Number(ex.weight) : null,
+          restSeconds: ex.restSeconds !== '' && ex.restSeconds != null ? Number(ex.restSeconds) : null,
           tempo: ex.tempo || null,
           notes: ex.notes || null,
           isDropSet: false,
