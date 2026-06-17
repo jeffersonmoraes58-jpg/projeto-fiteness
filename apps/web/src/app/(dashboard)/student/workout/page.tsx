@@ -907,9 +907,21 @@ function WorkoutSummaryModal({ workoutName, startTime, isPending, onConfirm, onC
   const [comment, setComment] = useState('');
   const [cardUrl, setCardUrl] = useState<string | null>(null);
   const [confirmed, setConfirmed] = useState(false);
+
+  // Selfie state — inlined to keep video.play() in the same gesture chain
   const [showSelfie, setShowSelfie] = useState(false);
-  const [selfieStream, setSelfieStream] = useState<MediaStream | null>(null);
+  const [facingMode, setFacingMode] = useState<'user' | 'environment'>('user');
+  const [capturedUrl, setCapturedUrl] = useState<string | null>(null);
+  const [isVideoReady, setIsVideoReady] = useState(false);
+  const [cameraError, setCameraError] = useState('');
   const [selfieErr, setSelfieErr] = useState('');
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+
+  useEffect(() => {
+    return () => { streamRef.current?.getTracks().forEach((t) => t.stop()); };
+  }, []);
 
   const durationMs = endTime.getTime() - startTime.getTime();
   const mins = Math.floor(durationMs / 60000);
@@ -949,20 +961,77 @@ function WorkoutSummaryModal({ workoutName, startTime, isPending, onConfirm, onC
     }
   };
 
+  // Starts the camera stream and calls video.play() within the caller's gesture chain.
+  // Must be called directly from a user-gesture handler (button onClick) for iOS Safari.
+  async function startCamera(facing: 'user' | 'environment') {
+    setCapturedUrl(null);
+    setIsVideoReady(false);
+    setCameraError('');
+    try {
+      const s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: facing }, audio: false });
+      streamRef.current?.getTracks().forEach((t) => t.stop());
+      streamRef.current = s;
+      const video = videoRef.current!;
+      video.srcObject = s;
+      try {
+        await video.play();
+        setIsVideoReady(true);
+      } catch {
+        // Some browsers need loadedmetadata before play() resolves
+        await new Promise<void>((resolve, reject) => {
+          const t = setTimeout(() => reject(new Error('timeout')), 5000);
+          video.onloadedmetadata = () => {
+            clearTimeout(t);
+            video.play().then(() => { setIsVideoReady(true); resolve(); }).catch(reject);
+          };
+        });
+      }
+    } catch (err: any) {
+      const name: string = err?.name ?? '';
+      if (name === 'NotAllowedError' || name === 'PermissionDeniedError') {
+        setCameraError('Câmera bloqueada. Verifique as permissões do navegador.\n\nNo Safari: Ajustes › Safari › Câmera › Permitir.');
+      } else if (name === 'NotFoundError' || name === 'DevicesNotFoundError') {
+        setCameraError('Nenhuma câmera encontrada neste dispositivo.');
+      } else if (name === 'NotReadableError' || name === 'TrackStartError') {
+        setCameraError('A câmera está em uso por outro app. Feche-o e tente novamente.');
+      } else {
+        setCameraError('Não foi possível acessar a câmera. Tente novamente.');
+      }
+    }
+  }
+
   async function handleSelfieClick() {
     setSelfieErr('');
+    setCameraError('');
+    setCapturedUrl(null);
+    setIsVideoReady(false);
+    setFacingMode('user');
+
     if (!navigator.mediaDevices?.getUserMedia) {
       setSelfieErr('Câmera não suportada. Abra no Chrome ou Safari.');
       return;
     }
     try {
-      let s: MediaStream;
+      const s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false });
+      streamRef.current?.getTracks().forEach((t) => t.stop());
+      streamRef.current = s;
+
+      const video = videoRef.current!;
+      video.srcObject = s;
+      // video.play() called here — still within the iOS Safari user-gesture trust chain
       try {
-        s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false });
+        await video.play();
+        setIsVideoReady(true);
       } catch {
-        s = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+        await new Promise<void>((resolve, reject) => {
+          const t = setTimeout(() => reject(new Error('timeout')), 5000);
+          video.onloadedmetadata = () => {
+            clearTimeout(t);
+            video.play().then(() => { setIsVideoReady(true); resolve(); }).catch(reject);
+          };
+        });
       }
-      setSelfieStream(s);
+
       setShowSelfie(true);
     } catch (err: any) {
       const name: string = err?.name ?? '';
@@ -978,99 +1047,274 @@ function WorkoutSummaryModal({ workoutName, startTime, isPending, onConfirm, onC
     }
   }
 
+  function flipCamera() {
+    const next: 'user' | 'environment' = facingMode === 'user' ? 'environment' : 'user';
+    setFacingMode(next);
+    startCamera(next);
+  }
+
+  function capture() {
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    if (!video || !canvas || !isVideoReady) return;
+    const vw = video.videoWidth;
+    const vh = video.videoHeight;
+    if (!vw || !vh) return;
+    canvas.width = vw;
+    canvas.height = vh;
+    const ctx = canvas.getContext('2d')!;
+    if (facingMode === 'user') { ctx.translate(vw, 0); ctx.scale(-1, 1); }
+    ctx.drawImage(video, 0, 0, vw, vh);
+    if (facingMode === 'user') ctx.setTransform(1, 0, 0, 1, 0, 0);
+    const now = new Date();
+    drawSelfieOverlay(ctx, vw, vh, {
+      workoutName,
+      durationStr,
+      intensity,
+      dayName: DAY_NAMES[now.getDay()],
+      dateStr: now.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' }),
+      timeStr: now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+    });
+    streamRef.current?.getTracks().forEach((t) => t.stop());
+    streamRef.current = null;
+    setCapturedUrl(canvas.toDataURL('image/jpeg', 0.93));
+  }
+
+  function closeSelfie() {
+    streamRef.current?.getTracks().forEach((t) => t.stop());
+    streamRef.current = null;
+    setShowSelfie(false);
+    setCapturedUrl(null);
+    setIsVideoReady(false);
+    setCameraError('');
+  }
+
+  async function handleSelfieDownload() {
+    if (!capturedUrl) return;
+    const a = document.createElement('a');
+    a.href = capturedUrl;
+    a.download = `fitlynutri-self-${new Date().toISOString().split('T')[0]}.jpg`;
+    a.click();
+  }
+
+  async function handleSelfieShare() {
+    if (!capturedUrl) return;
+    try {
+      const blob = await fetch(capturedUrl).then((r) => r.blob());
+      const file = new File([blob], 'fitlynutri-self.jpg', { type: 'image/jpeg' });
+      if (navigator.share && navigator.canShare?.({ files: [file] })) {
+        await navigator.share({ files: [file], title: 'Hora da Self! 💪', text: `Finalizei: ${workoutName} — Fitlynutri` });
+        return;
+      }
+    } catch {}
+    handleSelfieDownload();
+  }
+
+  // When in selfie mode and not yet captured: show the video fullscreen
+  const inLiveCamera = showSelfie && !capturedUrl && !cameraError;
+
   return (
     <>
-      {showSelfie && selfieStream && (
-        <SelfieModal
-          workoutName={workoutName}
-          durationStr={durationStr}
-          intensity={intensity}
-          initialStream={selfieStream}
-          onClose={() => { setShowSelfie(false); setSelfieStream(null); }}
-        />
-      )}
-    <div style={{ position: 'fixed', inset: 0, zIndex: 9999, backgroundColor: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(6px)', overflowY: 'auto', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '2rem 1rem' }}>
-      <div className="glass-card w-full max-w-md" style={{ position: 'relative' }}>
-        <button onClick={onClose} style={{ position: 'absolute', top: 16, right: 16 }} className="w-8 h-8 rounded-lg hover:bg-white/10 flex items-center justify-center transition-all">
-          <X className="w-4 h-4" />
-        </button>
-
-        <div className="text-center mb-6 pt-2">
-          <div className="w-16 h-16 rounded-full bg-emerald-500/20 flex items-center justify-center mx-auto mb-4">
-            <Trophy className="w-8 h-8 text-emerald-400" />
-          </div>
-          <h2 className="text-2xl font-bold">Parabéns!</h2>
-          <p className="text-muted-foreground text-sm mt-1">Treino concluído com sucesso</p>
-          <p className="text-primary font-medium mt-1">{workoutName}</p>
-        </div>
-
-        <div className="grid grid-cols-3 gap-2 mb-3">
-          {[{ label: 'Data', value: dateStr }, { label: 'Início', value: startStr }, { label: 'Fim', value: endStr }].map((s) => (
-            <div key={s.label} className="glass rounded-xl p-3 text-center">
-              <div className="text-xs text-muted-foreground mb-1">{s.label}</div>
-              <div className="font-semibold text-sm">{s.value}</div>
-            </div>
-          ))}
-        </div>
-        <div className="glass rounded-xl p-3 text-center mb-6">
-          <div className="text-xs text-muted-foreground mb-1">Duração total</div>
-          <div className="text-2xl font-bold text-primary">{durationStr} min</div>
-        </div>
-
-        {!confirmed ? (
-          <>
-            <div className="mb-4">
-              <label className="text-xs text-muted-foreground mb-2 block">Como foi a intensidade do treino?</label>
-              <div className="relative">
-                <select value={intensity} onChange={(e) => setIntensity(e.target.value)} className="input-field w-full appearance-none pr-10">
-                  <option value="">Selecione...</option>
-                  <option>Muito leve</option>
-                  <option>Leve</option>
-                  <option>Moderado</option>
-                  <option>Pesado</option>
-                  <option>Muito pesado</option>
-                </select>
-              </div>
-            </div>
-            <div className="mb-6">
-              <label className="text-xs text-muted-foreground mb-2 block">Deixe um comentário (opcional)</label>
-              <textarea value={comment} onChange={(e) => setComment(e.target.value)} placeholder="Como foi seu treino? Algo a destacar?" className="input-field resize-none w-full" rows={3} />
-            </div>
-            <button onClick={handleConcluir} disabled={isPending} className="btn-primary w-full flex items-center justify-center gap-2">
-              <CheckCircle2 className="w-4 h-4" />
-              {isPending ? 'Salvando...' : 'Concluir Treino'}
+      {/* Selfie fullscreen overlay */}
+      {showSelfie && (
+        <div className="fixed inset-0 z-[99999] bg-black flex flex-col select-none">
+          <div
+            className="absolute top-0 left-0 right-0 z-10 flex items-center justify-between px-4 py-3"
+            style={{ background: 'linear-gradient(to bottom, rgba(0,0,0,0.75) 0%, transparent 100%)' }}
+          >
+            <h2 className="font-bold text-lg flex items-center gap-2 text-white">
+              <Camera className="w-5 h-5 text-violet-400" />
+              Hora da Self!
+            </h2>
+            <button
+              onClick={closeSelfie}
+              className="w-9 h-9 rounded-full bg-black/40 border border-white/20 flex items-center justify-center"
+            >
+              <X className="w-4 h-4 text-white" />
             </button>
-          </>
-        ) : (
-          <>
-            {cardUrl && (
-              <div className="mb-4">
-                <p className="text-xs text-muted-foreground text-center mb-3">Seu card foi gerado! Baixe ou compartilhe.</p>
-                <img src={cardUrl} alt="Card do treino" className="w-full rounded-xl shadow-lg" />
-                <div className="flex gap-2 mt-3">
-                  <button onClick={handleDownload} className="flex-1 btn-secondary flex items-center justify-center gap-2 text-sm py-2">
-                    <Download className="w-4 h-4" /> Baixar
+          </div>
+
+          <div className="flex-1 relative overflow-hidden">
+            {cameraError ? (
+              <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-8">
+                <Camera className="w-14 h-14 text-white/25 mb-5" />
+                <p className="font-bold text-white text-base mb-3">Câmera não disponível</p>
+                <p className="text-sm text-white/60 whitespace-pre-line leading-relaxed">{cameraError}</p>
+                <button
+                  onClick={() => startCamera(facingMode)}
+                  className="mt-6 px-5 py-2.5 rounded-xl bg-violet-600 text-white text-sm font-semibold"
+                >
+                  Tentar novamente
+                </button>
+              </div>
+            ) : capturedUrl ? (
+              <img src={capturedUrl} alt="Sua self" className="absolute inset-0 w-full h-full object-contain" />
+            ) : !isVideoReady ? (
+              <div className="absolute inset-0 flex items-center justify-center">
+                <p className="text-white/60 text-sm">Iniciando câmera...</p>
+              </div>
+            ) : null}
+          </div>
+
+          <div
+            className="px-6 pb-10 pt-4 relative z-10"
+            style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.95) 70%, transparent 100%)' }}
+          >
+            {!capturedUrl ? (
+              <div className="flex items-center justify-between">
+                <div className="w-12" />
+                <button
+                  onClick={capture}
+                  disabled={!isVideoReady || !!cameraError}
+                  className="w-20 h-20 rounded-full border-4 border-white flex items-center justify-center disabled:opacity-30 active:scale-95 transition-transform"
+                >
+                  <div className="w-14 h-14 rounded-full bg-white" />
+                </button>
+                <button
+                  onClick={flipCamera}
+                  disabled={!!cameraError}
+                  className="w-12 h-12 rounded-full bg-white/15 border border-white/20 flex items-center justify-center disabled:opacity-30"
+                >
+                  <SwitchCamera className="w-5 h-5 text-white" />
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <p className="text-center text-sm text-white/70 mb-2">Sua self está pronta! 💪</p>
+                <div className="flex gap-3">
+                  <button
+                    onClick={handleSelfieDownload}
+                    className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl border border-white/20 text-white text-sm font-medium active:bg-white/10 transition-colors"
+                  >
+                    <Download className="w-4 h-4" /> Salvar
                   </button>
-                  <button onClick={handleShare} className="flex-1 btn-primary flex items-center justify-center gap-2 text-sm py-2">
+                  <button
+                    onClick={handleSelfieShare}
+                    className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl bg-violet-600 hover:bg-violet-700 text-white text-sm font-medium transition-colors"
+                  >
                     <Share2 className="w-4 h-4" /> Compartilhar
                   </button>
                 </div>
+                <button
+                  onClick={() => { setCapturedUrl(null); startCamera(facingMode); }}
+                  className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-white/10 text-white text-sm"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" /> Tirar novamente
+                </button>
               </div>
             )}
-            <button
-              onClick={handleSelfieClick}
-              className="w-full flex items-center justify-center gap-2 py-3 mt-2 rounded-xl bg-violet-600 hover:bg-violet-700 active:bg-violet-800 text-white font-semibold transition-all"
-            >
-              <Camera className="w-4 h-4" /> Hora da Self! 📸
-            </button>
-            {selfieErr && (
-              <p className="text-xs text-center text-destructive mt-2 whitespace-pre-line leading-relaxed">{selfieErr}</p>
-            )}
-            <button onClick={onClose} className="btn-secondary w-full mt-2">Fechar</button>
-          </>
-        )}
+          </div>
+        </div>
+      )}
+
+      {/*
+        Always in the DOM — critical for iOS Safari.
+        video.play() is called in handleSelfieClick (within the gesture chain),
+        BEFORE setShowSelfie(true). When inLiveCamera becomes true, we just
+        make this element visible; playback is already running.
+      */}
+      <video
+        ref={videoRef}
+        autoPlay
+        playsInline
+        muted
+        style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          width: inLiveCamera ? '100%' : '1px',
+          height: inLiveCamera ? '100%' : '1px',
+          objectFit: 'cover',
+          zIndex: inLiveCamera ? 99998 : -1,
+          opacity: inLiveCamera ? 1 : 0,
+          transform: facingMode === 'user' ? 'scaleX(-1)' : 'none',
+          pointerEvents: 'none',
+        }}
+      />
+      <canvas ref={canvasRef} style={{ display: 'none' }} />
+
+      <div style={{ position: 'fixed', inset: 0, zIndex: 9999, backgroundColor: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(6px)', overflowY: 'auto', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '2rem 1rem' }}>
+        <div className="glass-card w-full max-w-md" style={{ position: 'relative' }}>
+          <button onClick={onClose} style={{ position: 'absolute', top: 16, right: 16 }} className="w-8 h-8 rounded-lg hover:bg-white/10 flex items-center justify-center transition-all">
+            <X className="w-4 h-4" />
+          </button>
+
+          <div className="text-center mb-6 pt-2">
+            <div className="w-16 h-16 rounded-full bg-emerald-500/20 flex items-center justify-center mx-auto mb-4">
+              <Trophy className="w-8 h-8 text-emerald-400" />
+            </div>
+            <h2 className="text-2xl font-bold">Parabéns!</h2>
+            <p className="text-muted-foreground text-sm mt-1">Treino concluído com sucesso</p>
+            <p className="text-primary font-medium mt-1">{workoutName}</p>
+          </div>
+
+          <div className="grid grid-cols-3 gap-2 mb-3">
+            {[{ label: 'Data', value: dateStr }, { label: 'Início', value: startStr }, { label: 'Fim', value: endStr }].map((s) => (
+              <div key={s.label} className="glass rounded-xl p-3 text-center">
+                <div className="text-xs text-muted-foreground mb-1">{s.label}</div>
+                <div className="font-semibold text-sm">{s.value}</div>
+              </div>
+            ))}
+          </div>
+          <div className="glass rounded-xl p-3 text-center mb-6">
+            <div className="text-xs text-muted-foreground mb-1">Duração total</div>
+            <div className="text-2xl font-bold text-primary">{durationStr} min</div>
+          </div>
+
+          {!confirmed ? (
+            <>
+              <div className="mb-4">
+                <label className="text-xs text-muted-foreground mb-2 block">Como foi a intensidade do treino?</label>
+                <div className="relative">
+                  <select value={intensity} onChange={(e) => setIntensity(e.target.value)} className="input-field w-full appearance-none pr-10">
+                    <option value="">Selecione...</option>
+                    <option>Muito leve</option>
+                    <option>Leve</option>
+                    <option>Moderado</option>
+                    <option>Pesado</option>
+                    <option>Muito pesado</option>
+                  </select>
+                </div>
+              </div>
+              <div className="mb-6">
+                <label className="text-xs text-muted-foreground mb-2 block">Deixe um comentário (opcional)</label>
+                <textarea value={comment} onChange={(e) => setComment(e.target.value)} placeholder="Como foi seu treino? Algo a destacar?" className="input-field resize-none w-full" rows={3} />
+              </div>
+              <button onClick={handleConcluir} disabled={isPending} className="btn-primary w-full flex items-center justify-center gap-2">
+                <CheckCircle2 className="w-4 h-4" />
+                {isPending ? 'Salvando...' : 'Concluir Treino'}
+              </button>
+            </>
+          ) : (
+            <>
+              {cardUrl && (
+                <div className="mb-4">
+                  <p className="text-xs text-muted-foreground text-center mb-3">Seu card foi gerado! Baixe ou compartilhe.</p>
+                  <img src={cardUrl} alt="Card do treino" className="w-full rounded-xl shadow-lg" />
+                  <div className="flex gap-2 mt-3">
+                    <button onClick={handleDownload} className="flex-1 btn-secondary flex items-center justify-center gap-2 text-sm py-2">
+                      <Download className="w-4 h-4" /> Baixar
+                    </button>
+                    <button onClick={handleShare} className="flex-1 btn-primary flex items-center justify-center gap-2 text-sm py-2">
+                      <Share2 className="w-4 h-4" /> Compartilhar
+                    </button>
+                  </div>
+                </div>
+              )}
+              <button
+                onClick={handleSelfieClick}
+                className="w-full flex items-center justify-center gap-2 py-3 mt-2 rounded-xl bg-violet-600 hover:bg-violet-700 active:bg-violet-800 text-white font-semibold transition-all"
+              >
+                <Camera className="w-4 h-4" /> Hora da Self! 📸
+              </button>
+              {selfieErr && (
+                <p className="text-xs text-center text-destructive mt-2 whitespace-pre-line leading-relaxed">{selfieErr}</p>
+              )}
+              <button onClick={onClose} className="btn-secondary w-full mt-2">Fechar</button>
+            </>
+          )}
+        </div>
       </div>
-    </div>
     </>
   );
 }
@@ -1247,250 +1491,4 @@ function drawSelfieOverlay(ctx: CanvasRenderingContext2D, w: number, h: number, 
   }
 }
 
-// ─── Selfie Modal ─────────────────────────────────────────────────────────────
-
 const DAY_NAMES = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
-
-function SelfieModal({ workoutName, durationStr, intensity, initialStream, onClose }: {
-  workoutName: string;
-  durationStr: string;
-  intensity: string;
-  initialStream: MediaStream;
-  onClose: () => void;
-}) {
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const streamRef = useRef<MediaStream | null>(null);
-  const [facingMode, setFacingMode] = useState<'user' | 'environment'>('user');
-  const [capturedUrl, setCapturedUrl] = useState<string | null>(null);
-  const [cameraErrorMsg, setCameraErrorMsg] = useState<string | null>(null);
-  const [isReady, setIsReady] = useState(false);
-
-  async function attachStream(s: MediaStream) {
-    streamRef.current?.getTracks().forEach((t) => t.stop());
-    streamRef.current = s;
-    setIsReady(false);
-    setCameraErrorMsg(null);
-
-    let video = videoRef.current;
-    if (!video) {
-      await new Promise((r) => setTimeout(r, 150));
-      video = videoRef.current;
-    }
-    if (!video) {
-      setCameraErrorMsg('Erro ao iniciar a câmera. Tente novamente.');
-      return;
-    }
-
-    video.srcObject = s;
-    video.muted = true;
-    video.setAttribute('playsinline', 'true');
-    video.setAttribute('webkit-playsinline', 'true');
-
-    try {
-      await video.play();
-      setIsReady(true);
-    } catch {
-      await new Promise<void>((resolve, reject) => {
-        const timeout = setTimeout(() => reject(new Error('timeout')), 8000);
-        video!.onloadedmetadata = () => {
-          clearTimeout(timeout);
-          video!.play().then(() => { setIsReady(true); resolve(); }).catch(reject);
-        };
-      }).catch(() => {
-        setCameraErrorMsg('Erro ao iniciar o vídeo. Tente fechar outros apps que usam a câmera.');
-      });
-    }
-  }
-
-  useEffect(() => {
-    attachStream(initialStream);
-    return () => streamRef.current?.getTracks().forEach((t) => t.stop());
-  }, []); // eslint-disable-line
-
-  async function startCamera(facing: 'user' | 'environment') {
-    setCapturedUrl(null);
-    try {
-      let s: MediaStream;
-      try {
-        s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: facing }, audio: false });
-      } catch {
-        s = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
-      }
-      await attachStream(s);
-    } catch (err: any) {
-      const name: string = err?.name ?? '';
-      if (name === 'NotAllowedError' || name === 'PermissionDeniedError') {
-        setCameraErrorMsg('Permissão de câmera negada.');
-      } else {
-        setCameraErrorMsg('Não foi possível acessar a câmera. Tente novamente.');
-      }
-    }
-  }
-
-  function flipCamera() {
-    const next: 'user' | 'environment' = facingMode === 'user' ? 'environment' : 'user';
-    setFacingMode(next);
-    startCamera(next);
-  }
-
-  function capture() {
-    const video = videoRef.current;
-    const canvas = canvasRef.current;
-    if (!video || !canvas || !isReady) return;
-    const vw = video.videoWidth;
-    const vh = video.videoHeight;
-    if (!vw || !vh) return;
-    canvas.width = vw;
-    canvas.height = vh;
-    const ctx = canvas.getContext('2d')!;
-    if (facingMode === 'user') { ctx.translate(vw, 0); ctx.scale(-1, 1); }
-    ctx.drawImage(video, 0, 0, vw, vh);
-    if (facingMode === 'user') ctx.setTransform(1, 0, 0, 1, 0, 0);
-    const now = new Date();
-    drawSelfieOverlay(ctx, vw, vh, {
-      workoutName,
-      durationStr,
-      intensity,
-      dayName: DAY_NAMES[now.getDay()],
-      dateStr: now.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' }),
-      timeStr: now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
-    });
-    streamRef.current?.getTracks().forEach((t) => t.stop());
-    streamRef.current = null;
-    setCapturedUrl(canvas.toDataURL('image/jpeg', 0.93));
-  }
-
-  function handleDownload() {
-    if (!capturedUrl) return;
-    const a = document.createElement('a');
-    a.href = capturedUrl;
-    a.download = `fitlynutri-self-${new Date().toISOString().split('T')[0]}.jpg`;
-    a.click();
-  }
-
-  async function handleShare() {
-    if (!capturedUrl) return;
-    try {
-      const blob = await fetch(capturedUrl).then((r) => r.blob());
-      const file = new File([blob], 'fitlynutri-self.jpg', { type: 'image/jpeg' });
-      if (navigator.share && navigator.canShare?.({ files: [file] })) {
-        await navigator.share({ files: [file], title: 'Hora da Self! 💪', text: `Finalizei: ${workoutName} — Fitlynutri` });
-        return;
-      }
-    } catch {}
-    handleDownload();
-  }
-
-  function handleClose() {
-    streamRef.current?.getTracks().forEach((t) => t.stop());
-    onClose();
-  }
-
-  return (
-    <div className="fixed inset-0 z-[99999] bg-black flex flex-col select-none">
-      {/* Header */}
-      <div className="absolute top-0 left-0 right-0 z-10 flex items-center justify-between px-4 py-3"
-        style={{ background: 'linear-gradient(to bottom, rgba(0,0,0,0.75) 0%, transparent 100%)' }}>
-        <h2 className="font-bold text-lg flex items-center gap-2 text-white">
-          <Camera className="w-5 h-5 text-violet-400" />
-          Hora da Self!
-        </h2>
-        <button
-          onClick={handleClose}
-          className="w-9 h-9 rounded-full bg-black/40 border border-white/20 flex items-center justify-center"
-        >
-          <X className="w-4 h-4 text-white" />
-        </button>
-      </div>
-
-      {/* Camera / photo view */}
-      <div className="flex-1 relative overflow-hidden">
-        {cameraErrorMsg ? (
-          <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-8">
-            <Camera className="w-14 h-14 text-white/25 mb-5" />
-            <p className="font-bold text-white text-base mb-3">Câmera não disponível</p>
-            <p className="text-sm text-white/60 whitespace-pre-line leading-relaxed">{cameraErrorMsg}</p>
-            <button
-              onClick={() => startCamera(facingMode)}
-              className="mt-6 px-5 py-2.5 rounded-xl bg-violet-600 text-white text-sm font-semibold"
-            >
-              Tentar novamente
-            </button>
-          </div>
-        ) : capturedUrl ? (
-          <img src={capturedUrl} alt="Sua self" className="absolute inset-0 w-full h-full object-contain" />
-        ) : (
-          <>
-            <video
-              ref={videoRef}
-              autoPlay
-              playsInline
-              muted
-              className="absolute inset-0 w-full h-full object-cover"
-              style={{ transform: facingMode === 'user' ? 'scaleX(-1)' : 'none' }}
-            />
-            {!isReady && !cameraErrorMsg && (
-              <div className="absolute inset-0 flex items-center justify-center">
-                <p className="text-white/60 text-sm">Iniciando câmera...</p>
-              </div>
-            )}
-          </>
-        )}
-        <canvas ref={canvasRef} className="hidden" />
-      </div>
-
-      {/* Controls */}
-      <div
-        className="px-6 pb-10 pt-4"
-        style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.95) 70%, transparent 100%)' }}
-      >
-        {!capturedUrl ? (
-          <div className="flex items-center justify-between">
-            <div className="w-12" />
-            {/* Capture button */}
-            <button
-              onClick={capture}
-              disabled={!isReady || !!cameraErrorMsg}
-              className="w-20 h-20 rounded-full border-4 border-white flex items-center justify-center disabled:opacity-30 active:scale-95 transition-transform"
-            >
-              <div className="w-14 h-14 rounded-full bg-white" />
-            </button>
-            {/* Flip camera */}
-            <button
-              onClick={flipCamera}
-              disabled={!!cameraErrorMsg}
-              className="w-12 h-12 rounded-full bg-white/15 border border-white/20 flex items-center justify-center disabled:opacity-30"
-            >
-              <SwitchCamera className="w-5 h-5 text-white" />
-            </button>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            <p className="text-center text-sm text-white/70 mb-2">Sua self está pronta! 💪</p>
-            <div className="flex gap-3">
-              <button
-                onClick={handleDownload}
-                className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl border border-white/20 text-white text-sm font-medium active:bg-white/10 transition-colors"
-              >
-                <Download className="w-4 h-4" /> Salvar
-              </button>
-              <button
-                onClick={handleShare}
-                className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl bg-violet-600 hover:bg-violet-700 text-white text-sm font-medium transition-colors"
-              >
-                <Share2 className="w-4 h-4" /> Compartilhar
-              </button>
-            </div>
-            <button
-              onClick={() => startCamera(facingMode)}
-              className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-white/10 text-white text-sm"
-            >
-              <RotateCcw className="w-3.5 h-3.5" /> Tirar novamente
-            </button>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
