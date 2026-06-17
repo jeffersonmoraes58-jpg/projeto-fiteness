@@ -961,8 +961,6 @@ function WorkoutSummaryModal({ workoutName, startTime, isPending, onConfirm, onC
     }
   };
 
-  // Starts the camera stream and calls video.play() within the caller's gesture chain.
-  // Must be called directly from a user-gesture handler (button onClick) for iOS Safari.
   async function startCamera(facing: 'user' | 'environment') {
     setCapturedUrl(null);
     setIsVideoReady(false);
@@ -973,29 +971,17 @@ function WorkoutSummaryModal({ workoutName, startTime, isPending, onConfirm, onC
       streamRef.current = s;
       const video = videoRef.current!;
       video.srcObject = s;
-      try {
-        await video.play();
-        setIsVideoReady(true);
-      } catch {
-        // Some browsers need loadedmetadata before play() resolves
-        await new Promise<void>((resolve, reject) => {
-          const t = setTimeout(() => reject(new Error('timeout')), 5000);
-          video.onloadedmetadata = () => {
-            clearTimeout(t);
-            video.play().then(() => { setIsVideoReady(true); resolve(); }).catch(reject);
-          };
-        });
-      }
+      video.play().catch(() => {}); // fire-and-forget; onPlaying event sets isVideoReady
     } catch (err: any) {
       const name: string = err?.name ?? '';
       if (name === 'NotAllowedError' || name === 'PermissionDeniedError') {
-        setCameraError('Câmera bloqueada. Verifique as permissões do navegador.\n\nNo Safari: Ajustes › Safari › Câmera › Permitir.');
+        setCameraError('Câmera bloqueada. Verifique as permissões do navegador.');
       } else if (name === 'NotFoundError' || name === 'DevicesNotFoundError') {
         setCameraError('Nenhuma câmera encontrada neste dispositivo.');
       } else if (name === 'NotReadableError' || name === 'TrackStartError') {
         setCameraError('A câmera está em uso por outro app. Feche-o e tente novamente.');
       } else {
-        setCameraError('Não foi possível acessar a câmera. Tente novamente.');
+        setCameraError(`Erro ao acessar câmera: ${name || 'desconhecido'}`);
       }
     }
   }
@@ -1008,41 +994,27 @@ function WorkoutSummaryModal({ workoutName, startTime, isPending, onConfirm, onC
     setFacingMode('user');
 
     if (!navigator.mediaDevices?.getUserMedia) {
-      setSelfieErr('Câmera não suportada. Abra no Chrome ou Safari.');
+      setSelfieErr('Câmera não suportada neste navegador.');
       return;
     }
     try {
       const s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false });
       streamRef.current?.getTracks().forEach((t) => t.stop());
       streamRef.current = s;
-
       const video = videoRef.current!;
       video.srcObject = s;
-      // video.play() called here — still within the iOS Safari user-gesture trust chain
-      try {
-        await video.play();
-        setIsVideoReady(true);
-      } catch {
-        await new Promise<void>((resolve, reject) => {
-          const t = setTimeout(() => reject(new Error('timeout')), 5000);
-          video.onloadedmetadata = () => {
-            clearTimeout(t);
-            video.play().then(() => { setIsVideoReady(true); resolve(); }).catch(reject);
-          };
-        });
-      }
-
-      setShowSelfie(true);
+      video.play().catch(() => {}); // fire-and-forget; onPlaying event sets isVideoReady
+      setShowSelfie(true); // show overlay immediately — don't wait for play()
     } catch (err: any) {
       const name: string = err?.name ?? '';
       if (name === 'NotAllowedError' || name === 'PermissionDeniedError') {
-        setSelfieErr('Câmera bloqueada.\nToque no 🔒 na barra de endereços e selecione "Permitir câmera".\n\nNo Safari: Ajustes › Safari › Câmera › Permitir.');
+        setSelfieErr('Câmera bloqueada.\nToque no 🔒 na barra de endereços → "Permitir câmera".\n\nNo Safari: Ajustes › Safari › Câmera › Permitir.');
       } else if (name === 'NotFoundError' || name === 'DevicesNotFoundError') {
         setSelfieErr('Nenhuma câmera encontrada neste dispositivo.');
       } else if (name === 'NotReadableError' || name === 'TrackStartError') {
         setSelfieErr('A câmera está em uso por outro app. Feche-o e tente novamente.');
       } else {
-        setSelfieErr('Não foi possível acessar a câmera. Tente novamente.');
+        setSelfieErr(`Erro ao abrir câmera: ${name || 'desconhecido'} — ${err?.message || ''}`);
       }
     }
   }
@@ -1146,6 +1118,7 @@ function WorkoutSummaryModal({ workoutName, startTime, isPending, onConfirm, onC
             autoPlay
             playsInline
             muted
+            onPlaying={() => setIsVideoReady(true)}
             className="absolute inset-0 w-full h-full object-cover"
             style={{
               transform: facingMode === 'user' ? 'scaleX(-1)' : 'none',
