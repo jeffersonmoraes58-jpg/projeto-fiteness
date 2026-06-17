@@ -58,4 +58,22 @@ export class AiController {
   analyzePhoto(@Body() body: { photoUrl: string }) {
     return this.aiService.analyzeProgressPhoto(body.photoUrl);
   }
+
+  @Post('analyze-student/:studentId')
+  @ApiOperation({ summary: 'Análise completa de aluno por IA' })
+  analyzeStudent(
+    @Param('studentId') studentId: string,
+    @CurrentUser('id') userId: string,
+  ) {
+    return this.aiService.analyzeStudent(studentId, userId);
+  }
+
+  @Post('apply-changes')
+  @ApiOperation({ summary: 'Aplicar alterações de treino propostas pela IA' })
+  applyChanges(
+    @Body() body: { planId: string; exercises: any[] },
+    @CurrentUser('id') userId: string,
+  ) {
+    return this.aiService.applyStudentChanges(body.planId, body.exercises, userId);
+  }
 }
