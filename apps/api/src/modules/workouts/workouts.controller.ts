@@ -82,6 +82,13 @@ export class WorkoutsController {
     return this.workoutsService.assignToStudent(workoutId, dto);
   }
 
+  @Post('plans/:planId/fork')
+  @Roles(UserRole.TRAINER)
+  @ApiOperation({ summary: 'Criar cópia do treino para personalização do aluno' })
+  forkPlan(@Param('planId') planId: string) {
+    return this.workoutsService.forkPlan(planId);
+  }
+
   @Patch('plans/:planId')
   @Roles(UserRole.TRAINER, UserRole.NUTRITIONIST)
   @ApiOperation({ summary: 'Atualizar plano de treino atribuído ao aluno' })

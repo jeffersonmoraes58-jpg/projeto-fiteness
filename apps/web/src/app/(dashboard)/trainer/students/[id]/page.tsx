@@ -7,6 +7,7 @@ import {
   MessageCircle, UserCheck, Trash2,
   Clock, Zap, ChevronRight, ClipboardList, TrendingUp,
   Heart, Activity, Moon, Brain, Target, Info,
+  Plus, X, Search, Pencil,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
@@ -291,6 +292,7 @@ export default function StudentDetailPage() {
                           isPending={updatePlanMutation.isPending}
                           onSave={(data) => updatePlanMutation.mutate({ planId: plan.id, data })}
                           onCancel={() => setEditingPlan(null)}
+                          onPlansChange={() => qc.invalidateQueries({ queryKey: ['student-plans', id] })}
                         />
                       )}
                     </div>
@@ -412,11 +414,12 @@ export default function StudentDetailPage() {
   );
 }
 
-function PlanEditForm({ plan, isPending, onSave, onCancel }: {
+function PlanEditForm({ plan, isPending, onSave, onCancel, onPlansChange }: {
   plan: any;
   isPending: boolean;
   onSave: (data: any) => void;
   onCancel: () => void;
+  onPlansChange: () => void;
 }) {
   const [notes, setNotes] = useState(plan.notes || '');
   const [division, setDivision] = useState(plan.division || '');
@@ -426,6 +429,88 @@ function PlanEditForm({ plan, isPending, onSave, onCancel }: {
   const [endDate, setEndDate] = useState(
     plan.endDate ? new Date(plan.endDate).toISOString().split('T')[0] : '',
   );
+
+  // Exercise editor state
+  const [exMode, setExMode] = useState(false);
+  const [workoutId, setWorkoutId] = useState<string>(plan.workoutId);
+  const [exercises, setExercises] = useState<any[]>([]);
+  const [exSearch, setExSearch] = useState('');
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [searching, setSearching] = useState(false);
+  const [savingEx, setSavingEx] = useState(false);
+  const [forking, setForking] = useState(false);
+
+  async function openExercises() {
+    if (exMode) { setExMode(false); return; }
+    if (exercises.length > 0) { setExMode(true); return; }
+    setForking(true);
+    try {
+      const res = await api.post(`/workouts/plans/${plan.id}/fork`);
+      const data = res.data?.data ?? res.data;
+      setWorkoutId(data.workoutId);
+      setExercises((data.workout?.exercises || []).map(toExRow));
+      setExMode(true);
+      if (data.forked) onPlansChange();
+    } catch {
+      toast.error('Erro ao carregar exercícios');
+    } finally {
+      setForking(false);
+    }
+  }
+
+  async function searchExercises(q: string) {
+    setExSearch(q);
+    if (!q.trim()) { setSearchResults([]); return; }
+    setSearching(true);
+    try {
+      const res = await api.get(`/exercises?search=${encodeURIComponent(q)}`);
+      setSearchResults((res.data?.data ?? res.data ?? []).slice(0, 6));
+    } catch { setSearchResults([]); }
+    finally { setSearching(false); }
+  }
+
+  function addExercise(ex: any) {
+    setExercises((prev) => [
+      ...prev,
+      { _key: ex.id + Date.now(), exerciseId: ex.id, name: ex.name, sets: 3, reps: '10', weight: '', restSeconds: 60, notes: '' },
+    ]);
+    setExSearch('');
+    setSearchResults([]);
+  }
+
+  function removeExercise(idx: number) {
+    setExercises((prev) => prev.filter((_, i) => i !== idx));
+  }
+
+  function updateExField(idx: number, field: string, value: any) {
+    setExercises((prev) => prev.map((ex, i) => i === idx ? { ...ex, [field]: value } : ex));
+  }
+
+  async function saveExercises() {
+    setSavingEx(true);
+    try {
+      await api.patch(`/workouts/${workoutId}`, {
+        exercises: exercises.map((ex, i) => ({
+          exerciseId: ex.exerciseId,
+          order: i,
+          sets: Number(ex.sets) || 0,
+          reps: ex.reps || null,
+          weight: ex.weight !== '' ? Number(ex.weight) : null,
+          restSeconds: ex.restSeconds !== '' ? Number(ex.restSeconds) : null,
+          tempo: ex.tempo || null,
+          notes: ex.notes || null,
+          isDropSet: false,
+          isSuperSet: false,
+        })),
+      });
+      toast.success('Exercícios salvos!');
+      onPlansChange();
+    } catch {
+      toast.error('Erro ao salvar exercícios');
+    } finally {
+      setSavingEx(false);
+    }
+  }
 
   return (
     <div className="border-t border-border/50 p-3 space-y-3 bg-white/3">
@@ -460,8 +545,147 @@ function PlanEditForm({ plan, isPending, onSave, onCancel }: {
           Cancelar
         </button>
       </div>
+
+      {/* Exercise editor */}
+      <div className="border-t border-border/40 pt-3">
+        <button
+          onClick={openExercises}
+          disabled={forking}
+          className="flex items-center gap-2 text-xs font-medium text-primary hover:underline disabled:opacity-50"
+        >
+          <Pencil className="w-3 h-3" />
+          {forking ? 'Carregando...' : exMode ? 'Fechar editor de exercícios' : 'Editar exercícios deste aluno'}
+        </button>
+        <p className="text-xs text-muted-foreground mt-0.5">Alterações aqui afetam apenas este aluno.</p>
+
+        {exMode && (
+          <div className="mt-3 space-y-2">
+            {exercises.length === 0 && (
+              <p className="text-xs text-muted-foreground text-center py-3">Nenhum exercício. Adicione abaixo.</p>
+            )}
+            {exercises.map((ex, idx) => (
+              <div key={ex._key ?? idx} className="glass rounded-xl p-2.5 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-medium truncate flex-1 mr-2">{idx + 1}. {ex.name}</span>
+                  <button onClick={() => removeExercise(idx)} className="w-5 h-5 rounded flex items-center justify-center hover:bg-red-500/10 flex-shrink-0">
+                    <X className="w-3 h-3 text-red-400" />
+                  </button>
+                </div>
+                <div className="grid grid-cols-4 gap-1.5">
+                  <div>
+                    <label className="text-[10px] text-muted-foreground block mb-0.5">Séries</label>
+                    <input
+                      type="number"
+                      value={ex.sets}
+                      onChange={(e) => updateExField(idx, 'sets', e.target.value)}
+                      className="input-field text-xs py-1 px-2 text-center"
+                      min={1}
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-muted-foreground block mb-0.5">Reps</label>
+                    <input
+                      type="text"
+                      value={ex.reps ?? ''}
+                      onChange={(e) => updateExField(idx, 'reps', e.target.value)}
+                      placeholder="8-12"
+                      className="input-field text-xs py-1 px-2"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-muted-foreground block mb-0.5">Carga (kg)</label>
+                    <input
+                      type="number"
+                      value={ex.weight ?? ''}
+                      onChange={(e) => updateExField(idx, 'weight', e.target.value)}
+                      placeholder="0"
+                      className="input-field text-xs py-1 px-2 text-center"
+                      min={0}
+                      step={0.5}
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-muted-foreground block mb-0.5">Desc. (s)</label>
+                    <input
+                      type="number"
+                      value={ex.restSeconds ?? ''}
+                      onChange={(e) => updateExField(idx, 'restSeconds', e.target.value)}
+                      placeholder="60"
+                      className="input-field text-xs py-1 px-2 text-center"
+                      min={0}
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="text-[10px] text-muted-foreground block mb-0.5">Obs</label>
+                  <input
+                    type="text"
+                    value={ex.notes ?? ''}
+                    onChange={(e) => updateExField(idx, 'notes', e.target.value)}
+                    placeholder="Técnica, variação..."
+                    className="input-field text-xs py-1 px-2"
+                  />
+                </div>
+              </div>
+            ))}
+
+            {/* Add exercise */}
+            <div className="space-y-1.5">
+              <div className="relative">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-muted-foreground" />
+                <input
+                  type="text"
+                  value={exSearch}
+                  onChange={(e) => searchExercises(e.target.value)}
+                  placeholder="Buscar exercício para adicionar..."
+                  className="input-field text-xs py-1.5 pl-7"
+                />
+              </div>
+              {searching && <p className="text-xs text-muted-foreground text-center py-1">Buscando...</p>}
+              {searchResults.length > 0 && (
+                <div className="glass rounded-xl overflow-hidden divide-y divide-border/30">
+                  {searchResults.map((ex: any) => (
+                    <button
+                      key={ex.id}
+                      onClick={() => addExercise(ex)}
+                      className="w-full flex items-center gap-2 px-3 py-2 hover:bg-accent text-left transition-all"
+                    >
+                      <Plus className="w-3 h-3 text-primary flex-shrink-0" />
+                      <span className="text-xs truncate">{ex.name}</span>
+                      {ex.category && <span className="text-[10px] text-muted-foreground ml-auto">{ex.category}</span>}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <button
+              onClick={saveExercises}
+              disabled={savingEx}
+              className="btn-primary w-full text-sm py-1.5 flex items-center justify-center gap-1.5 disabled:opacity-50"
+            >
+              <Dumbbell className="w-3.5 h-3.5" />
+              {savingEx ? 'Salvando...' : 'Salvar exercícios'}
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   );
+}
+
+function toExRow(ex: any) {
+  return {
+    _key: ex.id,
+    exerciseId: ex.exerciseId,
+    name: ex.exercise?.name || '',
+    sets: ex.sets ?? 3,
+    reps: ex.reps ?? '',
+    weight: ex.weight ?? '',
+    restSeconds: ex.restSeconds ?? '',
+    tempo: ex.tempo ?? '',
+    notes: ex.notes ?? '',
+  };
 }
 
 function WhatsAppIcon({ className }: { className?: string }) {
