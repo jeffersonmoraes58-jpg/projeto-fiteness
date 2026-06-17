@@ -201,6 +201,7 @@ export class StudentsService {
         diet: {
           include: {
             meals: { include: { foods: { include: { food: true } } }, orderBy: { order: 'asc' } },
+            nutritionist: { include: { user: { include: { profile: true } } } },
           },
         },
       },
