@@ -132,21 +132,42 @@ export class TrainersService {
     return { message: 'Agendamento excluído' };
   }
 
-  async getReports(userId: string) {
+  async getReports(userId: string, days = 30) {
     const trainer = await this.getTrainer(userId);
-    const since = new Date(Date.now() - 30 * 86400000);
-    const [totalStudents, activeStudents, checkIns, recentLogs] = await Promise.all([
+    const since = new Date(Date.now() - days * 86400000);
+
+    const [totalStudents, activeStudents, totalWorkouts, logs, relations] = await Promise.all([
       this.prisma.trainerStudent.count({ where: { trainerId: trainer.id } }),
       this.prisma.trainerStudent.count({ where: { trainerId: trainer.id, isActive: true } }),
-      this.prisma.workoutLog.count({ where: { workoutPlan: { workout: { trainerId: trainer.id } }, completedAt: { gte: since } } }),
+      this.prisma.workout.count({ where: { trainerId: trainer.id, NOT: { tags: { has: '__personalized' } } } }),
       this.prisma.workoutLog.findMany({
         where: { workoutPlan: { workout: { trainerId: trainer.id } }, completedAt: { gte: since } },
-        include: { student: { include: { user: { include: { profile: true } } } } },
-        orderBy: { completedAt: 'desc' },
-        take: 50,
+        select: { completedAt: true },
+      }),
+      this.prisma.trainerStudent.findMany({
+        where: { trainerId: trainer.id, isActive: true },
+        include: { student: { select: { streak: true } } },
       }),
     ]);
-    return { summary: { totalStudents, activeStudents, checkInsLast30Days: checkIns }, recentLogs };
+
+    const totalCheckins = logs.length;
+    const avgStreak = relations.length
+      ? Math.round(relations.reduce((s, r) => s + (r.student?.streak || 0), 0) / relations.length)
+      : 0;
+
+    const dailyMap: Record<string, number> = {};
+    logs.forEach((log) => {
+      const key = new Date(log.completedAt).toISOString().split('T')[0];
+      dailyMap[key] = (dailyMap[key] || 0) + 1;
+    });
+    const dailyCheckins: number[] = [];
+    for (let i = days - 1; i >= 0; i--) {
+      const d = new Date(Date.now() - i * 86400000);
+      const key = d.toISOString().split('T')[0];
+      dailyCheckins.push(dailyMap[key] || 0);
+    }
+
+    return { activeStudents, totalCheckins, totalWorkouts, avgStreak, dailyCheckins, days };
   }
 
   async getPayments(userId: string) {
