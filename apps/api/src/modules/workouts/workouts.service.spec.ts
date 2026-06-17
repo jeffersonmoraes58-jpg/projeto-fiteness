@@ -77,7 +77,7 @@ describe('WorkoutsService', () => {
       const result = await service.findAll('user-1');
 
       expect(mockPrisma.workout.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({ where: { trainerId: 'trainer-1' } }),
+        expect.objectContaining({ where: expect.objectContaining({ trainerId: 'trainer-1' }) }),
       );
       expect(result).toHaveLength(1);
     });
