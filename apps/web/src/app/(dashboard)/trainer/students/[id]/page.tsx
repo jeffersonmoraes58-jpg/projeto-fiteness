@@ -51,6 +51,7 @@ export default function StudentDetailPage() {
   const [endDate, setEndDate] = useState('');
   const [notes, setNotes] = useState('');
   const [assignError, setAssignError] = useState('');
+  const [editingPlan, setEditingPlan] = useState<any | null>(null);
 
   const { data: students, isLoading } = useQuery({
     queryKey: ['trainer-students'],
@@ -106,6 +107,17 @@ export default function StudentDetailPage() {
       toast.success('Plano removido');
     },
     onError: () => toast.error('Erro ao remover plano'),
+  });
+
+  const updatePlanMutation = useMutation({
+    mutationFn: ({ planId, data }: { planId: string; data: any }) =>
+      api.patch(`/workouts/plans/${planId}`, data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['student-plans', id] });
+      setEditingPlan(null);
+      toast.success('Plano atualizado!');
+    },
+    onError: () => toast.error('Erro ao atualizar plano'),
   });
 
   const handleAssign = (e: React.FormEvent) => {
@@ -249,22 +261,38 @@ export default function StudentDetailPage() {
               ) : (
                 <div className="space-y-2">
                   {(plans || []).map((plan: any) => (
-                    <div key={plan.id} className="glass rounded-xl p-3 flex items-center gap-3">
-                      <Dumbbell className="w-4 h-4 text-purple-400 flex-shrink-0" />
-                      <div className="flex-1 min-w-0">
-                        <div className="text-sm font-medium truncate">{plan.workout?.name}</div>
-                        <div className="flex items-center gap-3 mt-0.5 text-xs text-muted-foreground">
-                          {plan.workout?.duration && <span className="flex items-center gap-0.5"><Clock className="w-3 h-3" />{plan.workout.duration}min</span>}
-                          {plan.workout?.level && <span className="flex items-center gap-0.5"><Zap className="w-3 h-3" />{LEVEL_LABELS[plan.workout.level] || ''}</span>}
-                          {plan.notes && <span>• {plan.notes}</span>}
+                    <div key={plan.id} className="glass rounded-xl overflow-hidden">
+                      <div className="p-3 flex items-center gap-3">
+                        <Dumbbell className="w-4 h-4 text-purple-400 flex-shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm font-medium truncate">{plan.workout?.name}</div>
+                          <div className="flex items-center gap-3 mt-0.5 text-xs text-muted-foreground">
+                            {plan.workout?.duration && <span className="flex items-center gap-0.5"><Clock className="w-3 h-3" />{plan.workout.duration}min</span>}
+                            {plan.workout?.level && <span className="flex items-center gap-0.5"><Zap className="w-3 h-3" />{LEVEL_LABELS[plan.workout.level] || ''}</span>}
+                            {plan.notes && <span>• {plan.notes}</span>}
+                            {plan.division && <span>• {plan.division}</span>}
+                          </div>
                         </div>
+                        <button
+                          onClick={() => setEditingPlan(editingPlan?.id === plan.id ? null : plan)}
+                          className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 transition-all ${editingPlan?.id === plan.id ? 'bg-primary/20 text-primary' : 'hover:bg-accent text-muted-foreground'}`}
+                          title="Editar atribuição"
+                        >
+                          <ChevronRight className={`w-3.5 h-3.5 transition-transform ${editingPlan?.id === plan.id ? 'rotate-90' : ''}`} />
+                        </button>
+                        <button onClick={() => { if (confirm('Remover este plano?')) removePlanMutation.mutate(plan.id); }} className="w-7 h-7 rounded-lg hover:bg-red-500/10 flex items-center justify-center flex-shrink-0">
+                          <Trash2 className="w-3.5 h-3.5 text-red-400" />
+                        </button>
                       </div>
-                      <Link href={`/trainer/workouts/${plan.workout?.id}`} className="w-7 h-7 rounded-lg hover:bg-accent flex items-center justify-center flex-shrink-0">
-                        <ChevronRight className="w-3.5 h-3.5 text-muted-foreground" />
-                      </Link>
-                      <button onClick={() => { if (confirm('Remover este plano?')) removePlanMutation.mutate(plan.id); }} className="w-7 h-7 rounded-lg hover:bg-red-500/10 flex items-center justify-center flex-shrink-0">
-                        <Trash2 className="w-3.5 h-3.5 text-red-400" />
-                      </button>
+
+                      {editingPlan?.id === plan.id && (
+                        <PlanEditForm
+                          plan={plan}
+                          isPending={updatePlanMutation.isPending}
+                          onSave={(data) => updatePlanMutation.mutate({ planId: plan.id, data })}
+                          onCancel={() => setEditingPlan(null)}
+                        />
+                      )}
                     </div>
                   ))}
                 </div>
@@ -380,6 +408,58 @@ export default function StudentDetailPage() {
           </motion.div>
         )}
       </AnimatePresence>
+    </div>
+  );
+}
+
+function PlanEditForm({ plan, isPending, onSave, onCancel }: {
+  plan: any;
+  isPending: boolean;
+  onSave: (data: any) => void;
+  onCancel: () => void;
+}) {
+  const [notes, setNotes] = useState(plan.notes || '');
+  const [division, setDivision] = useState(plan.division || '');
+  const [startDate, setStartDate] = useState(
+    plan.startDate ? new Date(plan.startDate).toISOString().split('T')[0] : '',
+  );
+  const [endDate, setEndDate] = useState(
+    plan.endDate ? new Date(plan.endDate).toISOString().split('T')[0] : '',
+  );
+
+  return (
+    <div className="border-t border-border/50 p-3 space-y-3 bg-white/3">
+      <p className="text-xs text-muted-foreground font-medium">Editar atribuição — {plan.workout?.name}</p>
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="text-xs text-muted-foreground mb-1 block">Início</label>
+          <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="input-field text-sm py-1.5" />
+        </div>
+        <div>
+          <label className="text-xs text-muted-foreground mb-1 block">Término</label>
+          <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} min={startDate} className="input-field text-sm py-1.5" />
+        </div>
+      </div>
+      <div>
+        <label className="text-xs text-muted-foreground mb-1 block">Divisão</label>
+        <input type="text" value={division} onChange={(e) => setDivision(e.target.value)} placeholder="Ex: Treino A, Segunda/Quarta..." className="input-field text-sm py-1.5" />
+      </div>
+      <div>
+        <label className="text-xs text-muted-foreground mb-1 block">Observações</label>
+        <input type="text" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Ex: Foco em progressão de carga" className="input-field text-sm py-1.5" />
+      </div>
+      <div className="flex gap-2">
+        <button
+          onClick={() => onSave({ notes, division, startDate, endDate: endDate || null })}
+          disabled={isPending}
+          className="btn-primary flex-1 text-sm py-1.5 flex items-center justify-center gap-1.5 disabled:opacity-50"
+        >
+          {isPending ? 'Salvando...' : 'Salvar'}
+        </button>
+        <button onClick={onCancel} className="btn-secondary text-sm py-1.5 px-4">
+          Cancelar
+        </button>
+      </div>
     </div>
   );
 }
