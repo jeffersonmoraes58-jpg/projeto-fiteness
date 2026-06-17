@@ -39,16 +39,37 @@ export class TrainersService {
     const relations = await this.prisma.trainerStudent.findMany({
       where: { trainerId: trainer.id, isActive: true },
       include: {
-        student: { include: { user: { include: { profile: true } }, anamnesis: true } },
+        student: {
+          include: {
+            user: { include: { profile: true } },
+            anamnesis: true,
+            workoutLogs: { orderBy: { completedAt: 'desc' }, take: 1, select: { completedAt: true } },
+          },
+        },
       },
     });
-    const results = relations.map((r) => ({ ...r.student, monthlyFee: r.monthlyFee, startedAt: r.startedAt, isActive: r.isActive }));
+    const results = relations.map((r) => ({
+      ...r.student,
+      monthlyFee: r.monthlyFee,
+      startedAt: r.startedAt,
+      isActive: r.isActive,
+      lastCheckinAt: r.student.workoutLogs[0]?.completedAt ?? null,
+    }));
     if (!search) return results;
     const q = search.toLowerCase();
     return results.filter((s) => {
       const name = `${s.user?.profile?.firstName} ${s.user?.profile?.lastName} ${s.user?.email}`.toLowerCase();
       return name.includes(q);
     });
+  }
+
+  async removeStudent(userId: string, studentId: string) {
+    const trainer = await this.getTrainer(userId);
+    await this.prisma.trainerStudent.updateMany({
+      where: { trainerId: trainer.id, studentId },
+      data: { isActive: false },
+    });
+    return { message: 'Aluno removido' };
   }
 
   async addStudent(userId: string, studentUserId: string, monthlyFee?: number) {

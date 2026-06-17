@@ -29,6 +29,12 @@ export class TrainersController {
     return this.service.addStudent(user.id, body.studentUserId, body.monthlyFee);
   }
 
+  @Delete('me/students/:studentId')
+  @ApiOperation({ summary: 'Remover aluno do trainer' })
+  removeStudent(@CurrentUser() user: any, @Param('studentId') studentId: string) {
+    return this.service.removeStudent(user.id, studentId);
+  }
+
   @Get('me/appointments')
   @ApiOperation({ summary: 'Listar agendamentos' })
   getAppointments(@CurrentUser() user: any) {
