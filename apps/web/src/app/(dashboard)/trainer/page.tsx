@@ -4,7 +4,7 @@ import { motion } from 'framer-motion';
 import {
   Users, Dumbbell, TrendingUp, DollarSign,
   Activity, Calendar, MessageCircle, Star, Trophy,
-  ArrowUpRight, Plus, ChevronRight,
+  ArrowUpRight, Plus, ChevronRight, Brain,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
@@ -108,6 +108,7 @@ export default function TrainerDashboard() {
                 { label: 'Agendar aula', icon: Calendar, href: '/trainer/schedule', color: 'text-emerald-400' },
                 { label: 'Ver mensagens', icon: MessageCircle, href: '/trainer/chat', color: 'text-orange-400' },
                 { label: 'Relatórios', icon: TrendingUp, href: '/trainer/reports', color: 'text-pink-400' },
+                { label: 'IA — Análise de aluno', icon: Brain, href: '/trainer/ai', color: 'text-violet-400' },
               ].map((action) => (
                 <Link
                   key={action.label}
@@ -123,18 +124,17 @@ export default function TrainerDashboard() {
           </div>
 
           {/* AI suggestion */}
-          <div className="glass-card bg-gradient-to-br from-purple-600/10 to-cyan-600/10 border border-purple-600/20">
+          <Link href="/trainer/ai" className="block glass-card bg-gradient-to-br from-purple-600/10 to-cyan-600/10 border border-purple-600/20 hover:border-purple-600/40 transition-all group">
             <div className="flex items-center gap-2 mb-3">
               <Star className="w-4 h-4 text-yellow-400" />
-              <span className="text-sm font-semibold">Sugestão da IA</span>
+              <span className="text-sm font-semibold">IA Fitness</span>
+              <ChevronRight className="w-3.5 h-3.5 text-muted-foreground ml-auto opacity-0 group-hover:opacity-100 transition-opacity" />
             </div>
-            <p className="text-sm text-muted-foreground mb-4">
-              3 alunos com objetivo de ganho muscular ainda não têm treino de pernas esta semana.
+            <p className="text-sm text-muted-foreground mb-3">
+              Analise o histórico completo de um aluno e receba sugestões precisas de ajuste de treino com aplicação automática.
             </p>
-            <button className="text-xs text-primary hover:underline">
-              Ver alunos →
-            </button>
-          </div>
+            <span className="text-xs text-primary font-medium">Analisar aluno →</span>
+          </Link>
         </div>
       </div>
 
