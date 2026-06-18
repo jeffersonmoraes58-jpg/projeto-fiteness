@@ -140,7 +140,7 @@ Escolha 5 a 8 exercícios da lista. Adapte séries e repetições ao objetivo.`;
       this.prisma.exercise.findMany({
         where: { OR: [{ isPublic: true }, { trainerId: trainer.id }] },
         select: { id: true, name: true, category: true },
-        take: 50,
+        take: 30,
         orderBy: { name: 'asc' },
       }),
     ]);
@@ -160,8 +160,8 @@ Escolha 5 a 8 exercícios da lista. Adapte séries e repetições ao objetivo.`;
       return `Plano ID:${p.id} — "${p.workout.name}" (divisão: ${p.division || 'N/A'}, dias da semana: ${days})\nExercícios:\n${exLines || '  Sem exercícios'}`;
     }).join('\n\n');
 
-    const logsSection = logs.slice(0, 20).map((l) =>
-      `${new Date(l.completedAt).toLocaleDateString('pt-BR')} | ${l.duration ?? '?'}min | sentiu: ${feelingMap[l.feeling ?? ''] ?? '?'} | status: ${l.status}`,
+    const logsSection = logs.slice(0, 10).map((l) =>
+      `${new Date(l.completedAt).toLocaleDateString('pt-BR')} | ${l.duration ?? '?'}min | ${feelingMap[l.feeling ?? ''] ?? '?'} | ${l.status}`,
     ).join('\n');
 
     const measSection = measurements.map((m) =>
@@ -195,37 +195,38 @@ ${measSection}
 ${libSection}
 
 ## INSTRUÇÕES
-Analise criticamente: volume, intensidade, frequência, progressão de carga, variedade, recuperação e adequação ao objetivo.
-Retorne APENAS JSON válido sem texto extra:
+Analise: volume, intensidade, frequência, progressão de carga e adequação ao objetivo.
+IMPORTANTE: Seja EXTREMAMENTE conciso. Strings curtas. Máximo 3 itens em cada lista. Máximo 3 exercícios por plano em proposedChanges. Inclua APENAS mudanças prioritárias.
+Retorne APENAS JSON válido sem texto extra (sem markdown, sem explicações fora do JSON):
 {
   "rating": 7,
-  "summary": "avaliação geral em 3-4 frases",
-  "positives": ["ponto positivo 1", "ponto positivo 2"],
-  "concerns": ["ponto de atenção 1", "ponto de atenção 2"],
-  "recommendations": ["recomendação estratégica 1", "recomendação 2"],
+  "summary": "2 frases máximo",
+  "positives": ["máx 3 itens curtos"],
+  "concerns": ["máx 3 itens curtos"],
+  "recommendations": ["máx 3 itens curtos"],
   "proposedChanges": [
     {
       "planId": "id_exato_do_plano",
       "planName": "nome do treino",
-      "reason": "motivo geral das mudanças neste plano",
+      "reason": "1 frase",
       "exercises": [
         {
-          "exerciseId": "id_exato_ou_null_para_add",
-          "exerciseName": "nome exato do exercício",
+          "exerciseId": "id_exato_ou_null",
+          "exerciseName": "nome",
           "action": "update",
           "current": { "sets": 3, "reps": "10", "weight": 80, "rest": 60 },
           "proposed": { "sets": 4, "reps": "8-10", "weight": 90, "rest": 90 },
-          "reason": "justificativa específica"
+          "reason": "1 frase curta"
         }
       ]
     }
   ]
 }
-Inclua APENAS exercícios que precisam de mudança real. Para "add" use exerciseId null. Valores de "current" null para add. Seja preciso e científico.`;
+Para "add" use exerciseId null e current null.`;
 
     let raw: string;
     try {
-      raw = await this.complete(prompt, 4096);
+      raw = await this.complete(prompt, 6000);
     } catch (err) {
       throw new Error(`Falha na chamada à IA: ${(err as Error).message}`);
     }
