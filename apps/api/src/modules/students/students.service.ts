@@ -1,9 +1,13 @@
 import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
 export class StudentsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private notifications: NotificationsService,
+  ) {}
 
   private async getStudent(userId: string) {
     const student = await this.prisma.student.findUnique({
@@ -116,6 +120,30 @@ export class StudentsService {
     });
   }
 
+  async startWorkout(userId: string, workoutPlanId: string) {
+    const student = await this.getStudent(userId);
+    const plan = await this.prisma.workoutPlan.findUnique({
+      where: { id: workoutPlanId },
+      include: {
+        workout: { include: { trainer: { include: { user: true } } } },
+        student: { include: { user: { include: { profile: true } } } },
+      },
+    });
+    if (plan?.workout?.trainer) {
+      const studentName = [
+        plan.student.user.profile?.firstName,
+        plan.student.user.profile?.lastName,
+      ].filter(Boolean).join(' ') || student.user.email;
+      await this.notifications.create({
+        userId: plan.workout.trainer.userId,
+        type: 'WORKOUT_REMINDER',
+        title: '🏃 Treino iniciado!',
+        body: `${studentName} começou o treino "${plan.workout.name}".`,
+      });
+    }
+    return { ok: true };
+  }
+
   async logWorkout(userId: string, data: { workoutPlanId?: string; duration?: number; notes?: string; feeling?: number }) {
     const student = await this.getStudent(userId);
     const log = await this.prisma.workoutLog.create({
@@ -133,6 +161,29 @@ export class StudentsService {
       data: { streak: { increment: 1 }, points: { increment: 10 } },
     });
     await this.checkAndAwardAchievements(student.id);
+
+    if (data.workoutPlanId) {
+      const plan = await this.prisma.workoutPlan.findUnique({
+        where: { id: data.workoutPlanId },
+        include: {
+          workout: { include: { trainer: { include: { user: true } } } },
+          student: { include: { user: { include: { profile: true } } } },
+        },
+      });
+      if (plan?.workout?.trainer) {
+        const studentName = [
+          plan.student.user.profile?.firstName,
+          plan.student.user.profile?.lastName,
+        ].filter(Boolean).join(' ') || student.user.email;
+        await this.notifications.create({
+          userId: plan.workout.trainer.userId,
+          type: 'ACHIEVEMENT',
+          title: '✅ Treino finalizado!',
+          body: `${studentName} concluiu o treino "${plan.workout.name}". 🎉`,
+        });
+      }
+    }
+
     return log;
   }
 

@@ -64,6 +64,92 @@ export class NotificationsScheduler {
     }
   }
 
+  // Aviso de vencimento de fatura — 9h todo dia
+  @Cron('0 9 * * *')
+  async invoiceDueReminder() {
+    const now = new Date();
+
+    // Faturas que vencem daqui a 3 dias
+    const in3Start = new Date(now);
+    in3Start.setDate(in3Start.getDate() + 3);
+    in3Start.setHours(0, 0, 0, 0);
+    const in3End = new Date(in3Start);
+    in3End.setHours(23, 59, 59, 999);
+
+    // Faturas que vencem hoje
+    const todayStart = new Date(now);
+    todayStart.setHours(0, 0, 0, 0);
+    const todayEnd = new Date(now);
+    todayEnd.setHours(23, 59, 59, 999);
+
+    const invoices = await this.prisma.invoice.findMany({
+      where: {
+        status: 'PENDING',
+        dueDate: { gte: todayStart, lte: in3End },
+      },
+      include: {
+        billing: {
+          include: {
+            student: { include: { user: true } },
+            trainer: { include: { user: { include: { profile: true } } } },
+          },
+        },
+      },
+    });
+
+    for (const invoice of invoices) {
+      const trainerName =
+        [invoice.billing.trainer.user.profile?.firstName, invoice.billing.trainer.user.profile?.lastName]
+          .filter(Boolean).join(' ') || 'Personal Trainer';
+      const dueStr = new Date(invoice.billing.nextDueDate ?? invoice.dueDate).toLocaleDateString('pt-BR');
+      const duesToday = new Date(invoice.dueDate) <= todayEnd;
+
+      await this.notifications.create({
+        userId: invoice.billing.student.userId,
+        type: 'PAYMENT',
+        title: duesToday ? '⚠️ Fatura vence hoje!' : '📅 Fatura vence em 3 dias',
+        body: `Sua mensalidade de R$ ${Number(invoice.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} com ${trainerName} vence ${duesToday ? 'hoje' : 'em 3 dias'} (${dueStr}).`,
+      });
+    }
+  }
+
+  // Alunos inativos há 7 dias — toda segunda às 8h
+  @Cron('0 8 * * 1')
+  async inactiveStudentAlert() {
+    const sevenDaysAgo = new Date(Date.now() - 7 * 86400000);
+
+    const relations = await this.prisma.trainerStudent.findMany({
+      where: { isActive: true },
+      include: {
+        trainer: { include: { user: { select: { id: true } } } },
+        student: {
+          include: {
+            user: { include: { profile: true } },
+            workoutLogs: { orderBy: { completedAt: 'desc' }, take: 1, select: { completedAt: true } },
+          },
+        },
+      },
+    });
+
+    for (const rel of relations) {
+      const lastLog = rel.student.workoutLogs[0];
+      if (lastLog && new Date(lastLog.completedAt) >= sevenDaysAgo) continue;
+
+      const studentName = [rel.student.user.profile?.firstName, rel.student.user.profile?.lastName]
+        .filter(Boolean).join(' ') || 'Aluno(a)';
+      const lastStr = lastLog
+        ? new Date(lastLog.completedAt).toLocaleDateString('pt-BR')
+        : 'nunca';
+
+      await this.notifications.create({
+        userId: rel.trainer.userId,
+        type: 'SYSTEM',
+        title: `⚠️ ${studentName} está inativo(a)`,
+        body: `${studentName} não treina há mais de 7 dias. Último treino: ${lastStr}. Que tal entrar em contato?`,
+      });
+    }
+  }
+
   // Parabéns aniversariante — 6h todo dia
   @Cron('0 6 * * *')
   async birthdayGreeting() {

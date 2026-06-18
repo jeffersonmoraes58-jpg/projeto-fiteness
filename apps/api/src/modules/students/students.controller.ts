@@ -36,6 +36,12 @@ export class StudentsController {
     return this.service.getWorkoutLogs(user.id);
   }
 
+  @Post('me/workout-start')
+  @ApiOperation({ summary: 'Notificar início de treino' })
+  startWorkout(@CurrentUser() user: any, @Body() body: { workoutPlanId: string }) {
+    return this.service.startWorkout(user.id, body.workoutPlanId);
+  }
+
   @Post('me/workout-logs')
   @ApiOperation({ summary: 'Registrar treino concluído' })
   logWorkout(@CurrentUser() user: any, @Body() body: any) {
