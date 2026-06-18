@@ -45,6 +45,7 @@ const navByRole: Record<string, NavItem[]> = {
     { icon: Dumbbell, label: 'Meu Treino', href: '/student/workout' },
     { icon: Apple, label: 'Minha Dieta', href: '/student/diet' },
     { icon: Activity, label: 'Evolução', href: '/student/progress' },
+    { icon: Calendar, label: 'Agenda', href: '/student/schedule' },
     { icon: Target, label: 'Metas', href: '/student/goals' },
     { icon: Trophy, label: 'Conquistas', href: '/student/achievements' },
     { icon: Star, label: 'Desafios', href: '/student/challenges' },

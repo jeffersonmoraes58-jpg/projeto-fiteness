@@ -12,6 +12,12 @@ import { Public } from '../../decorators/public.decorator';
 export class StudentsController {
   constructor(private service: StudentsService) {}
 
+  @Get('me/appointments')
+  @ApiOperation({ summary: 'Agendamentos do aluno com trainer' })
+  getMyAppointments(@CurrentUser() user: any) {
+    return this.service.getMyAppointments(user.id);
+  }
+
   @Get('me/contacts')
   @ApiOperation({ summary: 'Trainer e nutricionista do aluno' })
   getContacts(@CurrentUser() user: any) {
