@@ -153,10 +153,11 @@ Escolha 5 a 8 exercícios da lista. Adapte séries e repetições ao objetivo.`;
     const feelingMap: Record<string, string> = { GREAT: 'ótimo', GOOD: 'bom', AVERAGE: 'médio', BAD: 'ruim', TERRIBLE: 'péssimo' };
 
     const plansSection = plans.map((p) => {
-      const exLines = p.workout.exercises.map((we) =>
-        `    ID:${we.exerciseId} | ${we.exercise.name} | ${we.sets}x${we.reps ?? '?'} @ ${we.weight ?? 0}kg | desc ${we.restSeconds ?? 60}s`,
+      const exLines = (p.workout.exercises ?? []).map((we) =>
+        `    ID:${we.exerciseId} | ${we.exercise?.name ?? '?'} | ${we.sets}x${we.reps ?? '?'} @ ${we.weight ?? 0}kg | desc ${we.restSeconds ?? 60}s`,
       ).join('\n');
-      return `Plano ID:${p.id} — "${p.workout.name}" (divisão: ${p.division || 'N/A'}, dias da semana: ${(p.dayOfWeek as number[]).join(',') || 'N/A'})\nExercícios:\n${exLines}`;
+      const days = Array.isArray(p.dayOfWeek) ? (p.dayOfWeek as number[]).join(',') : 'N/A';
+      return `Plano ID:${p.id} — "${p.workout.name}" (divisão: ${p.division || 'N/A'}, dias da semana: ${days})\nExercícios:\n${exLines || '  Sem exercícios'}`;
     }).join('\n\n');
 
     const logsSection = logs.slice(0, 20).map((l) =>
