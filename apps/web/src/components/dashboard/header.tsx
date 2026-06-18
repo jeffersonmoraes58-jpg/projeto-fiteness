@@ -105,7 +105,10 @@ export function DashboardHeader() {
       </button>
 
       {/* Logo on mobile */}
-      <span className="lg:hidden font-bold gradient-text text-base flex-1">Fitlynutri</span>
+      <div className="lg:hidden flex items-center gap-2 flex-1">
+        <img src="/logo.png" alt="Fitlynutri" className="w-7 h-7 object-contain flex-shrink-0" />
+        <span className="font-bold gradient-text text-base">Fitlynutri</span>
+      </div>
 
       <div className="hidden sm:block flex-1 max-w-md">
         <div className="relative">
