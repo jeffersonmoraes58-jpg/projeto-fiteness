@@ -14,12 +14,12 @@ const statCards = [
   { key: 'students', label: 'Alunos Ativos', icon: Users, color: 'from-purple-600 to-indigo-600', prefix: '' },
   { key: 'workouts', label: 'Treinos Criados', icon: Dumbbell, color: 'from-cyan-600 to-blue-600', prefix: '' },
   { key: 'checkins', label: 'Check-ins Hoje', icon: Activity, color: 'from-emerald-600 to-teal-600', prefix: '' },
-  { key: 'revenue', label: 'Receita Mensal', icon: DollarSign, color: 'from-orange-600 to-amber-600', prefix: 'R$ ' },
+  { key: 'revenue', label: 'Receita Mensal', icon: DollarSign, color: 'from-orange-600 to-amber-600', prefix: 'R$ ', format: (v: number) => v.toLocaleString('pt-BR') },
 ];
 
 export default function TrainerDashboard() {
-  const { data: stats } = useQuery({
-    queryKey: ['trainer-stats'],
+  const { data: dashboard } = useQuery({
+    queryKey: ['trainer-dashboard'],
     queryFn: () => api.get('/trainers/me/dashboard').then((r) => r.data.data),
   });
 
@@ -52,29 +52,29 @@ export default function TrainerDashboard() {
 
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        {statCards.map((card, i) => (
-          <motion.div
-            key={card.key}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: i * 0.1 }}
-            className="stat-card"
-          >
-            <div className="flex items-center justify-between mb-4">
-              <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br ${card.color} flex items-center justify-center flex-shrink-0`}>
-                <card.icon className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
+        {statCards.map((card, i) => {
+          const raw = dashboard?.[card.key];
+          const display = raw == null ? '—' : (card as any).format ? (card as any).format(raw) : raw;
+          return (
+            <motion.div
+              key={card.key}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: i * 0.1 }}
+              className="stat-card"
+            >
+              <div className="flex items-center justify-between mb-4">
+                <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br ${card.color} flex items-center justify-center flex-shrink-0`}>
+                  <card.icon className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
+                </div>
               </div>
-              <span className="text-xs text-emerald-500 flex items-center gap-1">
-                <ArrowUpRight className="w-3 h-3" />
-                +12%
-              </span>
-            </div>
-            <div className="text-xl sm:text-2xl font-bold">
-              {card.prefix}{stats?.[card.key] ?? '—'}
-            </div>
-            <div className="text-[11px] sm:text-xs text-muted-foreground mt-1">{card.label}</div>
-          </motion.div>
-        ))}
+              <div className="text-xl sm:text-2xl font-bold">
+                {card.prefix}{display}
+              </div>
+              <div className="text-[11px] sm:text-xs text-muted-foreground mt-1">{card.label}</div>
+            </motion.div>
+          );
+        })}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
@@ -144,7 +144,7 @@ export default function TrainerDashboard() {
           <h2 className="font-semibold">Check-ins da Semana</h2>
           <span className="text-xs text-muted-foreground">Últimos 7 dias</span>
         </div>
-        <WeeklyChart />
+        <WeeklyChart values={dashboard?.weeklyCheckins} />
       </div>
     </div>
   );
@@ -193,25 +193,30 @@ function StudentRow({ student, index }: { student: any; index: number }) {
   );
 }
 
-function WeeklyChart() {
+function WeeklyChart({ values }: { values?: number[] }) {
   const days = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
-  const values = [12, 18, 15, 22, 19, 25, 8];
-  const max = Math.max(...values);
+  // Build labels for the last 7 days in order
+  const dayLabels = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(Date.now() - (6 - i) * 86400000);
+    return days[d.getDay()];
+  });
+  const data = values && values.length === 7 ? values : Array(7).fill(0);
+  const max = Math.max(...data, 1);
 
   return (
     <div className="flex items-end gap-1 sm:gap-3 h-24 sm:h-32">
-      {days.map((day, i) => (
-        <div key={day} className="flex-1 flex flex-col items-center gap-1 sm:gap-2">
+      {dayLabels.map((day, i) => (
+        <div key={i} className="flex-1 flex flex-col items-center gap-1 sm:gap-2">
           <div className="flex-1 w-full flex items-end">
             <motion.div
               initial={{ height: 0 }}
-              animate={{ height: `${(values[i] / max) * 100}%` }}
+              animate={{ height: `${(data[i] / max) * 100}%` }}
               transition={{ duration: 0.5, delay: i * 0.1 }}
-              className="w-full bg-gradient-to-t from-purple-600 to-indigo-600 rounded-t-md opacity-80 hover:opacity-100 transition-opacity"
+              className="w-full bg-gradient-to-t from-purple-600 to-indigo-600 rounded-t-md opacity-80 hover:opacity-100 transition-opacity min-h-[2px]"
             />
           </div>
           <div className="text-[10px] sm:text-xs text-muted-foreground">{day}</div>
-          <div className="text-[10px] sm:text-xs font-medium">{values[i]}</div>
+          <div className="text-[10px] sm:text-xs font-medium">{data[i]}</div>
         </div>
       ))}
     </div>
