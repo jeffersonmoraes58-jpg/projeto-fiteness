@@ -29,7 +29,7 @@ export function DashboardHeader() {
   const { data: unreadData } = useQuery({
     queryKey: ['unread-notifications-count'],
     queryFn: () => api.get('/notifications/unread-count').then((r) => r.data.data),
-    refetchInterval: 30000,
+    refetchInterval: 10000,
   });
 
   const { data: notifications } = useQuery({

@@ -130,16 +130,20 @@ export class StudentsService {
       },
     });
     if (plan?.workout?.trainer) {
-      const studentName = [
-        plan.student.user.profile?.firstName,
-        plan.student.user.profile?.lastName,
-      ].filter(Boolean).join(' ') || student.user.email;
-      await this.notifications.create({
-        userId: plan.workout.trainer.userId,
-        type: 'WORKOUT_REMINDER',
-        title: '🏃 Treino iniciado!',
-        body: `${studentName} começou o treino "${plan.workout.name}".`,
-      });
+      try {
+        const studentName = [
+          plan.student.user.profile?.firstName,
+          plan.student.user.profile?.lastName,
+        ].filter(Boolean).join(' ') || student.user.email;
+        await this.notifications.create({
+          userId: plan.workout.trainer.userId,
+          type: 'WORKOUT_REMINDER',
+          title: '🏃 Treino iniciado!',
+          body: `${studentName} começou o treino "${plan.workout.name}".`,
+        });
+      } catch (err) {
+        console.error('[startWorkout] failed to notify trainer:', err);
+      }
     }
     return { ok: true };
   }
@@ -163,24 +167,28 @@ export class StudentsService {
     await this.checkAndAwardAchievements(student.id);
 
     if (data.workoutPlanId) {
-      const plan = await this.prisma.workoutPlan.findUnique({
-        where: { id: data.workoutPlanId },
-        include: {
-          workout: { include: { trainer: { include: { user: true } } } },
-          student: { include: { user: { include: { profile: true } } } },
-        },
-      });
-      if (plan?.workout?.trainer) {
-        const studentName = [
-          plan.student.user.profile?.firstName,
-          plan.student.user.profile?.lastName,
-        ].filter(Boolean).join(' ') || student.user.email;
-        await this.notifications.create({
-          userId: plan.workout.trainer.userId,
-          type: 'ACHIEVEMENT',
-          title: '✅ Treino finalizado!',
-          body: `${studentName} concluiu o treino "${plan.workout.name}". 🎉`,
+      try {
+        const plan = await this.prisma.workoutPlan.findUnique({
+          where: { id: data.workoutPlanId },
+          include: {
+            workout: { include: { trainer: { include: { user: true } } } },
+            student: { include: { user: { include: { profile: true } } } },
+          },
         });
+        if (plan?.workout?.trainer) {
+          const studentName = [
+            plan.student.user.profile?.firstName,
+            plan.student.user.profile?.lastName,
+          ].filter(Boolean).join(' ') || student.user.email;
+          await this.notifications.create({
+            userId: plan.workout.trainer.userId,
+            type: 'ACHIEVEMENT',
+            title: '✅ Treino finalizado!',
+            body: `${studentName} concluiu o treino "${plan.workout.name}". 🎉`,
+          });
+        }
+      } catch (err) {
+        console.error('[logWorkout] failed to notify trainer:', err);
       }
     }
 
