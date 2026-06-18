@@ -2,7 +2,7 @@
 
 import { motion } from 'framer-motion';
 import Link from 'next/link';
-import { ArrowRight, Sparkles, Play, TrendingUp, Users, Dumbbell, Apple } from 'lucide-react';
+import { ArrowRight, Sparkles, TrendingUp, Users, Dumbbell, Apple } from 'lucide-react';
 
 export function LandingHero() {
   return (
@@ -55,7 +55,7 @@ export function LandingHero() {
           transition={{ duration: 0.6, delay: 0.2 }}
           className="text-center text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto mb-10"
         >
-          Personal trainers, nutricionistas e academias em uma única plataforma.
+          Personal trainers e nutricionistas em uma única plataforma.
           Gerencie treinos, dietas e evolução com inteligência artificial.
         </motion.p>
 
@@ -67,12 +67,11 @@ export function LandingHero() {
           className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-6"
         >
           <Link href="/register" className="btn-primary flex items-center gap-2 text-base shadow-2xl shadow-purple-600/30 px-7 py-3">
-            Começar grátis
+            Criar conta grátis
             <ArrowRight className="w-4 h-4" />
           </Link>
-          <Link href="/login" className="btn-secondary flex items-center gap-2 text-base px-7 py-3">
-            <Play className="w-4 h-4 fill-current" />
-            Ver demo
+          <Link href="#pricing" className="btn-secondary flex items-center gap-2 text-base px-7 py-3">
+            Ver planos e preços
           </Link>
         </motion.div>
 
@@ -82,7 +81,7 @@ export function LandingHero() {
           transition={{ duration: 0.6, delay: 0.45 }}
           className="text-center text-sm text-muted-foreground mb-16"
         >
-          14 dias grátis · Sem cartão de crédito · Cancele quando quiser
+          Grátis para sempre com 1 aluno · Planos a partir de R$35/mês · Sem fidelidade
         </motion.p>
 
         {/* Dashboard preview */}
@@ -93,7 +92,6 @@ export function LandingHero() {
           className="mx-auto max-w-5xl"
         >
           <div className="relative">
-            {/* Glow under the card */}
             <div className="absolute -inset-px bg-gradient-to-r from-purple-600/30 via-cyan-600/20 to-indigo-600/30 rounded-2xl blur-2xl" />
             <div className="relative rounded-2xl overflow-hidden border border-white/10 shadow-2xl shadow-black/60">
               {/* Browser chrome */}
@@ -102,7 +100,7 @@ export function LandingHero() {
                 <div className="w-3 h-3 rounded-full bg-yellow-500/70" />
                 <div className="w-3 h-3 rounded-full bg-green-500/70" />
                 <div className="flex-1 mx-4 h-6 bg-white/5 rounded-md flex items-center px-3">
-                  <span className="text-[11px] text-white/30">app.fitlynutri.com.br/trainer</span>
+                  <span className="text-[11px] text-white/30">fitlynutri.com.br/trainer</span>
                 </div>
               </div>
               <DashboardPreview />
@@ -129,12 +127,12 @@ function DashboardPreview() {
           <div className="h-2.5 bg-white/20 rounded w-14" />
         </div>
         {[
-          { color: 'bg-purple-600/30 border-l-2 border-purple-500', w: 'w-full' },
-          { color: 'bg-white/0', w: 'w-full' },
-          { color: 'bg-white/0', w: 'w-full' },
-          { color: 'bg-white/0', w: 'w-full' },
-          { color: 'bg-white/0', w: 'w-full' },
-          { color: 'bg-white/0', w: 'w-full' },
+          { color: 'bg-purple-600/30 border-l-2 border-purple-500' },
+          { color: 'bg-white/0' },
+          { color: 'bg-white/0' },
+          { color: 'bg-white/0' },
+          { color: 'bg-white/0' },
+          { color: 'bg-white/0' },
         ].map((item, i) => (
           <div key={i} className={`h-7 rounded-lg ${item.color} flex items-center gap-2 px-2`}>
             <div className={`w-3 h-3 rounded ${i === 0 ? 'bg-purple-400' : 'bg-white/10'}`} />
@@ -157,10 +155,10 @@ function DashboardPreview() {
         {/* Stats row */}
         <div className="grid grid-cols-4 gap-2">
           {[
-            { label: 'Alunos', value: '248', icon: Users, color: 'from-purple-600 to-indigo-600', delta: '+12%' },
-            { label: 'Treinos', value: '1.2k', icon: Dumbbell, color: 'from-cyan-600 to-blue-600', delta: '+8%' },
-            { label: 'Dietas', value: '89', icon: Apple, color: 'from-emerald-600 to-teal-600', delta: '+5%' },
-            { label: 'Receita', value: 'R$12k', icon: TrendingUp, color: 'from-orange-600 to-red-600', delta: '+22%' },
+            { label: 'Alunos', value: '48', icon: Users, color: 'from-purple-600 to-indigo-600', delta: '+12%' },
+            { label: 'Treinos', value: '124', icon: Dumbbell, color: 'from-cyan-600 to-blue-600', delta: '+8%' },
+            { label: 'Dietas', value: '32', icon: Apple, color: 'from-emerald-600 to-teal-600', delta: '+5%' },
+            { label: 'Receita', value: 'R$4.2k', icon: TrendingUp, color: 'from-orange-600 to-red-600', delta: '+18%' },
           ].map((s) => (
             <div key={s.label} className="bg-white/5 rounded-xl p-2.5 border border-white/5">
               <div className="flex items-center justify-between mb-2">

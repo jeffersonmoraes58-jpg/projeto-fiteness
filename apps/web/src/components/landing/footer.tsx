@@ -1,34 +1,27 @@
 import Link from 'next/link';
-import { Dumbbell, Instagram, Twitter, Youtube, Linkedin } from 'lucide-react';
+import { Instagram, Twitter, Youtube, Linkedin } from 'lucide-react';
 
 const links = {
   Produto: [
     { label: 'Funcionalidades', href: '#features' },
     { label: 'Preços', href: '#pricing' },
-    { label: 'Changelog', href: '/changelog' },
-    { label: 'Roadmap', href: '/roadmap' },
-    { label: 'API Docs', href: '/docs' },
+    { label: 'Para Trainers', href: '#' },
+    { label: 'Para Nutricionistas', href: '#' },
+    { label: 'Para Alunos', href: '#' },
   ],
   Empresa: [
     { label: 'Sobre nós', href: '/about' },
     { label: 'Blog', href: '/blog' },
-    { label: 'Carreiras', href: '/careers' },
-    { label: 'Imprensa', href: '/press' },
     { label: 'Contato', href: '/contact' },
+    { label: 'Termos de uso', href: '/terms' },
+    { label: 'Privacidade', href: '/privacy' },
   ],
   Suporte: [
     { label: 'Central de ajuda', href: '/help' },
-    { label: 'Documentação', href: '/docs' },
-    { label: 'Status', href: '/status' },
-    { label: 'Comunidade', href: '/community' },
-    { label: 'Webinars', href: '/webinars' },
-  ],
-  Legal: [
-    { label: 'Privacidade', href: '/privacy' },
-    { label: 'Termos de uso', href: '/terms' },
+    { label: 'Criar conta', href: '/register' },
+    { label: 'Entrar', href: '/login' },
+    { label: 'Perguntas frequentes', href: '#faq' },
     { label: 'LGPD', href: '/lgpd' },
-    { label: 'Cookies', href: '/cookies' },
-    { label: 'SLA', href: '/sla' },
   ],
 };
 
@@ -43,17 +36,16 @@ export function LandingFooter() {
   return (
     <footer className="border-t border-border/50 bg-background">
       <div className="container mx-auto px-6 py-16">
-        <div className="grid grid-cols-2 md:grid-cols-6 gap-8 mb-12">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-8 mb-12">
           {/* Brand */}
           <div className="col-span-2">
             <Link href="/" className="flex items-center gap-2 font-bold text-xl mb-4">
-              <div className="w-8 h-8 bg-gradient-brand rounded-lg flex items-center justify-center">
-                <Dumbbell className="w-4 h-4 text-white" />
-              </div>
+              <img src="/logo.png" alt="Fitlynutri" className="w-8 h-8 object-contain" />
               <span className="gradient-text">Fitlynutri</span>
             </Link>
             <p className="text-sm text-muted-foreground max-w-xs leading-relaxed mb-6">
-              A plataforma SaaS mais completa para personal trainers, nutricionistas e academias do Brasil.
+              A plataforma SaaS mais completa para personal trainers e nutricionistas do Brasil.
+              Comece grátis hoje.
             </p>
             {/* Social links */}
             <div className="flex items-center gap-3">

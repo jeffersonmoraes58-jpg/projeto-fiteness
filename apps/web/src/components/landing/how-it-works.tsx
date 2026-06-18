@@ -8,26 +8,26 @@ const steps = [
   {
     number: '01',
     icon: UserPlus,
-    title: 'Crie sua conta',
-    description: 'Cadastre-se em menos de 2 minutos. Sem cartão de crédito. 14 dias grátis para explorar tudo.',
+    title: 'Crie sua conta grátis',
+    description: 'Cadastre-se em menos de 2 minutos. Sem cartão de crédito. Plano gratuito com 1 aluno para sempre.',
     color: 'from-purple-600 to-indigo-600',
-    detail: ['Escolha seu perfil', 'Informe o nome do studio', 'Acesse imediatamente'],
+    detail: ['Escolha seu perfil (trainer ou nutricionista)', 'Preencha os dados básicos', 'Acesse o painel imediatamente'],
   },
   {
     number: '02',
     icon: Settings2,
-    title: 'Configure seu studio',
-    description: 'Adicione sua logo, personalize as cores, cadastre sua equipe e importe seus alunos existentes.',
+    title: 'Cadastre seus alunos',
+    description: 'Adicione alunos, monte treinos e dietas personalizados. Configure a agenda e as cobranças.',
     color: 'from-cyan-600 to-blue-600',
-    detail: ['White-label em minutos', 'Importe alunos via CSV', 'Defina planos e preços'],
+    detail: ['Cadastre alunos pelo painel', 'Monte treinos com exercícios e GIFs', 'Ative cobranças via Mercado Pago'],
   },
   {
     number: '03',
     icon: Rocket,
-    title: 'Comece a crescer',
+    title: 'Acompanhe e cresça',
     description: 'Seus alunos acessam o app, você acompanha em tempo real. A IA cuida das sugestões automáticas.',
     color: 'from-emerald-600 to-teal-600',
-    detail: ['App para alunos no ar', 'Cobranças automáticas', 'Relatórios em tempo real'],
+    detail: ['Alunos instalam o PWA no celular', 'Notificações automáticas de treino', 'Relatórios e KPIs em tempo real'],
   },
 ];
 
@@ -48,12 +48,12 @@ export function LandingHowItWorks() {
             Como funciona
           </div>
           <h2 className="text-4xl md:text-5xl font-bold mb-4">
-            Do zero ao seu studio
+            Do zero ao seu painel
             <br />
-            <span className="gradient-text">em menos de uma hora</span>
+            <span className="gradient-text">em menos de 5 minutos</span>
           </h2>
           <p className="text-muted-foreground text-lg max-w-xl mx-auto">
-            Sem complexidade. Sem suporte técnico. Três passos e seu studio digital está no ar.
+            Sem complexidade. Sem suporte técnico. Três passos e você já está gerenciando seus alunos.
           </p>
         </motion.div>
 
