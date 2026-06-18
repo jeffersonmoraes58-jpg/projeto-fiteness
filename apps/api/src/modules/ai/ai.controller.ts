@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Param, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, UseGuards, InternalServerErrorException } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { AiService } from './ai.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -61,11 +61,16 @@ export class AiController {
 
   @Post('analyze-student/:studentId')
   @ApiOperation({ summary: 'Análise completa de aluno por IA' })
-  analyzeStudent(
+  async analyzeStudent(
     @Param('studentId') studentId: string,
     @CurrentUser('id') userId: string,
   ) {
-    return this.aiService.analyzeStudent(studentId, userId);
+    try {
+      return await this.aiService.analyzeStudent(studentId, userId);
+    } catch (err) {
+      const msg = (err as Error).message || 'Erro interno na análise';
+      throw new InternalServerErrorException(msg);
+    }
   }
 
   @Post('apply-changes')
