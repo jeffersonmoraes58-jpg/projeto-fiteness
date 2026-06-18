@@ -7,28 +7,20 @@ import {
   Dumbbell, Target, Zap, TrendingUp, ChevronRight,
   FlaskConical, CheckCircle2, AlertTriangle, Star,
   ChevronDown, ChevronUp, Loader2, Check, ArrowRight,
+  MessageSquare,
 } from 'lucide-react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
 
-// ─── Chat types ──────────────────────────────────────────────────────────────
+// ─── Types ────────────────────────────────────────────────────────────────────
 
-interface Message {
+interface ChatMessage {
   id: string;
   role: 'user' | 'assistant';
   content: string;
   timestamp: Date;
 }
-
-const SUGGESTIONS = [
-  { icon: Dumbbell, label: 'Monte um treino de hipertrofia para iniciantes 3x por semana', color: 'text-purple-400' },
-  { icon: Target, label: 'Crie um programa periodizado de 12 semanas para ganho de força', color: 'text-cyan-400' },
-  { icon: TrendingUp, label: 'Monte um treino HIIT de 30 minutos para perda de gordura', color: 'text-emerald-400' },
-  { icon: Zap, label: 'Sugira exercícios de mobilidade e aquecimento para treino de pernas', color: 'text-orange-400' },
-];
-
-// ─── Analysis types ───────────────────────────────────────────────────────────
 
 interface ProposedExercise {
   exerciseId: string | null;
@@ -57,6 +49,13 @@ interface AnalysisResult {
   _plans: { id: string; name: string; workoutId: string }[];
 }
 
+const SUGGESTIONS = [
+  { icon: Dumbbell, label: 'Monte um treino de hipertrofia para iniciantes 3x por semana', color: 'text-purple-400' },
+  { icon: Target, label: 'Crie um programa periodizado de 12 semanas para ganho de força', color: 'text-cyan-400' },
+  { icon: TrendingUp, label: 'Monte um treino HIIT de 30 minutos para perda de gordura', color: 'text-emerald-400' },
+  { icon: Zap, label: 'Sugira exercícios de mobilidade e aquecimento para treino de pernas', color: 'text-orange-400' },
+];
+
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function TrainerAI() {
@@ -64,7 +63,6 @@ export default function TrainerAI() {
 
   return (
     <div className="flex flex-col h-[calc(100vh-8rem)]">
-      {/* Header */}
       <div className="flex items-center gap-3 mb-4">
         <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-600 to-indigo-600 flex items-center justify-center flex-shrink-0">
           <Brain className="w-5 h-5 text-white" />
@@ -79,7 +77,6 @@ export default function TrainerAI() {
         </div>
       </div>
 
-      {/* Tabs */}
       <div className="flex gap-1 mb-4 p-1 glass rounded-xl w-fit">
         <button
           onClick={() => setTab('chat')}
@@ -107,21 +104,21 @@ export default function TrainerAI() {
   );
 }
 
-// ─── Chat tab ─────────────────────────────────────────────────────────────────
+// ─── Generic chat tab ─────────────────────────────────────────────────────────
 
 function ChatTab() {
-  const [messages, setMessages] = useState<Message[]>([
+  const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: '0',
       role: 'assistant',
-      content: 'Olá! Sou sua assistente de IA especializada em fitness e treinamento. Posso ajudar com:\n\n• Criação de programas de treino personalizados\n• Periodização e progressão de cargas\n• Exercícios alternativos e substituições\n• Estratégias para objetivos específicos\n• Análise de treinos e sugestões de melhoria\n\nComo posso ajudar você hoje?',
+      content: 'Olá! Sou sua assistente de IA especializada em fitness e treinamento. Posso ajudar com:\n\n• Criação de programas de treino personalizados\n• Periodização e progressão de cargas\n• Exercícios alternativos e substituições\n• Estratégias para objetivos específicos\n\nPara analisar um aluno específico com acesso ao histórico completo dele, use a aba **Análise de Aluno**.',
       timestamp: new Date(),
     },
   ]);
   const [input, setInput] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const buildHistory = (msgs: Message[]) =>
+  const buildHistory = (msgs: ChatMessage[]) =>
     msgs.slice(1).map((m) => ({ role: m.role, content: m.content }));
 
   const sendMutation = useMutation({
@@ -152,7 +149,7 @@ function ChatTab() {
   const handleSend = (text?: string) => {
     const content = text || input.trim();
     if (!content) return;
-    const userMsg: Message = { id: Date.now().toString(), role: 'user', content, timestamp: new Date() };
+    const userMsg: ChatMessage = { id: Date.now().toString(), role: 'user', content, timestamp: new Date() };
     setMessages((prev) => {
       const next = [...prev, userMsg];
       sendMutation.mutate({ message: content, history: buildHistory(next) });
@@ -166,58 +163,11 @@ function ChatTab() {
       <div className="flex-1 overflow-y-auto scrollbar-hide space-y-4 pr-1">
         <AnimatePresence initial={false}>
           {messages.map((msg) => (
-            <motion.div
-              key={msg.id}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              className={cn('flex gap-3', msg.role === 'user' && 'flex-row-reverse')}
-            >
-              <div className={cn(
-                'w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 mt-0.5',
-                msg.role === 'assistant' ? 'bg-gradient-to-br from-purple-600 to-indigo-600' : 'bg-gradient-to-br from-cyan-600 to-blue-600',
-              )}>
-                {msg.role === 'assistant' ? <Brain className="w-4 h-4 text-white" /> : <User className="w-4 h-4 text-white" />}
-              </div>
-              <div className={cn(
-                'max-w-[80%] rounded-2xl px-4 py-3 text-sm relative group',
-                msg.role === 'assistant' ? 'glass rounded-tl-sm' : 'bg-primary text-primary-foreground rounded-tr-sm',
-              )}>
-                <p className="whitespace-pre-wrap leading-relaxed">{msg.content}</p>
-                <div className={cn('text-[10px] mt-2', msg.role === 'assistant' ? 'text-muted-foreground' : 'text-primary-foreground/70')}>
-                  {msg.timestamp.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-                </div>
-                {msg.role === 'assistant' && (
-                  <button
-                    onClick={() => navigator.clipboard.writeText(msg.content)}
-                    className="absolute top-2 right-2 w-6 h-6 rounded-lg opacity-0 group-hover:opacity-100 hover:bg-accent flex items-center justify-center transition-all"
-                  >
-                    <Copy className="w-3 h-3" />
-                  </button>
-                )}
-              </div>
-            </motion.div>
+            <ChatBubble key={msg.id} msg={msg} />
           ))}
         </AnimatePresence>
 
-        {sendMutation.isPending && (
-          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="flex gap-3">
-            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-purple-600 to-indigo-600 flex items-center justify-center flex-shrink-0">
-              <Brain className="w-4 h-4 text-white" />
-            </div>
-            <div className="glass rounded-2xl rounded-tl-sm px-4 py-3">
-              <div className="flex gap-1.5 items-center h-4">
-                {[0, 1, 2].map((i) => (
-                  <motion.div
-                    key={i}
-                    animate={{ scale: [1, 1.3, 1], opacity: [0.5, 1, 0.5] }}
-                    transition={{ duration: 0.8, repeat: Infinity, delay: i * 0.2 }}
-                    className="w-1.5 h-1.5 rounded-full bg-muted-foreground"
-                  />
-                ))}
-              </div>
-            </div>
-          </motion.div>
-        )}
+        {sendMutation.isPending && <TypingIndicator />}
 
         {messages.length === 1 && (
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} className="space-y-2">
@@ -238,36 +188,13 @@ function ChatTab() {
         <div ref={messagesEndRef} />
       </div>
 
-      <div className="mt-4 glass rounded-2xl p-2">
-        <div className="flex items-end gap-2">
-          <textarea
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
-            placeholder="Descreva o que precisa... (Enter para enviar)"
-            rows={1}
-            className="flex-1 bg-transparent text-sm resize-none focus:outline-none py-2 px-2 max-h-32 overflow-y-auto scrollbar-hide"
-            style={{ fieldSizing: 'content' } as any}
-          />
-          <div className="flex items-center gap-1.5 pb-1">
-            <button onClick={() => setMessages([messages[0]])} className="w-8 h-8 rounded-xl hover:bg-accent flex items-center justify-center transition-all" title="Nova conversa">
-              <RefreshCw className="w-3.5 h-3.5 text-muted-foreground" />
-            </button>
-            <button
-              onClick={() => handleSend()}
-              disabled={!input.trim() || sendMutation.isPending}
-              className={cn('w-9 h-9 rounded-xl flex items-center justify-center transition-all',
-                input.trim() && !sendMutation.isPending ? 'bg-primary hover:bg-primary/80' : 'bg-muted cursor-not-allowed',
-              )}
-            >
-              {sendMutation.isPending
-                ? <Sparkles className="w-4 h-4 text-muted-foreground animate-spin" />
-                : <Send className="w-4 h-4 text-white" />
-              }
-            </button>
-          </div>
-        </div>
-      </div>
+      <ChatInput
+        value={input}
+        onChange={setInput}
+        onSend={handleSend}
+        onClear={() => setMessages([messages[0]])}
+        pending={sendMutation.isPending}
+      />
     </>
   );
 }
@@ -309,6 +236,26 @@ function AnalysisTab() {
 
   const handleApply = (plan: ProposedPlan) => {
     applyMutation.mutate({ planId: plan.planId, exercises: plan.exercises });
+  };
+
+  // Build rich context string to pass into the follow-up chat
+  const buildContext = (a: AnalysisResult): string => {
+    const plans = a._plans.map((p) => p.name).join(', ');
+    const changes = a.proposedChanges.map((p) =>
+      `Plano "${p.planName}": ${p.exercises.map((e) => `${e.exerciseName} (${e.action})`).join(', ')}`,
+    ).join('. ');
+    return `Você é um personal trainer expert. Você acabou de analisar o aluno(a) "${a._studentName}" e os dados do sistema foram consultados.
+
+RESULTADO DA ANÁLISE:
+- Avaliação geral: ${a.rating}/10
+- Resumo: ${a.summary}
+- Pontos positivos: ${a.positives.join('; ')}
+- Pontos de atenção: ${a.concerns.join('; ')}
+- Recomendações: ${a.recommendations.join('; ')}
+- Planos ativos: ${plans}
+- Alterações propostas: ${changes || 'Nenhuma'}
+
+Responda perguntas do personal trainer sobre este aluno de forma precisa e baseada nesses dados. Seja direto e objetivo.`;
   };
 
   return (
@@ -357,7 +304,6 @@ function AnalysisTab() {
         )}
       </div>
 
-      {/* Results */}
       <AnimatePresence>
         {analysis && (
           <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
@@ -407,7 +353,7 @@ function AnalysisTab() {
               </div>
             </div>
 
-            {/* Strategic recommendations */}
+            {/* Recommendations */}
             <div className="glass-card">
               <div className="flex items-center gap-2 mb-3">
                 <Star className="w-4 h-4 text-purple-400" />
@@ -423,7 +369,7 @@ function AnalysisTab() {
               </ol>
             </div>
 
-            {/* Proposed changes per plan */}
+            {/* Proposed changes */}
             {analysis.proposedChanges.length === 0 ? (
               <div className="glass-card text-center py-8">
                 <CheckCircle2 className="w-8 h-8 text-emerald-400 mx-auto mb-2" />
@@ -445,7 +391,6 @@ function AnalysisTab() {
               </div>
             )}
 
-            {/* Apply all */}
             {analysis.proposedChanges.length > 1 && (
               <div className="flex justify-end">
                 <button
@@ -473,6 +418,12 @@ function AnalysisTab() {
                 </button>
               </div>
             )}
+
+            {/* Follow-up contextual chat */}
+            <ContextualChat
+              studentName={analysis._studentName}
+              context={buildContext(analysis)}
+            />
           </motion.div>
         )}
       </AnimatePresence>
@@ -480,10 +431,216 @@ function AnalysisTab() {
   );
 }
 
+// ─── Contextual chat (after analysis) ────────────────────────────────────────
+
+function ContextualChat({ studentName, context }: { studentName: string; context: string }) {
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [input, setInput] = useState('');
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const sendMutation = useMutation({
+    mutationFn: ({ message, history }: { message: string; history: any[] }) =>
+      api.post('/ai/assistant', { message, history, context }).then((r) => r.data.data),
+    onSuccess: (data) => {
+      setMessages((prev) => [...prev, {
+        id: Date.now().toString(),
+        role: 'assistant',
+        content: data.reply || data.response || String(data),
+        timestamp: new Date(),
+      }]);
+    },
+    onError: () => {
+      setMessages((prev) => [...prev, {
+        id: Date.now().toString(),
+        role: 'assistant',
+        content: 'Erro ao processar. Tente novamente.',
+        timestamp: new Date(),
+      }]);
+    },
+  });
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
+  const buildHistory = (msgs: ChatMessage[]) =>
+    msgs.map((m) => ({ role: m.role, content: m.content }));
+
+  const handleSend = (text?: string) => {
+    const content = text || input.trim();
+    if (!content) return;
+    const userMsg: ChatMessage = { id: Date.now().toString(), role: 'user', content, timestamp: new Date() };
+    setMessages((prev) => {
+      const next = [...prev, userMsg];
+      sendMutation.mutate({ message: content, history: buildHistory(next) });
+      return next;
+    });
+    setInput('');
+  };
+
+  const QUICK_QUESTIONS = [
+    `Qual exercício devo priorizar primeiro para ${studentName}?`,
+    'Como devo ajustar a carga progressivamente nas próximas semanas?',
+    'Há risco de overtraining no programa atual?',
+    'Qual frequência semanal seria ideal?',
+  ];
+
+  return (
+    <div className="glass-card border border-purple-500/20 bg-gradient-to-br from-purple-600/5 to-indigo-600/5">
+      <div className="flex items-center gap-2 mb-4">
+        <MessageSquare className="w-4 h-4 text-purple-400" />
+        <span className="text-sm font-semibold">Perguntar sobre {studentName}</span>
+        <span className="text-xs text-muted-foreground ml-1">— IA com acesso ao histórico completo</span>
+      </div>
+
+      {messages.length === 0 && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-4">
+          {QUICK_QUESTIONS.map((q, i) => (
+            <button
+              key={i}
+              onClick={() => handleSend(q)}
+              className="text-left p-3 rounded-xl border border-white/5 hover:bg-accent transition-all text-xs text-muted-foreground hover:text-foreground"
+            >
+              {q}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {messages.length > 0 && (
+        <div className="space-y-3 mb-4 max-h-80 overflow-y-auto scrollbar-hide pr-1">
+          {messages.map((msg) => (
+            <ChatBubble key={msg.id} msg={msg} compact />
+          ))}
+          {sendMutation.isPending && <TypingIndicator compact />}
+          <div ref={messagesEndRef} />
+        </div>
+      )}
+
+      <ChatInput
+        value={input}
+        onChange={setInput}
+        onSend={handleSend}
+        onClear={() => setMessages([])}
+        pending={sendMutation.isPending}
+        placeholder={`Pergunte sobre ${studentName}... (Enter para enviar)`}
+        compact
+      />
+    </div>
+  );
+}
+
+// ─── Shared UI components ─────────────────────────────────────────────────────
+
+function ChatBubble({ msg, compact }: { msg: ChatMessage; compact?: boolean }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      className={cn('flex gap-3', msg.role === 'user' && 'flex-row-reverse')}
+    >
+      <div className={cn(
+        'rounded-xl flex items-center justify-center flex-shrink-0 mt-0.5',
+        compact ? 'w-6 h-6' : 'w-8 h-8',
+        msg.role === 'assistant' ? 'bg-gradient-to-br from-purple-600 to-indigo-600' : 'bg-gradient-to-br from-cyan-600 to-blue-600',
+      )}>
+        {msg.role === 'assistant'
+          ? <Brain className={cn('text-white', compact ? 'w-3 h-3' : 'w-4 h-4')} />
+          : <User className={cn('text-white', compact ? 'w-3 h-3' : 'w-4 h-4')} />
+        }
+      </div>
+      <div className={cn(
+        'max-w-[80%] rounded-2xl px-4 py-3 text-sm relative group',
+        msg.role === 'assistant' ? 'glass rounded-tl-sm' : 'bg-primary text-primary-foreground rounded-tr-sm',
+        compact && 'px-3 py-2 text-xs',
+      )}>
+        <p className="whitespace-pre-wrap leading-relaxed">{msg.content}</p>
+        <div className={cn('mt-1.5', compact ? 'text-[9px]' : 'text-[10px]', msg.role === 'assistant' ? 'text-muted-foreground' : 'text-primary-foreground/70')}>
+          {msg.timestamp.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+        </div>
+        {msg.role === 'assistant' && (
+          <button
+            onClick={() => navigator.clipboard.writeText(msg.content)}
+            className="absolute top-2 right-2 w-6 h-6 rounded-lg opacity-0 group-hover:opacity-100 hover:bg-accent flex items-center justify-center transition-all"
+          >
+            <Copy className="w-3 h-3" />
+          </button>
+        )}
+      </div>
+    </motion.div>
+  );
+}
+
+function TypingIndicator({ compact }: { compact?: boolean }) {
+  return (
+    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="flex gap-3">
+      <div className={cn('rounded-xl bg-gradient-to-br from-purple-600 to-indigo-600 flex items-center justify-center flex-shrink-0', compact ? 'w-6 h-6' : 'w-8 h-8')}>
+        <Brain className={cn('text-white', compact ? 'w-3 h-3' : 'w-4 h-4')} />
+      </div>
+      <div className="glass rounded-2xl rounded-tl-sm px-4 py-3">
+        <div className="flex gap-1.5 items-center h-4">
+          {[0, 1, 2].map((i) => (
+            <motion.div
+              key={i}
+              animate={{ scale: [1, 1.3, 1], opacity: [0.5, 1, 0.5] }}
+              transition={{ duration: 0.8, repeat: Infinity, delay: i * 0.2 }}
+              className="w-1.5 h-1.5 rounded-full bg-muted-foreground"
+            />
+          ))}
+        </div>
+      </div>
+    </motion.div>
+  );
+}
+
+function ChatInput({
+  value, onChange, onSend, onClear, pending, placeholder, compact,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  onSend: (text?: string) => void;
+  onClear: () => void;
+  pending: boolean;
+  placeholder?: string;
+  compact?: boolean;
+}) {
+  return (
+    <div className={cn('glass rounded-2xl p-2', compact && 'mt-0')}>
+      <div className="flex items-end gap-2">
+        <textarea
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); onSend(); } }}
+          placeholder={placeholder || 'Descreva o que precisa... (Enter para enviar)'}
+          rows={1}
+          className="flex-1 bg-transparent text-sm resize-none focus:outline-none py-2 px-2 max-h-32 overflow-y-auto scrollbar-hide"
+          style={{ fieldSizing: 'content' } as any}
+        />
+        <div className="flex items-center gap-1.5 pb-1">
+          <button onClick={onClear} className="w-8 h-8 rounded-xl hover:bg-accent flex items-center justify-center transition-all" title="Limpar conversa">
+            <RefreshCw className="w-3.5 h-3.5 text-muted-foreground" />
+          </button>
+          <button
+            onClick={() => onSend()}
+            disabled={!value.trim() || pending}
+            className={cn('w-9 h-9 rounded-xl flex items-center justify-center transition-all',
+              value.trim() && !pending ? 'bg-primary hover:bg-primary/80' : 'bg-muted cursor-not-allowed',
+            )}
+          >
+            {pending
+              ? <Sparkles className="w-4 h-4 text-muted-foreground animate-spin" />
+              : <Send className="w-4 h-4 text-white" />
+            }
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Rating gauge ─────────────────────────────────────────────────────────────
 
 function RatingGauge({ rating }: { rating: number }) {
-  const color = rating >= 8 ? 'text-emerald-400' : rating >= 6 ? 'text-yellow-400' : 'text-red-400';
   const bg = rating >= 8 ? 'from-emerald-600 to-teal-600' : rating >= 6 ? 'from-yellow-600 to-amber-600' : 'from-red-600 to-orange-600';
   return (
     <div className={`w-16 h-16 rounded-2xl bg-gradient-to-br ${bg} flex flex-col items-center justify-center flex-shrink-0`}>
@@ -541,7 +698,7 @@ function PlanChangesCard({
                     <th className="text-left py-2 pr-4 text-muted-foreground font-medium">Exercício</th>
                     <th className="text-center py-2 px-2 text-muted-foreground font-medium">Ação</th>
                     <th className="text-center py-2 px-2 text-muted-foreground font-medium">Atual</th>
-                    <th className="text-center py-2 px-2 text-muted-foreground font-medium"></th>
+                    <th className="text-center py-2 px-1 text-muted-foreground font-medium"></th>
                     <th className="text-center py-2 px-2 text-muted-foreground font-medium">Proposto</th>
                     <th className="text-left py-2 pl-4 text-muted-foreground font-medium">Motivo</th>
                   </tr>
@@ -559,7 +716,7 @@ function PlanChangesCard({
                         </td>
                         <td className="py-2.5 px-2 text-center text-muted-foreground">
                           {ex.current
-                            ? <span>{ex.current.sets}×{ex.current.reps} {ex.current.weight ? `@ ${ex.current.weight}kg` : ''}</span>
+                            ? <span>{ex.current.sets}×{ex.current.reps}{ex.current.weight ? ` @ ${ex.current.weight}kg` : ''}</span>
                             : <span className="text-white/20">—</span>
                           }
                         </td>
@@ -568,7 +725,7 @@ function PlanChangesCard({
                         </td>
                         <td className="py-2.5 px-2 text-center">
                           {ex.proposed && ex.action !== 'remove'
-                            ? <span className="text-primary font-medium">{ex.proposed.sets}×{ex.proposed.reps} {ex.proposed.weight ? `@ ${ex.proposed.weight}kg` : ''}</span>
+                            ? <span className="text-primary font-medium">{ex.proposed.sets}×{ex.proposed.reps}{ex.proposed.weight ? ` @ ${ex.proposed.weight}kg` : ''}</span>
                             : <span className="text-white/20">—</span>
                           }
                         </td>
