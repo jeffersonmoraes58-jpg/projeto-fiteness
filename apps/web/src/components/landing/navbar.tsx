@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Menu, X, Dumbbell } from 'lucide-react';
+import { Menu, X } from 'lucide-react';
 
 const navLinks = [
   { label: 'Funcionalidades', href: '#features' },
@@ -30,8 +30,8 @@ export function LandingNavbar() {
     >
       <nav className="container mx-auto px-6 h-16 flex items-center justify-between">
         <Link href="/" className="flex items-center gap-2 font-bold text-xl">
-          <div className="w-8 h-8 bg-gradient-brand rounded-lg flex items-center justify-center">
-            <Dumbbell className="w-4 h-4 text-white" />
+          <div className="w-8 h-8 rounded-xl overflow-hidden">
+            <img src="/logo.png" alt="Fitlynutri" className="w-full h-full object-cover" />
           </div>
           <span className="gradient-text">Fitlynutri</span>
         </Link>
