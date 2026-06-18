@@ -16,22 +16,53 @@ export class TrainersService {
 
   async getDashboard(userId: string) {
     const trainer = await this.getTrainer(userId);
-    const [totalStudents, totalWorkouts, recentLogs, upcomingAppointments] = await Promise.all([
-      this.prisma.trainerStudent.count({ where: { trainerId: trainer.id, isActive: true } }),
-      this.prisma.workout.count({ where: { trainerId: trainer.id } }),
-      this.prisma.workoutLog.findMany({
-        where: { workoutPlan: { workout: { trainerId: trainer.id } } },
-        orderBy: { completedAt: 'desc' },
-        take: 10,
-        include: { student: { include: { user: { include: { profile: true } } } } },
-      }),
-      this.prisma.appointment.findMany({
-        where: { trainerId: trainer.id, scheduledAt: { gte: new Date() } },
-        orderBy: { scheduledAt: 'asc' },
-        take: 5,
-      }),
-    ]);
-    return { trainer, stats: { totalStudents, totalWorkouts }, recentLogs, upcomingAppointments };
+
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    const sevenDaysAgo = new Date(Date.now() - 7 * 86400000);
+
+    const [students, workouts, recentLogs, upcomingAppointments, todayLogs, weekLogs, fees] =
+      await Promise.all([
+        this.prisma.trainerStudent.count({ where: { trainerId: trainer.id, isActive: true } }),
+        this.prisma.workout.count({ where: { trainerId: trainer.id, NOT: { tags: { has: '__personalized' } } } }),
+        this.prisma.workoutLog.findMany({
+          where: { workoutPlan: { workout: { trainerId: trainer.id } } },
+          orderBy: { completedAt: 'desc' },
+          take: 10,
+          include: { student: { include: { user: { include: { profile: true } } } } },
+        }),
+        this.prisma.appointment.findMany({
+          where: { trainerId: trainer.id, scheduledAt: { gte: new Date() } },
+          orderBy: { scheduledAt: 'asc' },
+          take: 5,
+        }),
+        this.prisma.workoutLog.count({
+          where: { workoutPlan: { workout: { trainerId: trainer.id } }, completedAt: { gte: todayStart } },
+        }),
+        this.prisma.workoutLog.findMany({
+          where: { workoutPlan: { workout: { trainerId: trainer.id } }, completedAt: { gte: sevenDaysAgo } },
+          select: { completedAt: true },
+        }),
+        this.prisma.trainerStudent.findMany({
+          where: { trainerId: trainer.id, isActive: true },
+          select: { monthlyFee: true },
+        }),
+      ]);
+
+    const revenue = fees.reduce((sum, s) => sum + (s.monthlyFee || 0), 0);
+
+    const dailyMap: Record<string, number> = {};
+    weekLogs.forEach((l) => {
+      const key = new Date(l.completedAt).toISOString().split('T')[0];
+      dailyMap[key] = (dailyMap[key] || 0) + 1;
+    });
+    const weeklyCheckins: number[] = [];
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date(Date.now() - i * 86400000);
+      weeklyCheckins.push(dailyMap[d.toISOString().split('T')[0]] || 0);
+    }
+
+    return { trainer, students, workouts, checkins: todayLogs, revenue, weeklyCheckins, recentLogs, upcomingAppointments };
   }
 
   async getStudents(userId: string, search?: string) {
