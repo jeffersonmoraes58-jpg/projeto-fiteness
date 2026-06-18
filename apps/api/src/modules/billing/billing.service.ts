@@ -150,6 +150,14 @@ export class BillingService {
       data: { billingId: billing.id, amount, status: 'PENDING', dueDate, description },
     });
 
+    const dueDateStr = dueDate.toLocaleDateString('pt-BR');
+    await this.notifications.create({
+      userId: student.userId,
+      type: 'PAYMENT',
+      title: '💳 Nova cobrança emitida',
+      body: `${description}. Valor: R$ ${amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}. Vencimento: ${dueDateStr}.`,
+    });
+
     return { billing, invoice };
   }
 

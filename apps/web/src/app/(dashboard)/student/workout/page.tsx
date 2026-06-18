@@ -346,6 +346,9 @@ export default function StudentWorkout() {
                     setActiveWorkout(true);
                     setStartTime(new Date());
                     setCompletedSets({});
+                    if (selectedPlanId) {
+                      api.post('/students/me/workout-start', { workoutPlanId: selectedPlanId }).catch(() => {});
+                    }
                   }}
                   className="w-full bg-emerald-500 hover:bg-emerald-600 active:bg-emerald-700 text-white font-bold text-base py-4 rounded-2xl transition-all flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20"
                 >

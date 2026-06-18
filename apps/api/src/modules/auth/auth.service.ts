@@ -9,6 +9,7 @@ import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import { UsersService } from '../users/users.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import * as bcrypt from 'bcryptjs';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
@@ -21,6 +22,7 @@ export class AuthService {
     private usersService: UsersService,
     private jwtService: JwtService,
     private config: ConfigService,
+    private notifications: NotificationsService,
   ) {}
 
   async register(dto: RegisterDto) {
@@ -125,6 +127,23 @@ export class AuthService {
       where: { id: user.id },
       data: { lastLoginAt: new Date() },
     });
+
+    if (user.role === UserRole.STUDENT) {
+      const todayStart = new Date();
+      todayStart.setHours(0, 0, 0, 0);
+      const alreadyGreeted = await this.prisma.notification.findFirst({
+        where: { userId: user.id, type: 'SYSTEM', createdAt: { gte: todayStart } },
+      });
+      if (!alreadyGreeted) {
+        const firstName = user.profile?.firstName || 'aluno(a)';
+        await this.notifications.create({
+          userId: user.id,
+          type: 'SYSTEM',
+          title: `Olá, ${firstName}! 👋`,
+          body: 'Bem-vindo(a) de volta! Lembre de se hidratar bem durante o dia. 💧',
+        });
+      }
+    }
 
     const tokens = await this.generateTokens(user.id, user.email, user.role, user.tenantId);
     await this.saveRefreshToken(user.id, tokens.refreshToken);

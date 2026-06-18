@@ -8,6 +8,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
+import toast, { Toaster } from 'react-hot-toast';
 
 const TYPE_CONFIG: Record<string, { icon: any; color: string; bg: string }> = {
   INFO: { icon: Info, color: 'text-blue-400', bg: 'bg-blue-500/10' },
@@ -22,6 +23,8 @@ export function DashboardHeader() {
   const [notifOpen, setNotifOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const queryClient = useQueryClient();
+  const prevCountRef = useRef<number>(0);
+  const initializedRef = useRef(false);
 
   const { data: unreadData } = useQuery({
     queryKey: ['unread-notifications-count'],
@@ -70,10 +73,28 @@ export function DashboardHeader() {
   }, []);
 
   const unreadCount: number = unreadData?.count ?? unreadData ?? 0;
+
+  useEffect(() => {
+    if (!initializedRef.current) {
+      prevCountRef.current = unreadCount;
+      initializedRef.current = true;
+      return;
+    }
+    if (unreadCount > prevCountRef.current) {
+      toast('🔔 Você tem novas notificações', {
+        duration: 4000,
+        style: { background: 'hsl(var(--card))', color: 'hsl(var(--foreground))', border: '1px solid hsl(var(--border))', borderRadius: '12px', fontSize: '14px' },
+        icon: undefined,
+      });
+    }
+    prevCountRef.current = unreadCount;
+  }, [unreadCount]);
   const notifList: any[] = Array.isArray(notifications) ? notifications : notifications?.notifications ?? [];
   const hasUnread = unreadCount > 0;
 
   return (
+    <>
+    <Toaster position="top-right" />
     <header className="h-14 sm:h-16 border-b border-border/50 px-3 sm:px-4 lg:px-6 flex items-center gap-3 bg-background/80 backdrop-blur-xl sticky top-0 z-20 relative">
       {/* Mobile menu button — integrated in header */}
       <button
@@ -220,5 +241,6 @@ export function DashboardHeader() {
         </div>
       </div>
     </header>
+    </>
   );
 }
