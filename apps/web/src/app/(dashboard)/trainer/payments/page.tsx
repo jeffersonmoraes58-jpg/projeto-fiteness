@@ -450,6 +450,11 @@ export default function TrainerPayments() {
               {setPricingMut.isSuccess && (
                 <p className="text-xs text-emerald-400 text-center">Configurações salvas!</p>
               )}
+              {setPricingMut.isError && (
+                <p className="text-xs text-red-400 text-center">
+                  {(setPricingMut.error as any)?.message ?? 'Erro ao salvar. Tente novamente.'}
+                </p>
+              )}
             </div>
           </div>
         </motion.div>
