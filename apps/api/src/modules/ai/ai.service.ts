@@ -31,6 +31,16 @@ export class AiService {
     return block.type === 'text' ? block.text : '';
   }
 
+  private extractJson(text: string): string {
+    // Strip markdown code fences
+    const stripped = text.replace(/```json\s*/gi, '').replace(/```\s*/g, '').trim();
+    // Find outermost JSON object
+    const start = stripped.indexOf('{');
+    const end = stripped.lastIndexOf('}');
+    if (start !== -1 && end > start) return stripped.slice(start, end + 1);
+    return stripped;
+  }
+
   async generateWorkout(description: string, userId: string) {
     const trainer = await this.prisma.trainer.findUnique({ where: { userId } });
     if (!trainer) throw new ForbiddenException('Apenas trainers podem gerar treinos');
@@ -130,7 +140,7 @@ Escolha 5 a 8 exercícios da lista. Adapte séries e repetições ao objetivo.`;
       this.prisma.exercise.findMany({
         where: { OR: [{ isPublic: true }, { trainerId: trainer.id }] },
         select: { id: true, name: true, category: true },
-        take: 80,
+        take: 50,
         orderBy: { name: 'asc' },
       }),
     ]);
@@ -212,8 +222,22 @@ Retorne APENAS JSON válido sem texto extra:
 }
 Inclua APENAS exercícios que precisam de mudança real. Para "add" use exerciseId null. Valores de "current" null para add. Seja preciso e científico.`;
 
-    const raw = (await this.complete(prompt, 3500)).replace(/```json[\s\S]*?```|```/g, '').trim();
-    const parsed = JSON.parse(raw);
+    let raw: string;
+    try {
+      raw = await this.complete(prompt, 4096);
+    } catch (err) {
+      throw new Error(`Falha na chamada à IA: ${(err as Error).message}`);
+    }
+
+    let parsed: any;
+    try {
+      parsed = JSON.parse(this.extractJson(raw));
+    } catch {
+      // Log raw for debugging and return a safe fallback
+      console.error('[AI analyzeStudent] JSON parse failed. Raw response:', raw.slice(0, 500));
+      throw new Error('A IA retornou uma resposta inválida. Tente novamente.');
+    }
+
     parsed._studentName = `${student.user.profile?.firstName ?? ''} ${student.user.profile?.lastName ?? ''}`.trim();
     parsed._plans = plans.map((p) => ({ id: p.id, name: p.workout.name, workoutId: p.workoutId }));
     return parsed;
