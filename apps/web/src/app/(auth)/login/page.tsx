@@ -6,7 +6,7 @@ import { motion } from 'framer-motion';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Eye, EyeOff, Dumbbell, Loader2 } from 'lucide-react';
+import { Eye, EyeOff, Loader2 } from 'lucide-react';
 import { useAuthStore } from '@/store/auth';
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
@@ -46,11 +46,8 @@ export default function LoginPage() {
           <div className="absolute bottom-1/4 right-1/4 w-64 h-64 bg-cyan-600/30 rounded-full blur-[80px]" />
         </div>
         <div className="relative text-center p-12">
-          <Link href="/" className="flex items-center justify-center gap-3 mb-8">
-            <div className="w-12 h-12 bg-gradient-brand rounded-2xl flex items-center justify-center">
-              <Dumbbell className="w-6 h-6 text-white" />
-            </div>
-            <span className="text-3xl font-bold gradient-text">Fitlynutri</span>
+          <Link href="/" className="flex justify-center mb-8">
+            <img src="/logo-full.png" alt="Fitlynutri" className="w-56 object-contain drop-shadow-2xl" />
           </Link>
           <h1 className="text-4xl font-bold mb-4">
             Bem-vindo de volta!
@@ -83,11 +80,8 @@ export default function LoginPage() {
           className="w-full max-w-md"
         >
           <div className="lg:hidden flex justify-center mb-8">
-            <Link href="/" className="flex items-center gap-2">
-              <div className="w-8 h-8 bg-gradient-brand rounded-lg flex items-center justify-center">
-                <Dumbbell className="w-4 h-4 text-white" />
-              </div>
-              <span className="text-xl font-bold gradient-text">Fitlynutri</span>
+            <Link href="/">
+              <img src="/logo-full.png" alt="Fitlynutri" className="w-44 object-contain" />
             </Link>
           </div>
 
