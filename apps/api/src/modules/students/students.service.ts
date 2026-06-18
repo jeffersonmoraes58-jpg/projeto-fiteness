@@ -18,6 +18,17 @@ export class StudentsService {
     return student;
   }
 
+  async getMyAppointments(userId: string) {
+    const student = await this.getStudent(userId);
+    return this.prisma.appointment.findMany({
+      where: { studentId: student.id },
+      include: {
+        trainer: { include: { user: { include: { profile: true } } } },
+      },
+      orderBy: { scheduledAt: 'asc' },
+    });
+  }
+
   async getContacts(userId: string) {
     const student = await this.getStudent(userId);
 

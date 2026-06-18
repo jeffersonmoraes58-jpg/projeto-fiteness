@@ -46,4 +46,10 @@ export class ProgressController {
   addAssessment(@CurrentUser() user: any, @Body() body: any) {
     return this.service.addAssessment(body.studentUserId, user.id, body);
   }
+
+  @Get('trainer/student/:userId/measurements')
+  @ApiOperation({ summary: 'Dados de progresso do aluno (visão do trainer)' })
+  getStudentData(@Param('userId') userId: string) {
+    return this.service.getStudentData(userId);
+  }
 }

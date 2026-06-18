@@ -67,5 +67,27 @@ export class ProgressService {
     });
     return { weightChart: measurements.map((m) => ({ date: m.measuredAt, value: m.weight })) };
   }
+
+  async getStudentData(userId: string) {
+    const student = await this.getStudent(userId);
+    const [measurements, assessments, photos] = await Promise.all([
+      this.prisma.bodyMeasurement.findMany({
+        where: { studentId: student.id },
+        orderBy: { measuredAt: 'desc' },
+        take: 20,
+      }),
+      this.prisma.physicalAssessment.findMany({
+        where: { studentId: student.id },
+        orderBy: { assessedAt: 'desc' },
+        take: 10,
+      }),
+      this.prisma.progressPhoto.findMany({
+        where: { studentId: student.id },
+        orderBy: { takenAt: 'desc' },
+        take: 12,
+      }),
+    ]);
+    return { measurements, assessments, photos };
+  }
 }
 

@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { motion } from 'framer-motion';
 import {
   Users, Dumbbell, Activity,
-  BarChart3, Flame, Trophy, Target, Clock,
+  BarChart3, Flame, Trophy, Target, Clock, FileDown,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
@@ -68,6 +68,81 @@ export default function TrainerReports() {
     URL.revokeObjectURL(url);
   }
 
+  function exportPDF() {
+    if (!students?.length && !stats) return;
+    const date = new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' });
+    const rows = (students ?? [])
+      .sort((a: any, b: any) => (b.streak || 0) - (a.streak || 0))
+      .map((s: any) => `
+        <tr>
+          <td>${`${s.user?.profile?.firstName ?? ''} ${s.user?.profile?.lastName ?? ''}`.trim()}</td>
+          <td>${s.user?.email ?? ''}</td>
+          <td>${GOAL_LABELS[s.goalType ?? '__undefined'] ?? '—'}</td>
+          <td>${s.streak ?? 0}🔥</td>
+          <td>${s.level ?? 1}</td>
+          <td>${s.points ?? 0}</td>
+          <td style="color:${s.isActive ? '#10b981' : '#94a3b8'}">${s.isActive ? 'Ativo' : 'Inativo'}</td>
+          <td>${s.lastCheckinAt ? new Date(s.lastCheckinAt).toLocaleDateString('pt-BR') : '—'}</td>
+        </tr>
+      `).join('');
+
+    const html = `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <title>Relatório — Fitlynutri</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Segoe UI', Arial, sans-serif; color: #1e293b; background: #fff; padding: 32px; }
+    h1 { font-size: 22px; font-weight: 700; color: #7c3aed; margin-bottom: 4px; }
+    .subtitle { color: #64748b; font-size: 13px; margin-bottom: 28px; }
+    .kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 28px; }
+    .kpi { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px; }
+    .kpi-value { font-size: 26px; font-weight: 700; color: #7c3aed; }
+    .kpi-label { font-size: 11px; color: #94a3b8; margin-top: 4px; text-transform: uppercase; letter-spacing: .05em; }
+    h2 { font-size: 15px; font-weight: 600; margin-bottom: 12px; color: #334155; }
+    table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    th { text-align: left; padding: 8px 10px; background: #f1f5f9; font-weight: 600; color: #64748b; text-transform: uppercase; font-size: 10px; letter-spacing: .05em; }
+    td { padding: 8px 10px; border-bottom: 1px solid #f1f5f9; }
+    tr:hover td { background: #fafafa; }
+    .footer { margin-top: 32px; text-align: center; color: #94a3b8; font-size: 11px; }
+    @media print { body { padding: 16px; } @page { margin: 1cm; } }
+  </style>
+</head>
+<body>
+  <h1>Relatório — Fitlynutri</h1>
+  <p class="subtitle">Período: ${period.label} &nbsp;•&nbsp; Gerado em ${date}</p>
+
+  <div class="kpis">
+    <div class="kpi"><div class="kpi-value">${stats?.activeStudents ?? '—'}</div><div class="kpi-label">Alunos ativos</div></div>
+    <div class="kpi"><div class="kpi-value">${stats?.totalCheckins ?? '—'}</div><div class="kpi-label">Check-ins</div></div>
+    <div class="kpi"><div class="kpi-value">${stats?.totalWorkouts ?? '—'}</div><div class="kpi-label">Treinos criados</div></div>
+    <div class="kpi"><div class="kpi-value">${stats?.avgStreak != null ? stats.avgStreak + 'd' : '—'}</div><div class="kpi-label">Sequência média</div></div>
+  </div>
+
+  <h2>Alunos (${students?.length ?? 0})</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Nome</th><th>Email</th><th>Objetivo</th><th>Sequência</th>
+        <th>Nível</th><th>Pontos</th><th>Status</th><th>Último treino</th>
+      </tr>
+    </thead>
+    <tbody>${rows}</tbody>
+  </table>
+
+  <div class="footer">Fitlynutri &mdash; ${date}</div>
+  <script>window.onload = function() { window.print(); window.onafterprint = function() { window.close(); }; };<\/script>
+</body>
+</html>`;
+
+    const w = window.open('', '_blank', 'width=900,height=700');
+    if (w) {
+      w.document.write(html);
+      w.document.close();
+    }
+  }
+
   const kpis = [
     {
       label: 'Alunos ativos',
@@ -102,17 +177,28 @@ export default function TrainerReports() {
           <h1 className="text-2xl font-bold">Relatórios</h1>
           <p className="text-muted-foreground text-sm mt-1">Visão geral do desempenho</p>
         </div>
-        <button
-          onClick={exportCSV}
-          disabled={!students?.length}
-          className="btn-secondary flex items-center gap-2 text-sm py-2 disabled:opacity-40"
-          title="Exportar lista de alunos em CSV"
-        >
-          <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-            <path d="M12 15V3m0 12-4-4m4 4 4-4M2 17l.621 2.485A2 2 0 004.561 21h14.878a2 2 0 001.94-1.515L22 17" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-          Exportar CSV
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={exportPDF}
+            disabled={!students?.length}
+            className="btn-primary flex items-center gap-2 text-sm py-2 disabled:opacity-40"
+            title="Exportar relatório em PDF"
+          >
+            <FileDown className="w-4 h-4" />
+            Exportar PDF
+          </button>
+          <button
+            onClick={exportCSV}
+            disabled={!students?.length}
+            className="btn-secondary flex items-center gap-2 text-sm py-2 disabled:opacity-40"
+            title="Exportar lista de alunos em CSV"
+          >
+            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+              <path d="M12 15V3m0 12-4-4m4 4 4-4M2 17l.621 2.485A2 2 0 004.561 21h14.878a2 2 0 001.94-1.515L22 17" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            CSV
+          </button>
+        </div>
       </div>
 
       {/* Period filter */}
