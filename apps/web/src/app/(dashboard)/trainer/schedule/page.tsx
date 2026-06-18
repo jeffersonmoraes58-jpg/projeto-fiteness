@@ -370,15 +370,15 @@ export default function TrainerSchedule() {
 
       {/* List section */}
       <div className="glass-card">
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
           <h2 className="font-semibold">Agendamentos</h2>
-          <div className="flex gap-1 glass rounded-xl p-0.5">
+          <div className="flex gap-1 glass rounded-xl p-0.5 overflow-x-auto scrollbar-hide min-w-0">
             {STATUS_FILTERS.map((f) => (
               <button
                 key={f.key}
                 onClick={() => setStatusFilter(f.key)}
                 className={cn(
-                  'px-3 py-1 rounded-lg text-xs font-medium transition-all',
+                  'px-3 py-1 rounded-lg text-xs font-medium transition-all whitespace-nowrap flex-shrink-0',
                   statusFilter === f.key ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground',
                 )}
               >
