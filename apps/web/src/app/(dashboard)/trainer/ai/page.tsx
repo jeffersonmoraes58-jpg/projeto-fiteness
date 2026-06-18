@@ -213,7 +213,7 @@ function AnalysisTab() {
 
   const analyzeMutation = useMutation({
     mutationFn: (studentId: string) =>
-      api.post(`/ai/analyze-student/${studentId}`).then((r) => r.data?.data ?? r.data),
+      api.post(`/ai/analyze-student/${studentId}`, {}, { timeout: 120000 }).then((r) => r.data?.data ?? r.data),
     onSuccess: (data) => {
       setAnalysis(data);
       setAppliedPlans(new Set());
