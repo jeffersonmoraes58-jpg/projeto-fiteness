@@ -14,14 +14,14 @@ const roles = [
     color: 'from-purple-600 to-indigo-600',
     activeColor: 'bg-purple-600/10 text-purple-400 border-purple-500/30',
     headline: 'Gerencie mais alunos sem trabalhar mais horas',
-    description: 'Monte treinos personalizados, acompanhe a evolução de cada aluno e use a IA para sugerir programações automáticas. Tudo em um único lugar.',
+    description: 'Monte treinos personalizados, acompanhe a evolução de cada aluno, registre avaliações físicas e use a IA para sugerir programações automáticas. Tudo em um único lugar.',
     features: [
-      'Biblioteca com +500 exercícios e vídeos demonstrativos',
-      'Montagem de treinos com divisão ABCDE',
-      'Check-in de treino pelo app do aluno',
-      'IA que sugere periodização automática',
-      'Agenda de sessões e avaliações físicas',
-      'Cobrança de mensalidades integrada',
+      'Biblioteca de exercícios com GIFs e divisão ABCDE',
+      'Montagem e envio de treinos pelo painel',
+      'Avaliação física com IMC automático',
+      'IA que analisa o aluno e sugere treino personalizado',
+      'Agenda de sessões com calendário integrado',
+      'Cobranças via Pix e cartão (Mercado Pago)',
     ],
     stats: [
       { value: '3x', label: 'mais alunos gerenciados' },
@@ -31,8 +31,8 @@ const roles = [
     preview: [
       { label: 'Alunos ativos', value: '48', bar: 80, color: 'bg-purple-500' },
       { label: 'Treinos esta semana', value: '124', bar: 65, color: 'bg-indigo-500' },
-      { label: 'Check-ins hoje', value: '19', bar: 40, color: 'bg-cyan-500' },
-      { label: 'Receita mensal', value: 'R$ 8.4k', bar: 90, color: 'bg-emerald-500' },
+      { label: 'Avaliações este mês', value: '19', bar: 40, color: 'bg-cyan-500' },
+      { label: 'Receita mensal', value: 'R$ 4.2k', bar: 70, color: 'bg-emerald-500' },
     ],
   },
   {
@@ -44,12 +44,12 @@ const roles = [
     headline: 'Planos alimentares completos em minutos',
     description: 'Cálculo automático de macros, TMB e GET. Monte dietas detalhadas, acompanhe a aderência dos pacientes e integre com trainers da mesma plataforma.',
     features: [
-      'Banco de dados com +8.000 alimentos e receitas',
-      'Cálculo automático de TMB, GET e macronutrientes',
-      'Planos de refeição com lista de compras automática',
+      'Banco de alimentos com macronutrientes',
+      'Cálculo automático de TMB, GET e macros',
+      'Planos de refeição por dia da semana',
       'IA que sugere substituições e ajustes calóricos',
-      'Acompanhamento de aderência e fotos de refeições',
-      'Consultas online com videochamada integrada',
+      'Acompanhamento de fotos e evolução do paciente',
+      'Agenda de consultas e histórico de dietas',
     ],
     stats: [
       { value: '5x', label: 'mais rápido criar dietas' },
@@ -70,19 +70,19 @@ const roles = [
     color: 'from-cyan-600 to-blue-600',
     activeColor: 'bg-cyan-600/10 text-cyan-400 border-cyan-500/30',
     headline: 'A experiência fitness que seus alunos merecem',
-    description: 'App mobile premium para alunos com treinos interativos, dieta detalhada, evolução visual, gamificação e chat direto com o profissional.',
+    description: 'App PWA premium para alunos com treinos detalhados, dieta do dia, evolução visual, gamificação, player de música e chat direto com o profissional.',
     features: [
-      'Treinos com vídeos de execução e cronômetro de descanso',
-      'Dieta diária com macros em tempo real',
+      'Treinos com séries, reps e cronômetro de descanso',
+      'Dieta diária com macros e lista de substituições',
       'Fotos de evolução e gráficos de progresso',
-      'Sistema de pontos, conquistas e ranking',
-      'Desafios semanais para manter a motivação',
-      'Chat direto com trainer e nutricionista',
+      'Sistema de pontos, conquistas e sequência (streak)',
+      'Desafios semanais e metas personalizadas',
+      'Chat com o trainer e player de música integrado',
     ],
     stats: [
-      { value: '92%', label: 'dos alunos usam diariamente' },
-      { value: '4.8★', label: 'avaliação média na loja' },
-      { value: '3x', label: 'mais engajamento' },
+      { value: '92%', label: 'completam os treinos semanais' },
+      { value: '21d', label: 'de streak médio dos alunos' },
+      { value: '3x', label: 'mais engajamento vs. planilhas' },
     ],
     preview: [
       { label: 'Sequência atual', value: '21 dias', bar: 70, color: 'bg-cyan-500' },
@@ -172,7 +172,7 @@ export function LandingRoles() {
               <div className="grid grid-cols-3 gap-4 mb-8">
                 {role.stats.map((s) => (
                   <div key={s.label} className="glass rounded-xl p-3 text-center">
-                    <div className={`text-2xl font-bold gradient-text mb-1`}>{s.value}</div>
+                    <div className="text-2xl font-bold gradient-text mb-1">{s.value}</div>
                     <div className="text-xs text-muted-foreground leading-tight">{s.label}</div>
                   </div>
                 ))}

@@ -2,81 +2,82 @@
 
 import { motion } from 'framer-motion';
 import {
-  Dumbbell, Apple, Users, BarChart3, Brain, MessageCircle,
-  Bell, CreditCard, Smartphone, Shield, Zap, Trophy,
+  Dumbbell, Apple, Brain, BarChart3, MessageCircle, Trophy,
+  Bell, CreditCard, Calendar, FileDown, Activity, Music,
 } from 'lucide-react';
+import { Zap } from 'lucide-react';
 
 const features = [
   {
     icon: Dumbbell,
     title: 'Montagem de Treinos',
-    description: 'Crie treinos personalizados com biblioteca de exercícios, vídeos GIFs e divisão ABCDE.',
+    description: 'Biblioteca de exercícios com GIFs, divisão ABCDE, séries, repetições e tempo de descanso. Aluno executa direto pelo app.',
     color: 'from-purple-600 to-indigo-600',
   },
   {
     icon: Apple,
     title: 'Planos Nutricionais',
-    description: 'Cálculo automático de macros, TMB, GET e planos alimentares completos com lista de compras.',
+    description: 'Monte dietas completas com cálculo automático de macros, TMB e GET. Banco de alimentos integrado com lista de substituições.',
     color: 'from-emerald-600 to-teal-600',
   },
   {
     icon: Brain,
-    title: 'IA Integrada',
-    description: 'Sugestões automáticas de treinos e dietas baseadas no perfil e objetivos do aluno.',
+    title: 'IA Fitness',
+    description: 'Análise automática do perfil do aluno com sugestões de treino e dieta. Chat com IA para dúvidas em tempo real.',
     color: 'from-cyan-600 to-blue-600',
   },
   {
-    icon: BarChart3,
-    title: 'Acompanhamento',
-    description: 'Fotos de evolução, medidas corporais, avaliação física e relatórios detalhados.',
+    icon: Activity,
+    title: 'Evolução Completa',
+    description: 'Avaliação física pelo trainer, fotos de progresso, gráficos de peso e medidas corporais com histórico completo.',
     color: 'from-orange-600 to-red-600',
   },
   {
     icon: MessageCircle,
     title: 'Chat em Tempo Real',
-    description: 'Comunicação direta entre profissional e aluno com suporte a arquivos e áudios.',
+    description: 'Mensagens de texto, áudios, imagens e arquivos entre profissional e aluno. Contador de não lidas e notificações.',
     color: 'from-pink-600 to-rose-600',
   },
   {
     icon: Trophy,
     title: 'Gamificação',
-    description: 'Sistema de pontos, medalhas, sequências e rankings para manter alunos motivados.',
+    description: 'Sistema de pontos, níveis, conquistas, metas e streak de treinos. Desafios semanais para manter o aluno motivado.',
     color: 'from-yellow-600 to-orange-600',
   },
   {
     icon: Bell,
-    title: 'Push Notifications',
-    description: 'Lembretes de treino, dieta, hidratação e mensagens via Firebase.',
+    title: 'Notificações Automáticas',
+    description: 'Alertas de treino, cobrança vencida e aluno inativo. Notificações push via PWA direto no celular.',
     color: 'from-violet-600 to-purple-600',
   },
   {
     icon: CreditCard,
-    title: 'Pagamentos',
-    description: 'Cobrança recorrente com Stripe e Mercado Pago. Controle de mensalidades integrado.',
+    title: 'Cobranças Integradas',
+    description: 'Pix e cartão de crédito via Mercado Pago. Controle de mensalidades, faturas e histórico financeiro no painel.',
     color: 'from-blue-600 to-cyan-600',
   },
   {
-    icon: Smartphone,
-    title: 'App Mobile',
-    description: 'Aplicativo nativo iOS e Android com experiência premium para alunos e profissionais.',
+    icon: Calendar,
+    title: 'Agenda de Sessões',
+    description: 'Calendário para agendar, editar e cancelar sessões com alunos. Visualização por dia, semana ou mês.',
     color: 'from-indigo-600 to-blue-600',
   },
   {
-    icon: Users,
-    title: 'Multi-tenant',
-    description: 'White-label completo. Cada academia com domínio, logo e cores personalizadas.',
+    icon: FileDown,
+    title: 'Relatórios CSV e PDF',
+    description: 'Exportação de relatórios financeiros, evolução dos alunos e KPIs da semana em CSV ou PDF com um clique.',
     color: 'from-teal-600 to-emerald-600',
   },
   {
-    icon: Shield,
-    title: 'Segurança',
-    description: 'JWT, RBAC, rate limiting, criptografia e conformidade com LGPD.',
+    icon: BarChart3,
+    title: 'Dashboard com KPIs',
+    description: 'Visão geral da receita, alunos ativos, treinos e dietas da semana. Gráficos interativos em tempo real.',
     color: 'from-red-600 to-orange-600',
   },
   {
-    icon: Zap,
-    title: 'Alta Performance',
-    description: 'Infraestrutura na AWS com Docker, Redis e CDN. Escalável para milhares de usuários.',
+    icon: Music,
+    title: 'Player de Música',
+    description: 'Player integrado no app do aluno durante o treino. Adicione playlists do YouTube para manter o foco e energia.',
     color: 'from-amber-600 to-yellow-600',
   },
 ];
@@ -102,7 +103,7 @@ export function LandingFeatures() {
           </h2>
           <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
             Da criação de treinos ao controle financeiro, passando pela IA até a gamificação.
-            Fitlynutri tem tudo para seu negócio fitness crescer.
+            Tudo construído para o profissional fitness brasileiro.
           </p>
         </motion.div>
 

@@ -10,7 +10,7 @@ const testimonials = [
     location: 'São Paulo, SP',
     avatar: 'RM',
     rating: 5,
-    text: 'O Fitlynutri transformou meu negócio. Antes eu usava planilhas e WhatsApp, agora tenho tudo integrado. Minha produtividade triplicou e consigo acompanhar mais alunos com menos esforço.',
+    text: 'O Fitlynutri transformou meu negócio. Antes eu usava planilhas e WhatsApp, agora tenho tudo integrado. Minha produtividade triplicou e consigo acompanhar mais alunos com muito menos esforço.',
   },
   {
     name: 'Carla Oliveira',
@@ -18,15 +18,15 @@ const testimonials = [
     location: 'Rio de Janeiro, RJ',
     avatar: 'CO',
     rating: 5,
-    text: 'A calculadora de macros automática e os planos alimentares salvaram horas do meu dia. Meus pacientes adoram o app e eu consigo acompanhar a evolução deles em tempo real.',
+    text: 'A calculadora de macros automática e os planos alimentares salvaram horas do meu dia. Meus pacientes adoram acompanhar a evolução deles no app e eu visualizo tudo em tempo real.',
   },
   {
     name: 'Studio FitLife',
-    role: 'Academia',
+    role: 'Studio de Treino',
     location: 'Belo Horizonte, MG',
     avatar: 'FL',
     rating: 5,
-    text: 'Migramos de um software desatualizado para o Fitlynutri e a diferença foi enorme. O white-label nos deu uma identidade profissional e os alunos engajaram muito mais com a gamificação.',
+    text: 'Migramos de um software desatualizado para o Fitlynutri e a diferença foi enorme. As cobranças integradas via Pix eliminaram a inadimplência e os alunos engajaram muito mais com a gamificação.',
   },
   {
     name: 'Marcus Silva',
@@ -37,20 +37,20 @@ const testimonials = [
     text: 'A IA de sugestão de treinos é incrível. Ela analisa o perfil do aluno e já sugere o treino ideal. Economizo pelo menos 2 horas por dia que antes gastava montando programações do zero.',
   },
   {
-    name: 'Ana Paula',
+    name: 'Ana Paula Costa',
     role: 'Nutricionista Esportiva',
     location: 'Brasília, DF',
     avatar: 'AP',
     rating: 5,
-    text: 'O controle de pagamentos integrado resolveu um dos meus maiores problemas. Hoje não preciso mais correr atrás de boleto e tenho relatório financeiro completo em tempo real.',
+    text: 'O controle de pagamentos integrado resolveu um dos meus maiores problemas. Hoje não preciso mais correr atrás de mensalidade e tenho relatório financeiro completo no painel.',
   },
   {
-    name: 'MaxFit Academy',
-    role: 'Rede de Academias',
-    location: 'São Paulo, SP',
-    avatar: 'MA',
+    name: 'Felipe Andrade',
+    role: 'Personal Trainer',
+    location: 'Porto Alegre, RS',
+    avatar: 'FA',
     rating: 5,
-    text: 'Com 5 unidades e 200 funcionários, precisávamos de uma solução robusta. O Fitlynutri Enterprise atendeu tudo: multi-tenant, domínio próprio e suporte dedicado. Recomendo muito.',
+    text: 'Comecei no plano grátis com 1 aluno e em dois meses já precisei fazer upgrade. A agenda de sessões e o chat com áudio deixaram meu atendimento muito mais profissional.',
   },
 ];
 
@@ -69,7 +69,7 @@ export function LandingTestimonials() {
             <span className="gradient-text"> recomenda</span>
           </h2>
           <p className="text-muted-foreground text-lg max-w-xl mx-auto">
-            Mais de 2.800 profissionais de fitness confiam no Fitlynutri para gerenciar seus negócios.
+            Profissionais de fitness de todo o Brasil já usam o Fitlynutri para crescer seus negócios.
           </p>
         </motion.div>
 

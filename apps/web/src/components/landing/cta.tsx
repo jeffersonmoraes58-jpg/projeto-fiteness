@@ -2,12 +2,12 @@
 
 import { motion } from 'framer-motion';
 import Link from 'next/link';
-import { ArrowRight, Sparkles, Shield, Clock, CreditCard } from 'lucide-react';
+import { ArrowRight, Sparkles, Shield, Users, Zap } from 'lucide-react';
 
 const guarantees = [
-  { icon: Clock, label: '14 dias grátis' },
-  { icon: CreditCard, label: 'Sem cartão de crédito' },
-  { icon: Shield, label: 'Cancele quando quiser' },
+  { icon: Users, label: '1 aluno grátis para sempre' },
+  { icon: Zap, label: 'Planos a partir de R$35/mês' },
+  { icon: Shield, label: 'Sem fidelidade, cancele quando quiser' },
 ];
 
 export function LandingCTA() {
@@ -45,7 +45,7 @@ export function LandingCTA() {
               className="inline-flex items-center gap-2 bg-white/10 border border-white/15 rounded-full px-4 py-1.5 text-sm font-medium mb-6"
             >
               <Sparkles className="w-4 h-4 text-yellow-400" />
-              <span>Mais de 2.800 profissionais já usam</span>
+              <span>Comece hoje mesmo — é grátis</span>
             </motion.div>
 
             <motion.h2
@@ -67,8 +67,8 @@ export function LandingCTA() {
               transition={{ delay: 0.2 }}
               className="text-muted-foreground text-lg max-w-xl mx-auto mb-10"
             >
-              Junte-se a milhares de profissionais que já usam o Fitlynutri para crescer.
-              Comece grátis hoje — sem complicações.
+              Crie sua conta grátis agora e comece a gerenciar seu primeiro aluno em minutos.
+              Sem cartão de crédito. Sem burocracia.
             </motion.p>
 
             <motion.div
@@ -85,8 +85,8 @@ export function LandingCTA() {
                 Criar conta grátis
                 <ArrowRight className="w-4 h-4" />
               </Link>
-              <Link href="/demo" className="btn-secondary text-base px-8 py-3.5 border border-white/10">
-                Ver demonstração ao vivo
+              <Link href="#pricing" className="btn-secondary text-base px-8 py-3.5 border border-white/10">
+                Ver todos os planos
               </Link>
             </motion.div>
 

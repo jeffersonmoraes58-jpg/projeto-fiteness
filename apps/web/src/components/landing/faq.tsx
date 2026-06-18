@@ -8,36 +8,36 @@ import Link from 'next/link';
 
 const faqs = [
   {
-    question: 'Preciso de cartão de crédito para começar?',
-    answer: 'Não. O período de 14 dias grátis não exige nenhum dado de pagamento. Você só precisa de um e-mail para criar sua conta. Ao final do trial, você escolhe o plano ou cancela — sem cobranças surpresa.',
+    question: 'O plano gratuito é realmente grátis para sempre?',
+    answer: 'Sim. O plano Grátis não tem prazo de validade. Você pode gerenciar 1 aluno, montar treinos, usar o chat e ver o dashboard sem pagar nada. Para mais alunos ou funcionalidades avançadas como IA, agenda e cobranças, basta fazer upgrade para um plano pago a qualquer momento.',
   },
   {
-    question: 'Posso importar meus alunos de outra plataforma?',
-    answer: 'Sim. O Fitlynutri suporta importação em massa via CSV com nome, e-mail, telefone e histórico básico. Nossa equipe de suporte também pode ajudar na migração de sistemas como Trainner, Total Pass, entre outros.',
-  },
-  {
-    question: 'O app é disponível para iOS e Android?',
-    answer: 'Sim. O app para alunos está disponível na App Store (iOS) e Google Play (Android). Profissionais acessam pelo app ou pela versão web, com a mesma experiência em qualquer dispositivo.',
+    question: 'Preciso de cartão de crédito para criar minha conta?',
+    answer: 'Não. O plano gratuito não exige nenhum dado de pagamento. Você só precisa de um e-mail para criar sua conta e começar a usar imediatamente.',
   },
   {
     question: 'Quantos alunos posso ter em cada plano?',
-    answer: 'No plano Starter: até 30 alunos. No Pro: até 150 alunos, com 3 trainers e 2 nutricionistas. No Enterprise: ilimitado, com toda a equipe que precisar. Você pode fazer upgrade a qualquer momento sem perder dados.',
+    answer: 'Grátis: 1 aluno. Starter (R$35/mês): até 20 alunos. Pro (R$55/mês): até 60 alunos. Elite (R$95/mês): alunos ilimitados. Você pode fazer upgrade a qualquer momento sem perder nenhum dado.',
   },
   {
-    question: 'Como funciona o white-label?',
-    answer: 'No plano Pro você pode adicionar sua logo e personalizar as cores principais. No Enterprise, você tem domínio próprio (app.suaacademia.com.br), marca completa no app mobile e e-mails transacionais com sua identidade.',
+    question: 'O que inclui a IA Fitness?',
+    answer: 'A IA Fitness analisa automaticamente o perfil do aluno (objetivos, histórico, medidas) e sugere treinos e dietas personalizados. Também há um chat interativo onde o aluno pode tirar dúvidas sobre treino e nutrição com a IA. Disponível nos planos Pro e Elite.',
   },
   {
-    question: 'Os pagamentos dos alunos passam pelo Fitlynutri?',
-    answer: 'Sim, opcionalmente. Você pode usar o módulo de pagamentos integrado com Stripe e Mercado Pago para cobrar mensalidades automaticamente. Ou pode gerenciar pagamentos externamente — a escolha é sua.',
+    question: 'Como funcionam as cobranças integradas?',
+    answer: 'Nos planos Starter, Pro e Elite você pode cobrar mensalidades dos seus alunos via Pix ou cartão de crédito, tudo integrado com Mercado Pago. O dinheiro cai direto na sua conta. O Fitlynutri não retém nenhum valor — você só paga a taxa padrão do Mercado Pago por transação.',
+  },
+  {
+    question: 'O app funciona no celular?',
+    answer: 'Sim. O Fitlynutri é um PWA (Progressive Web App) — você instala direto pelo navegador no Android ou iPhone, sem precisar de App Store ou Play Store. A experiência é fluida e funciona como um app nativo.',
   },
   {
     question: 'Meus dados ficam seguros?',
-    answer: 'Totalmente. Usamos criptografia em trânsito (TLS 1.3) e em repouso, backups diários, infraestrutura na AWS com alta disponibilidade e conformidade total com a LGPD. Seus dados e os de seus clientes nunca são compartilhados.',
+    answer: 'Totalmente. Usamos criptografia em trânsito e em repouso, autenticação JWT, backups diários e conformidade com a LGPD. Seus dados e os dos seus alunos nunca são compartilhados com terceiros.',
   },
   {
     question: 'Posso cancelar a qualquer momento?',
-    answer: 'Sim. Sem fidelidade, sem multa. Você pode cancelar diretamente pelo painel e seus dados ficam disponíveis para exportação por 30 dias após o cancelamento.',
+    answer: 'Sim. Sem fidelidade, sem multa. Você pode cancelar diretamente pelo painel e seus dados ficam disponíveis para exportação. O plano gratuito continua ativo mesmo após cancelar um plano pago.',
   },
 ];
 
@@ -92,7 +92,7 @@ export function LandingFAQ() {
             </h2>
             <p className="text-muted-foreground text-lg">
               Não encontrou o que procura?{' '}
-              <Link href="/contact" className="text-primary hover:underline">Fale com nosso time</Link>.
+              <Link href="/register" className="text-primary hover:underline">Crie sua conta e fale conosco</Link>.
             </p>
           </motion.div>
 

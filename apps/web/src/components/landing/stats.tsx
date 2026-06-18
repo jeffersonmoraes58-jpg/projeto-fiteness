@@ -23,23 +23,19 @@ function useCounter(end: number, duration = 2000, started = false) {
 }
 
 const stats = [
-  { end: 50000, suffix: '+', label: 'Alunos ativos', prefix: '' },
-  { end: 2800, suffix: '+', label: 'Personal trainers', prefix: '' },
-  { end: 890, suffix: '+', label: 'Academias', prefix: '' },
+  { end: 12, suffix: ' funcionalidades', label: 'Completas e funcionando', prefix: '' },
+  { end: 4, suffix: ' planos', label: 'Incluindo o gratuito', prefix: '' },
+  { end: 35, suffix: '/mês', label: 'Plano Starter a partir de', prefix: 'R$' },
   { end: 98, suffix: '%', label: 'Satisfação dos clientes', prefix: '' },
 ];
 
 function StatItem({ stat, started }: { stat: typeof stats[0]; started: boolean }) {
   const count = useCounter(stat.end, 2000, started);
 
-  const formatted = count >= 1000
-    ? `${(count / 1000).toFixed(count >= 10000 ? 0 : 1)}k`
-    : count.toString();
-
   return (
     <div className="text-center">
       <div className="text-4xl md:text-5xl font-bold gradient-text mb-2">
-        {stat.prefix}{formatted}{stat.suffix}
+        {stat.prefix}{count}{stat.suffix}
       </div>
       <div className="text-sm text-muted-foreground">{stat.label}</div>
     </div>
