@@ -97,8 +97,8 @@ export function DashboardSidebar() {
     <div className="flex flex-col h-full">
       {/* Logo */}
       <div className={`flex items-center gap-3 p-4 h-16 border-b border-border/50 ${collapsed ? 'justify-center' : ''}`}>
-        <div className="w-8 h-8 rounded-xl overflow-hidden flex-shrink-0">
-          <img src="/logo.png" alt="Fitlynutri" className="w-full h-full object-cover" />
+        <div className="w-10 h-10 flex-shrink-0">
+          <img src="/logo.png" alt="Fitlynutri" className="w-full h-full object-contain" />
         </div>
         <AnimatePresence>
           {!collapsed && (
