@@ -12,6 +12,7 @@ import {
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
+import { PlanGate } from '@/components/ui/plan-gate';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -62,6 +63,7 @@ export default function TrainerAI() {
   const [tab, setTab] = useState<'chat' | 'analysis'>('chat');
 
   return (
+    <PlanGate feature="ai">
     <div className="flex flex-col h-[calc(100vh-8rem)]">
       <div className="flex items-center gap-3 mb-4">
         <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-600 to-indigo-600 flex items-center justify-center flex-shrink-0">
@@ -770,5 +772,6 @@ function PlanChangesCard({
         )}
       </AnimatePresence>
     </div>
+    </PlanGate>
   );
 }

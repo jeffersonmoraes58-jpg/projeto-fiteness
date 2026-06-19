@@ -13,7 +13,7 @@ import { NotificationsService } from '../notifications/notifications.service';
 import * as bcrypt from 'bcryptjs';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
-import { UserRole } from '@prisma/client';
+import { UserRole, SubscriptionPlan, SubscriptionStatus } from '@prisma/client';
 
 @Injectable()
 export class AuthService {
@@ -37,7 +37,21 @@ export class AuthService {
       const tenant = await this.prisma.tenant.create({
         data: { name: dto.studioName, slug: `${base}-${suffix}` },
       });
-      await this.prisma.tenantSubscription.create({ data: { tenantId: tenant.id } });
+      const planMap: Record<string, SubscriptionPlan> = {
+        starter: SubscriptionPlan.BASIC,
+        pro: SubscriptionPlan.PRO,
+        elite: SubscriptionPlan.ENTERPRISE,
+      };
+      const chosenPlan = dto.plan && planMap[dto.plan.toLowerCase()]
+        ? planMap[dto.plan.toLowerCase()]
+        : SubscriptionPlan.FREE;
+      await this.prisma.tenantSubscription.create({
+        data: {
+          tenantId: tenant.id,
+          plan: chosenPlan,
+          status: chosenPlan === SubscriptionPlan.FREE ? SubscriptionStatus.ACTIVE : SubscriptionStatus.TRIAL,
+        },
+      });
       tenantId = tenant.id;
     } else {
       const tenantExists = await this.prisma.tenant.findUnique({ where: { id: tenantId } });

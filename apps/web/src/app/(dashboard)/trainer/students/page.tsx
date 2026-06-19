@@ -13,6 +13,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
+import { useSubscription } from '@/hooks/useSubscription';
 
 const FILTERS = ['Todos', 'Ativos', 'Inativos'];
 const GOAL_LABELS: Record<string, string> = {
@@ -60,6 +61,8 @@ export default function TrainerStudents() {
     window.open(`https://wa.me/?text=${text}`, '_blank');
   }
 
+  const { limits, isAtStudentLimit, displayName, upgradePrice, upgradePlan } = useSubscription();
+
   const { data: students, isLoading } = useQuery({
     queryKey: ['trainer-students-list'],
     queryFn: () => api.get('/trainers/me/students').then((r) => r.data.data),
@@ -77,6 +80,8 @@ export default function TrainerStudents() {
 
   const totalStudents = students?.length ?? 0;
   const activeStudents = students?.filter((s: any) => s.isActive).length ?? 0;
+  const atLimit = isAtStudentLimit(activeStudents);
+  const maxStudents = limits?.maxStudents ?? 1;
   const avgStreak = students?.length
     ? Math.round(students.reduce((sum: number, s: any) => sum + (s.streak || 0), 0) / students.length)
     : 0;
@@ -140,23 +145,48 @@ export default function TrainerStudents() {
         </div>
       )}
 
+      {atLimit && upgradePlan && (
+        <div className="flex items-center gap-3 p-3 rounded-xl bg-orange-500/10 border border-orange-500/20 text-sm">
+          <span className="text-orange-400 font-medium">
+            Limite de {maxStudents} aluno(s) do plano {displayName} atingido.
+          </span>
+          <a
+            href={`/register?plan=${upgradePlan}`}
+            className="ml-auto flex-shrink-0 text-xs font-semibold bg-orange-500 text-white rounded-lg px-3 py-1.5 hover:bg-orange-600 transition-colors"
+          >
+            Upgrade {upgradePrice}
+          </a>
+        </div>
+      )}
+
       <div className="page-header">
         <div>
           <h1 className="text-2xl font-bold">Alunos</h1>
-          <p className="text-muted-foreground text-sm mt-1">{totalStudents} alunos cadastrados</p>
+          <p className="text-muted-foreground text-sm mt-1">
+            {activeStudents}{maxStudents !== -1 ? `/${maxStudents}` : ''} alunos ativos
+            {maxStudents !== -1 && <span className="ml-1 text-xs">· plano {displayName}</span>}
+          </p>
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
           <button
-            onClick={handleOpenInvite}
-            className="btn-secondary flex items-center gap-1.5 text-sm py-2 px-3"
+            onClick={atLimit ? undefined : handleOpenInvite}
+            disabled={atLimit}
+            className={cn('btn-secondary flex items-center gap-1.5 text-sm py-2 px-3', atLimit && 'opacity-40 cursor-not-allowed')}
           >
             <Link2 className="w-4 h-4" />
             <span className="hidden sm:inline">Enviar </span>Link
           </button>
-          <Link href="/trainer/students/new" className="btn-primary flex items-center gap-2 text-sm py-2 self-start sm:self-auto">
-            <Plus className="w-4 h-4" />
-            <span className="hidden sm:inline">Novo </span>aluno
-          </Link>
+          {atLimit ? (
+            <span className="btn-primary flex items-center gap-2 text-sm py-2 opacity-40 cursor-not-allowed">
+              <Plus className="w-4 h-4" />
+              <span className="hidden sm:inline">Novo </span>aluno
+            </span>
+          ) : (
+            <Link href="/trainer/students/new" className="btn-primary flex items-center gap-2 text-sm py-2 self-start sm:self-auto">
+              <Plus className="w-4 h-4" />
+              <span className="hidden sm:inline">Novo </span>aluno
+            </Link>
+          )}
         </div>
       </div>
 
