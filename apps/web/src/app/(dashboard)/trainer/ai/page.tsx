@@ -103,6 +103,7 @@ export default function TrainerAI() {
 
       {tab === 'chat' ? <ChatTab /> : <AnalysisTab />}
     </div>
+    </PlanGate>
   );
 }
 
@@ -772,6 +773,5 @@ function PlanChangesCard({
         )}
       </AnimatePresence>
     </div>
-    </PlanGate>
   );
 }
