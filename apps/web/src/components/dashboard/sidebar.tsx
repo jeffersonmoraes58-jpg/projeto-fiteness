@@ -32,7 +32,13 @@ const TRAINER_NAV: NavItem[] = [
 
 const navByRole: Record<string, NavItem[]> = {
   TRAINER: TRAINER_NAV,
-  STUDIO_OWNER: TRAINER_NAV,
+  STUDIO_OWNER: [
+    { icon: Home, label: 'Dashboard', href: '/studio' },
+    { icon: Users, label: 'Equipe', href: '/studio/team' },
+    { icon: BarChart3, label: 'Relatórios', href: '/studio/reports' },
+    { icon: CreditCard, label: 'Meu Plano', href: '/studio/subscription' },
+    { icon: Settings, label: 'Configurações', href: '/studio/settings' },
+  ],
   NUTRITIONIST: [
     { icon: Home, label: 'Dashboard', href: '/nutritionist' },
     { icon: Users, label: 'Pacientes', href: '/nutritionist/patients' },
@@ -173,7 +179,11 @@ export function DashboardSidebar() {
               <p className="text-[11px] text-muted-foreground mb-2">Upgrade por {upgradePrice}</p>
             )}
             <Link
-              href={user?.role === 'NUTRITIONIST' ? '/nutritionist/subscription' : '/trainer/subscription'}
+              href={
+                user?.role === 'NUTRITIONIST' ? '/nutritionist/subscription' :
+                user?.role === 'STUDIO_OWNER' ? '/studio/subscription' :
+                '/trainer/subscription'
+              }
               className="block text-center text-[11px] font-semibold bg-primary text-primary-foreground rounded-lg py-1.5 hover:bg-primary/90 transition-colors"
             >
               Fazer upgrade

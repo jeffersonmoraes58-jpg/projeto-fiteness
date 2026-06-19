@@ -4,7 +4,7 @@ import type { NextRequest } from 'next/server';
 const ROLE_HOME: Record<string, string> = {
   ADMIN: '/admin',
   TRAINER: '/trainer',
-  STUDIO_OWNER: '/trainer',
+  STUDIO_OWNER: '/studio',
   NUTRITIONIST: '/nutritionist',
   STUDENT: '/student',
 };
@@ -14,7 +14,7 @@ const AUTH_PATHS = ['/login', '/register', '/forgot-password', '/reset-password'
 const ROLE_PREFIXES: Record<string, string[]> = {
   ADMIN: ['/admin'],
   TRAINER: ['/trainer'],
-  STUDIO_OWNER: ['/trainer'],
+  STUDIO_OWNER: ['/studio'],
   NUTRITIONIST: ['/nutritionist'],
   STUDENT: ['/student'],
 };
@@ -75,5 +75,6 @@ export const config = {
     '/trainer/:path*',
     '/nutritionist/:path*',
     '/student/:path*',
+    '/studio/:path*',
   ],
 };

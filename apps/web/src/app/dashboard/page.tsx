@@ -7,7 +7,7 @@ import { useAuthStore } from '@/store/auth';
 const ROLE_HOME: Record<string, string> = {
   ADMIN: '/admin',
   TRAINER: '/trainer',
-  STUDIO_OWNER: '/trainer',
+  STUDIO_OWNER: '/studio',
   NUTRITIONIST: '/nutritionist',
   STUDENT: '/student',
 };
