@@ -1,15 +1,15 @@
 'use client';
 
-import { useState } from 'react';
+import { Suspense, useState, useEffect } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import {
   Eye, EyeOff, Dumbbell, Loader2, Apple,
-  Shield, ChevronRight, ChevronLeft, Check,
+  Shield, ChevronRight, ChevronLeft, Check, Lock,
 } from 'lucide-react';
 import { useAuthStore } from '@/store/auth';
 import { cn } from '@/lib/utils';
@@ -59,7 +59,10 @@ const step2Schema = z.object({
 
 type Step2Data = z.infer<typeof step2Schema>;
 
-export default function RegisterPage() {
+function RegisterPageContent() {
+  const searchParams = useSearchParams();
+  const studioParam = searchParams.get('studio');
+
   const [step, setStep] = useState(1);
   const [selectedRole, setSelectedRole] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -67,15 +70,24 @@ export default function RegisterPage() {
   const { register: authRegister, isLoading } = useAuthStore();
   const router = useRouter();
 
-  const { register, handleSubmit, formState: { errors }, watch } = useForm<Step2Data>({
+  const { register, handleSubmit, formState: { errors }, setValue } = useForm<Step2Data>({
     resolver: zodResolver(step2Schema),
+    defaultValues: { tenantId: studioParam ?? '' },
   });
 
-  const [trainerMode, setTrainerMode] = useState<'own' | 'studio'>('own');
+  const [trainerMode, setTrainerMode] = useState<'own' | 'studio'>(studioParam ? 'studio' : 'own');
+
+  const handleRoleSelect = (role: string) => {
+    setSelectedRole(role);
+    if (studioParam && (role === 'TRAINER' || role === 'NUTRITIONIST')) {
+      setTrainerMode('studio');
+      setValue('tenantId', studioParam);
+    }
+  };
 
   const isStudioOwner = selectedRole === 'STUDIO_OWNER';
   const isTrainerOrNutri = selectedRole === 'TRAINER' || selectedRole === 'NUTRITIONIST';
-  const needsTenantId = selectedRole === 'STUDENT' || (isTrainerOrNutri && trainerMode === 'studio');
+  const needsTenantId = isTrainerOrNutri && trainerMode === 'studio';
   const needsWorkspaceName = isStudioOwner || (isTrainerOrNutri && trainerMode === 'own');
 
   const onSubmit = async (data: Step2Data) => {
@@ -158,6 +170,13 @@ export default function RegisterPage() {
             </span>
           </div>
 
+          {studioParam && step === 1 && (
+            <div className="flex items-center gap-2 mb-4 px-4 py-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-sm text-emerald-400">
+              <Check className="w-4 h-4 flex-shrink-0" />
+              Você foi convidado para um studio. Selecione seu perfil para continuar.
+            </div>
+          )}
+
           <AnimatePresence mode="wait">
             {step === 1 ? (
               <motion.div
@@ -173,7 +192,7 @@ export default function RegisterPage() {
                   {ROLES.map((r) => (
                     <button
                       key={r.value}
-                      onClick={() => setSelectedRole(r.value)}
+                      onClick={() => handleRoleSelect(r.value)}
                       className={cn(
                         'p-4 rounded-2xl border-2 text-left transition-all hover:bg-accent',
                         selectedRole === r.value
@@ -295,15 +314,29 @@ export default function RegisterPage() {
                   {needsTenantId && (
                     <div>
                       <label className="text-xs text-muted-foreground mb-1 block">Código do Studio *</label>
-                      <input
-                        {...register('tenantId')}
-                        placeholder="Cole aqui o código do studio"
-                        className="input-field"
-                        autoComplete="off"
-                      />
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Solicite esse código ao proprietário do studio ou academia.
-                      </p>
+                      <div className="relative">
+                        <input
+                          {...register('tenantId')}
+                          placeholder="Cole aqui o código do studio"
+                          className={cn('input-field', studioParam && 'pr-10 border-emerald-500/40 bg-emerald-500/5')}
+                          readOnly={!!studioParam}
+                          autoComplete="off"
+                        />
+                        {studioParam && (
+                          <div className="absolute right-3 top-1/2 -translate-y-1/2 text-emerald-400" title="Código preenchido automaticamente">
+                            <Lock className="w-4 h-4" />
+                          </div>
+                        )}
+                      </div>
+                      {studioParam ? (
+                        <p className="text-xs text-emerald-400 mt-1 flex items-center gap-1">
+                          <Check className="w-3 h-3" /> Código do studio preenchido automaticamente
+                        </p>
+                      ) : (
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Solicite esse código ao proprietário do studio ou academia.
+                        </p>
+                      )}
                       {errors.tenantId && <p className="text-xs text-destructive mt-1">{errors.tenantId.message}</p>}
                     </div>
                   )}
@@ -367,5 +400,17 @@ export default function RegisterPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function RegisterPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+      </div>
+    }>
+      <RegisterPageContent />
+    </Suspense>
   );
 }

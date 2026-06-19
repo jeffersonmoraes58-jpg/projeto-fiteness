@@ -1,7 +1,8 @@
 'use client';
 
+import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Users, Dumbbell, Apple, UserX, Phone, Mail, ChevronLeft } from 'lucide-react';
+import { Users, Dumbbell, Apple, UserX, Phone, ChevronLeft, Copy, Check, MessageCircle } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { useRouter } from 'next/navigation';
@@ -15,6 +16,12 @@ const ROLE_CONFIG: Record<string, { label: string; icon: any; color: string }> =
 export default function StudioTeamPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
+  const [copied, setCopied] = useState(false);
+
+  const { data: overview } = useQuery<any>({
+    queryKey: ['studio-overview'],
+    queryFn: () => api.get('/tenants/my/overview').then((r) => r.data.data ?? r.data),
+  });
 
   const { data: members = [], isLoading } = useQuery<any[]>({
     queryKey: ['studio-members'],
@@ -30,6 +37,26 @@ export default function StudioTeamPage() {
     },
     onError: () => toast.error('Erro ao remover profissional'),
   });
+
+  const tenantId = overview?.tenant?.id;
+  const studioName = overview?.tenant?.name ?? 'Studio';
+  const inviteLink = tenantId ? `https://fitlynutri.com.br/register?studio=${tenantId}` : '';
+
+  const copyInviteLink = () => {
+    if (!inviteLink) return;
+    navigator.clipboard.writeText(inviteLink);
+    setCopied(true);
+    toast.success('Link copiado!');
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const shareWhatsApp = () => {
+    if (!inviteLink) return;
+    const msg = encodeURIComponent(
+      `Olá! Você foi convidado para fazer parte do studio *${studioName}* no Fitlynutri.\n\nCadastre-se pelo link abaixo — o código do studio já vem preenchido automaticamente:\n${inviteLink}`
+    );
+    window.open(`https://wa.me/?text=${msg}`, '_blank');
+  };
 
   const trainers = members.filter((m) => m.role === 'TRAINER');
   const nutritionists = members.filter((m) => m.role === 'NUTRITIONIST');
@@ -88,6 +115,35 @@ export default function StudioTeamPage() {
         </div>
       </div>
 
+      {/* Invite card */}
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="glass-card">
+        <h2 className="font-semibold mb-1">Convidar Profissional</h2>
+        <p className="text-sm text-muted-foreground mb-4">
+          Envie o link abaixo para personal trainers ou nutricionistas. O código do studio já vem preenchido automaticamente no cadastro.
+        </p>
+        <div className="flex items-center gap-3 mb-3">
+          <div className="flex-1 font-mono text-xs bg-white/5 border border-border rounded-xl px-4 py-3 truncate text-muted-foreground">
+            {inviteLink || '—'}
+          </div>
+          <button
+            onClick={copyInviteLink}
+            disabled={!inviteLink}
+            className="btn-secondary flex items-center gap-2 px-4 py-3 text-sm flex-shrink-0 disabled:opacity-40"
+          >
+            {copied ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
+            {copied ? 'Copiado' : 'Copiar'}
+          </button>
+          <button
+            onClick={shareWhatsApp}
+            disabled={!inviteLink}
+            className="flex items-center gap-2 px-4 py-3 text-sm rounded-xl font-medium bg-[#25D366] hover:bg-[#20bd5a] text-white transition-colors flex-shrink-0 disabled:opacity-40"
+          >
+            <MessageCircle className="w-4 h-4" />
+            WhatsApp
+          </button>
+        </div>
+      </motion.div>
+
       {isLoading ? (
         <div className="flex items-center justify-center py-16">
           <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
@@ -101,7 +157,7 @@ export default function StudioTeamPage() {
           <Users className="w-12 h-12 mx-auto text-muted-foreground/30 mb-4" />
           <p className="text-muted-foreground font-medium mb-1">Nenhum profissional ainda</p>
           <p className="text-sm text-muted-foreground">
-            Compartilhe o código do studio para que trainers e nutricionistas se cadastrem.
+            Use o link acima para convidar trainers e nutricionistas.
           </p>
         </motion.div>
       ) : (
