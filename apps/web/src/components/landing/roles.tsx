@@ -93,24 +93,26 @@ const roles = [
   },
 ];
 
+const SHORT_LABEL: Record<string, string> = { trainer: 'Trainer', nutritionist: 'Nutri', student: 'Aluno' };
+
 export function LandingRoles() {
   const [activeRole, setActiveRole] = useState('trainer');
   const role = roles.find((r) => r.id === activeRole)!;
 
   return (
-    <section className="py-32 bg-background">
-      <div className="container mx-auto px-6">
+    <section className="py-16 md:py-32 bg-background">
+      <div className="container mx-auto px-4 sm:px-6">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
-          className="text-center mb-12"
+          className="text-center mb-10 md:mb-12"
         >
           <div className="inline-flex items-center gap-2 bg-primary/10 text-primary rounded-full px-4 py-1.5 text-sm font-medium mb-4">
             <Users className="w-4 h-4" />
             Para cada perfil
           </div>
-          <h2 className="text-4xl md:text-5xl font-bold mb-4">
+          <h2 className="text-3xl md:text-5xl font-bold mb-4">
             Uma plataforma,
             <br />
             <span className="gradient-text">múltiplos perfis</span>
@@ -121,19 +123,20 @@ export function LandingRoles() {
         </motion.div>
 
         {/* Tab selector */}
-        <div className="flex justify-center mb-10">
-          <div className="flex gap-2 glass rounded-2xl p-1.5">
+        <div className="flex justify-center mb-8 md:mb-10">
+          <div className="flex gap-1.5 sm:gap-2 glass rounded-2xl p-1.5">
             {roles.map((r) => (
               <button
                 key={r.id}
                 onClick={() => setActiveRole(r.id)}
                 className={cn(
-                  'flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-medium transition-all border',
+                  'flex items-center gap-1.5 sm:gap-2 px-3 sm:px-5 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-medium transition-all border',
                   activeRole === r.id ? r.activeColor : 'text-muted-foreground border-transparent hover:bg-accent',
                 )}
               >
-                <r.icon className="w-4 h-4" />
-                {r.label}
+                <r.icon className="w-3.5 h-3.5 sm:w-4 sm:h-4 flex-shrink-0" />
+                <span className="sm:hidden">{SHORT_LABEL[r.id]}</span>
+                <span className="hidden sm:inline">{r.label}</span>
               </button>
             ))}
           </div>
@@ -169,11 +172,11 @@ export function LandingRoles() {
               </ul>
 
               {/* Stats */}
-              <div className="grid grid-cols-3 gap-4 mb-8">
+              <div className="grid grid-cols-3 gap-2 sm:gap-4 mb-8">
                 {role.stats.map((s) => (
-                  <div key={s.label} className="glass rounded-xl p-3 text-center">
-                    <div className="text-2xl font-bold gradient-text mb-1">{s.value}</div>
-                    <div className="text-xs text-muted-foreground leading-tight">{s.label}</div>
+                  <div key={s.label} className="glass rounded-xl p-2 sm:p-3 text-center">
+                    <div className="text-lg sm:text-2xl font-bold gradient-text mb-0.5 sm:mb-1">{s.value}</div>
+                    <div className="text-[10px] sm:text-xs text-muted-foreground leading-tight">{s.label}</div>
                   </div>
                 ))}
               </div>

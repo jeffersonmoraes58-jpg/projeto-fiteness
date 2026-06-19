@@ -33,21 +33,21 @@ const steps = [
 
 export function LandingHowItWorks() {
   return (
-    <section className="py-32 bg-gradient-dark relative overflow-hidden">
+    <section className="py-16 md:py-32 bg-gradient-dark relative overflow-hidden">
       <div className="absolute -top-32 left-1/2 -translate-x-1/2 w-[600px] h-[600px] bg-purple-600/5 rounded-full blur-[120px] pointer-events-none" />
 
-      <div className="container mx-auto px-6 relative">
+      <div className="container mx-auto px-4 sm:px-6 relative">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
-          className="text-center mb-16"
+          className="text-center mb-10 md:mb-16"
         >
           <div className="inline-flex items-center gap-2 bg-primary/10 text-primary rounded-full px-4 py-1.5 text-sm font-medium mb-4">
             <Rocket className="w-4 h-4" />
             Como funciona
           </div>
-          <h2 className="text-4xl md:text-5xl font-bold mb-4">
+          <h2 className="text-3xl md:text-5xl font-bold mb-4">
             Do zero ao seu painel
             <br />
             <span className="gradient-text">em menos de 5 minutos</span>

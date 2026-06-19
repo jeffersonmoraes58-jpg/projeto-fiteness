@@ -20,13 +20,13 @@ export function LandingHero() {
         />
       </div>
 
-      <div className="relative z-10 container mx-auto px-6 py-20">
+      <div className="relative z-10 container mx-auto px-4 sm:px-6 py-10 md:py-20">
         {/* Badge */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
-          className="flex justify-center mb-8"
+          className="flex justify-center mb-6 md:mb-8"
         >
           <div className="inline-flex items-center gap-2 bg-white/5 border border-white/10 rounded-full px-4 py-2 text-sm text-muted-foreground">
             <Sparkles className="w-4 h-4 text-purple-400" />
@@ -40,7 +40,7 @@ export function LandingHero() {
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.1 }}
-          className="text-center text-5xl md:text-7xl lg:text-8xl font-bold tracking-tight mb-6"
+          className="text-center text-4xl sm:text-5xl md:text-7xl lg:text-8xl font-bold tracking-tight mb-5 md:mb-6"
         >
           A plataforma fitness
           <br />
@@ -53,7 +53,7 @@ export function LandingHero() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.2 }}
-          className="text-center text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto mb-10"
+          className="text-center text-base md:text-xl text-muted-foreground max-w-2xl mx-auto mb-8 md:mb-10"
         >
           Personal trainers e nutricionistas em uma única plataforma.
           Gerencie treinos, dietas e evolução com inteligência artificial.
@@ -79,17 +79,17 @@ export function LandingHero() {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 0.6, delay: 0.45 }}
-          className="text-center text-sm text-muted-foreground mb-16"
+          className="text-center text-xs sm:text-sm text-muted-foreground mb-10 md:mb-16"
         >
           Grátis para sempre com 1 aluno · Planos a partir de R$35/mês · Sem fidelidade
         </motion.p>
 
-        {/* Dashboard preview */}
+        {/* Dashboard preview — hidden on small phones */}
         <motion.div
           initial={{ opacity: 0, y: 80 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.9, delay: 0.5, ease: [0.16, 1, 0.3, 1] }}
-          className="mx-auto max-w-5xl"
+          className="hidden sm:block mx-auto max-w-5xl"
         >
           <div className="relative">
             <div className="absolute -inset-px bg-gradient-to-r from-purple-600/30 via-cyan-600/20 to-indigo-600/30 rounded-2xl blur-2xl" />
