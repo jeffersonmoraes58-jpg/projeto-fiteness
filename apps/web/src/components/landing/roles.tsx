@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Dumbbell, Apple, Users, Check, ArrowRight } from 'lucide-react';
+import { Dumbbell, Apple, Users, Check, ArrowRight, Info } from 'lucide-react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 
@@ -181,10 +181,20 @@ export function LandingRoles() {
                 ))}
               </div>
 
-              <Link href="/register" className="btn-primary inline-flex items-center gap-2">
-                Criar conta como {role.label}
-                <ArrowRight className="w-4 h-4" />
-              </Link>
+              {role.id === 'student' ? (
+                <div className="flex items-start gap-3 glass rounded-xl px-4 py-3 border border-cyan-500/20 text-sm text-muted-foreground">
+                  <Info className="w-4 h-4 text-cyan-400 flex-shrink-0 mt-0.5" />
+                  <span>
+                    Você é aluno? O acesso é feito via convite do seu personal trainer ou nutricionista.
+                    Peça o link diretamente ao seu profissional.
+                  </span>
+                </div>
+              ) : (
+                <Link href="/register" className="btn-primary inline-flex items-center gap-2">
+                  Criar conta como {role.label}
+                  <ArrowRight className="w-4 h-4" />
+                </Link>
+              )}
             </div>
 
             {/* Right: preview card */}

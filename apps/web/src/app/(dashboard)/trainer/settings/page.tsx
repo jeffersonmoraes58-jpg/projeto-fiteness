@@ -294,7 +294,7 @@ export default function TrainerSettings() {
             { icon: Bell, label: 'Notificações', description: 'Alertas, lembretes e novidades', onClick: () => setShowNotifications(true) },
             { icon: Shield, label: 'Segurança', description: 'Senha e autenticação em dois fatores', onClick: () => setShowSecurity(true) },
             { icon: Palette, label: 'Aparência', description: 'Tema e cor de destaque', onClick: () => setShowAppearance(true) },
-            { icon: CreditCard, label: 'Plano e Cobrança', description: 'Gerenciar assinatura', onClick: () => router.push('/trainer/billing') },
+            { icon: CreditCard, label: 'Plano e Cobrança', description: 'Seu plano Fitlynutri', onClick: () => router.push('/trainer/subscription') },
           ].map((item) => (
             <button key={item.label} onClick={item.onClick} className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-accent transition-all text-left">
               <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center flex-shrink-0">
