@@ -44,4 +44,9 @@ export class RegisterDto {
   @IsOptional()
   @IsString()
   inviteToken?: string;
+
+  @ApiPropertyOptional({ example: 'pro', description: 'Plano escolhido na landing page: starter, pro, elite' })
+  @IsOptional()
+  @IsString()
+  plan?: string;
 }

@@ -14,6 +14,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useAuthStore } from '@/store/auth';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
+import { useSubscription } from '@/hooks/useSubscription';
 
 const navByRole: Record<string, NavItem[]> = {
   TRAINER: [
@@ -78,6 +79,7 @@ export function DashboardSidebar() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const pathname = usePathname();
   const { user, logout } = useAuthStore();
+  const { displayName, upgradePrice, upgradePlan, isMaxPlan } = useSubscription();
 
   const { data: unreadCount = 0 } = useQuery<number>({
     queryKey: ['chat-unread-count'],
@@ -155,6 +157,33 @@ export function DashboardSidebar() {
           );
         })}
       </nav>
+
+      {/* Plan badge + upgrade */}
+      {!collapsed && !isMaxPlan && upgradePlan && (
+        <div className="px-3 pb-2">
+          <div className="rounded-xl bg-primary/10 border border-primary/20 p-3">
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="text-[11px] font-semibold text-primary uppercase tracking-wide">Plano {displayName}</span>
+            </div>
+            {upgradePrice && (
+              <p className="text-[11px] text-muted-foreground mb-2">Upgrade por {upgradePrice}</p>
+            )}
+            <a
+              href={`/register?plan=${upgradePlan}`}
+              className="block text-center text-[11px] font-semibold bg-primary text-primary-foreground rounded-lg py-1.5 hover:bg-primary/90 transition-colors"
+            >
+              Fazer upgrade
+            </a>
+          </div>
+        </div>
+      )}
+      {collapsed && !isMaxPlan && (
+        <div className="px-2 pb-2 flex justify-center">
+          <div className="w-8 h-8 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center" title={`Plano ${displayName} — Upgrade disponível`}>
+            <Star className="w-3.5 h-3.5 text-primary" />
+          </div>
+        </div>
+      )}
 
       {/* User + logout */}
       <div className="p-3 border-t border-border/50 space-y-1">

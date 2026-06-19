@@ -1,9 +1,13 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { SubscriptionService } from '../subscriptions/subscription.service';
 
 @Injectable()
 export class TrainersService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private subscriptionService: SubscriptionService,
+  ) {}
 
   private async getTrainer(userId: string) {
     const trainer = await this.prisma.trainer.findUnique({
@@ -107,6 +111,14 @@ export class TrainersService {
     const trainer = await this.getTrainer(userId);
     const student = await this.prisma.student.findUnique({ where: { userId: studentUserId } });
     if (!student) throw new NotFoundException('Aluno não encontrado');
+
+    const existing = await this.prisma.trainerStudent.findUnique({
+      where: { trainerId_studentId: { trainerId: trainer.id, studentId: student.id } },
+    });
+    if (!existing || !existing.isActive) {
+      await this.subscriptionService.checkStudentLimit(trainer.user.tenantId, trainer.id);
+    }
+
     return this.prisma.trainerStudent.upsert({
       where: { trainerId_studentId: { trainerId: trainer.id, studentId: student.id } },
       update: { isActive: true, monthlyFee },
