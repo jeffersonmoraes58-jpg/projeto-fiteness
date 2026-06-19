@@ -16,20 +16,23 @@ import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { useSubscription } from '@/hooks/useSubscription';
 
+const TRAINER_NAV: NavItem[] = [
+  { icon: Home, label: 'Dashboard', href: '/trainer' },
+  { icon: Users, label: 'Alunos', href: '/trainer/students' },
+  { icon: Dumbbell, label: 'Treinos', href: '/trainer/workouts' },
+  { icon: Activity, label: 'Exercícios', href: '/trainer/exercises' },
+  { icon: Trophy, label: 'Desafios', href: '/trainer/challenges' },
+  { icon: Calendar, label: 'Agenda', href: '/trainer/schedule' },
+  { icon: MessageCircle, label: 'Chat', href: '/trainer/chat', isChat: true },
+  { icon: BarChart3, label: 'Relatórios', href: '/trainer/reports' },
+  { icon: Brain, label: 'IA Fitness', href: '/trainer/ai' },
+  { icon: CreditCard, label: 'Pagamentos', href: '/trainer/payments' },
+  { icon: Settings, label: 'Configurações', href: '/trainer/settings' },
+];
+
 const navByRole: Record<string, NavItem[]> = {
-  TRAINER: [
-    { icon: Home, label: 'Dashboard', href: '/trainer' },
-    { icon: Users, label: 'Alunos', href: '/trainer/students' },
-    { icon: Dumbbell, label: 'Treinos', href: '/trainer/workouts' },
-    { icon: Activity, label: 'Exercícios', href: '/trainer/exercises' },
-    { icon: Trophy, label: 'Desafios', href: '/trainer/challenges' },
-    { icon: Calendar, label: 'Agenda', href: '/trainer/schedule' },
-    { icon: MessageCircle, label: 'Chat', href: '/trainer/chat', isChat: true },
-    { icon: BarChart3, label: 'Relatórios', href: '/trainer/reports' },
-    { icon: Brain, label: 'IA Fitness', href: '/trainer/ai' },
-    { icon: CreditCard, label: 'Pagamentos', href: '/trainer/payments' },
-    { icon: Settings, label: 'Configurações', href: '/trainer/settings' },
-  ],
+  TRAINER: TRAINER_NAV,
+  STUDIO_OWNER: TRAINER_NAV,
   NUTRITIONIST: [
     { icon: Home, label: 'Dashboard', href: '/nutritionist' },
     { icon: Users, label: 'Pacientes', href: '/nutritionist/patients' },
