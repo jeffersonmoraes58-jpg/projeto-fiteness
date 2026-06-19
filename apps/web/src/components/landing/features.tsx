@@ -84,19 +84,19 @@ const features = [
 
 export function LandingFeatures() {
   return (
-    <section id="features" className="py-32 bg-background">
-      <div className="container mx-auto px-6">
+    <section id="features" className="py-16 md:py-32 bg-background">
+      <div className="container mx-auto px-4 sm:px-6">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
-          className="text-center mb-16"
+          className="text-center mb-10 md:mb-16"
         >
           <div className="inline-flex items-center gap-2 bg-primary/10 text-primary rounded-full px-4 py-1.5 text-sm font-medium mb-4">
             <Zap className="w-4 h-4" />
             Funcionalidades completas
           </div>
-          <h2 className="text-4xl md:text-5xl font-bold mb-4">
+          <h2 className="text-3xl md:text-5xl font-bold mb-4">
             Tudo que você precisa
             <br />
             <span className="gradient-text">em um único lugar</span>

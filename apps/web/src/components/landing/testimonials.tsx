@@ -56,15 +56,15 @@ const testimonials = [
 
 export function LandingTestimonials() {
   return (
-    <section id="testimonials" className="py-32 bg-gradient-dark">
-      <div className="container mx-auto px-6">
+    <section id="testimonials" className="py-16 md:py-32 bg-gradient-dark">
+      <div className="container mx-auto px-4 sm:px-6">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
-          className="text-center mb-16"
+          className="text-center mb-10 md:mb-16"
         >
-          <h2 className="text-4xl md:text-5xl font-bold mb-4">
+          <h2 className="text-3xl md:text-5xl font-bold mb-4">
             Quem usa,
             <span className="gradient-text"> recomenda</span>
           </h2>

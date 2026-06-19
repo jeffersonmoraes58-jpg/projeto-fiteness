@@ -12,8 +12,8 @@ const guarantees = [
 
 export function LandingCTA() {
   return (
-    <section className="py-32 bg-background">
-      <div className="container mx-auto px-6">
+    <section className="py-16 md:py-32 bg-background">
+      <div className="container mx-auto px-4 sm:px-6">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
@@ -36,7 +36,7 @@ export function LandingCTA() {
           {/* Border glow */}
           <div className="absolute inset-0 rounded-3xl border border-white/10" />
 
-          <div className="relative px-8 py-16 md:px-20 md:py-20 text-center">
+          <div className="relative px-5 py-10 sm:px-10 sm:py-14 md:px-20 md:py-20 text-center">
             <motion.div
               initial={{ opacity: 0, scale: 0.9 }}
               whileInView={{ opacity: 1, scale: 1 }}
@@ -53,7 +53,7 @@ export function LandingCTA() {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ delay: 0.15 }}
-              className="text-4xl md:text-6xl font-bold mb-5"
+              className="text-3xl md:text-5xl lg:text-6xl font-bold mb-5"
             >
               Pronto para transformar
               <br />

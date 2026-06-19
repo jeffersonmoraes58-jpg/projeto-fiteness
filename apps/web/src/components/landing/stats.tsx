@@ -34,10 +34,10 @@ function StatItem({ stat, started }: { stat: typeof stats[0]; started: boolean }
 
   return (
     <div className="text-center">
-      <div className="text-4xl md:text-5xl font-bold gradient-text mb-2">
+      <div className="text-2xl sm:text-4xl md:text-5xl font-bold gradient-text mb-1 md:mb-2 leading-tight">
         {stat.prefix}{count}{stat.suffix}
       </div>
-      <div className="text-sm text-muted-foreground">{stat.label}</div>
+      <div className="text-xs sm:text-sm text-muted-foreground">{stat.label}</div>
     </div>
   );
 }
@@ -47,11 +47,11 @@ export function LandingStats() {
   const inView = useInView(ref, { once: true, margin: '-100px' });
 
   return (
-    <section ref={ref} className="py-20 relative">
+    <section ref={ref} className="py-12 md:py-20 relative">
       <div className="absolute inset-0 border-y border-border/50" />
       <div className="absolute inset-0 bg-gradient-to-r from-purple-600/3 via-transparent to-cyan-600/3" />
-      <div className="relative container mx-auto px-6">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
+      <div className="relative container mx-auto px-4 sm:px-6">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-8">
           {stats.map((stat, i) => (
             <motion.div
               key={stat.label}
