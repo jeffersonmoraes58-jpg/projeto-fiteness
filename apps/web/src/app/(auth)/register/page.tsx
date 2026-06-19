@@ -9,7 +9,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import {
   Eye, EyeOff, Dumbbell, Loader2, Apple,
-  Users, Shield, ChevronRight, ChevronLeft, Check,
+  Shield, ChevronRight, ChevronLeft, Check,
 } from 'lucide-react';
 import { useAuthStore } from '@/store/auth';
 import { cn } from '@/lib/utils';
@@ -36,13 +36,6 @@ const ROLES = [
     description: 'Monte dietas e acompanhe pacientes',
     icon: Apple,
     color: 'from-emerald-500 to-teal-500',
-  },
-  {
-    value: 'STUDENT',
-    label: 'Aluno',
-    description: 'Acesse treinos, dietas e evolua',
-    icon: Users,
-    color: 'from-cyan-500 to-blue-500',
   },
 ];
 
