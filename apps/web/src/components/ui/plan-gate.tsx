@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import Link from 'next/link';
 import { Lock, Zap } from 'lucide-react';
 import { useSubscription, PlanLimits } from '@/hooks/useSubscription';
+import { useAuthStore } from '@/store/auth';
 
 interface PlanGateProps {
   feature: keyof Omit<PlanLimits, 'maxStudents'>;
@@ -12,6 +13,9 @@ interface PlanGateProps {
 
 export function PlanGate({ feature, children }: PlanGateProps) {
   const { canUseFeature, displayName, upgradePrice, upgradePlan, isLoading } = useSubscription();
+  const { user } = useAuthStore();
+  const subscriptionHref =
+    user?.role === 'NUTRITIONIST' ? '/nutritionist/subscription' : '/trainer/subscription';
 
   if (isLoading) {
     return (
@@ -43,7 +47,7 @@ export function PlanGate({ feature, children }: PlanGateProps) {
       )}
       {upgradePlan && (
         <Link
-          href={`/register?plan=${upgradePlan}`}
+          href={subscriptionHref}
           className="btn-primary inline-flex items-center gap-2 px-8 py-3"
         >
           <Zap className="w-4 h-4" />

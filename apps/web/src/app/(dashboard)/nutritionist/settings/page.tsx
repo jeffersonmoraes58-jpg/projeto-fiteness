@@ -2,11 +2,13 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { useTheme } from 'next-themes';
+import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import {
   User, Camera, Mail, Phone, MapPin, Award,
   Bell, Shield, LogOut, Save, Edit2, ChevronRight, Globe,
   Eye, EyeOff, X, Trash2, CheckCheck, Palette, Sun, Moon, Monitor, Check,
+  CreditCard,
 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
@@ -16,6 +18,7 @@ import toast from 'react-hot-toast';
 export default function NutritionistSettings() {
   const { user, logout } = useAuthStore();
   const { theme, setTheme } = useTheme();
+  const router = useRouter();
   const [editing, setEditing] = useState(false);
   const [avatarUploading, setAvatarUploading] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
@@ -140,6 +143,7 @@ export default function NutritionistSettings() {
   };
 
   const preferences = [
+    { icon: CreditCard, label: 'Plano e Cobrança', description: 'Seu plano Fitlynutri', onClick: () => router.push('/nutritionist/subscription') },
     { icon: Bell, label: 'Notificações', description: 'Alertas e lembretes', onClick: () => setShowNotifications(true) },
     { icon: Shield, label: 'Segurança', description: 'Senha e autenticação', onClick: () => setShowSecurity(true) },
     { icon: Palette, label: 'Aparência', description: 'Tema e cor de destaque', onClick: () => setShowAppearance(true) },

@@ -39,6 +39,7 @@ const navByRole: Record<string, NavItem[]> = {
     { icon: MessageCircle, label: 'Chat', href: '/nutritionist/chat', isChat: true },
     { icon: BarChart3, label: 'Relatórios', href: '/nutritionist/reports' },
     { icon: Brain, label: 'IA Nutrição', href: '/nutritionist/ai' },
+    { icon: CreditCard, label: 'Meu Plano', href: '/nutritionist/subscription' },
     { icon: Settings, label: 'Configurações', href: '/nutritionist/settings' },
   ],
   STUDENT: [
@@ -168,12 +169,12 @@ export function DashboardSidebar() {
             {upgradePrice && (
               <p className="text-[11px] text-muted-foreground mb-2">Upgrade por {upgradePrice}</p>
             )}
-            <a
-              href={`/register?plan=${upgradePlan}`}
+            <Link
+              href={user?.role === 'NUTRITIONIST' ? '/nutritionist/subscription' : '/trainer/subscription'}
               className="block text-center text-[11px] font-semibold bg-primary text-primary-foreground rounded-lg py-1.5 hover:bg-primary/90 transition-colors"
             >
               Fazer upgrade
-            </a>
+            </Link>
           </div>
         </div>
       )}
