@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { ChevronLeft, Save, LogOut, Building2, Mail } from 'lucide-react';
 import { useQuery, useMutation } from '@tanstack/react-query';
@@ -15,11 +15,14 @@ export default function StudioSettingsPage() {
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState('');
 
-  const { data } = useQuery({
+  const { data } = useQuery<any>({
     queryKey: ['studio-overview'],
     queryFn: () => api.get('/tenants/my/overview').then((r) => r.data.data ?? r.data),
-    onSuccess: (d: any) => { if (d?.tenant?.name && !editing) setName(d.tenant.name); },
   });
+
+  useEffect(() => {
+    if (data?.tenant?.name && !editing) setName(data.tenant.name);
+  }, [data]);
 
   const saveMutation = useMutation({
     mutationFn: () => api.patch('/users/me', { studioName: name }),
