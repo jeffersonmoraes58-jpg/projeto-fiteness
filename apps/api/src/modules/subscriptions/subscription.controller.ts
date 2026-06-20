@@ -1,8 +1,10 @@
-import { Controller, Get, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Body, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../../decorators/current-user.decorator';
 import { SubscriptionService } from './subscription.service';
+import { Public } from '../../decorators/public.decorator';
+import { SubscriptionPlan } from '@prisma/client';
 
 @ApiTags('subscriptions')
 @ApiBearerAuth()
@@ -15,5 +17,21 @@ export class SubscriptionController {
   @ApiOperation({ summary: 'Retorna o plano atual e limites de features do tenant' })
   getMyPlan(@CurrentUser('tenantId') tenantId: string) {
     return this.subscriptionService.getMyPlan(tenantId);
+  }
+
+  @Post('checkout')
+  @ApiOperation({ summary: 'Cria preferência de pagamento Mercado Pago para upgrade de plano' })
+  createCheckout(
+    @CurrentUser('tenantId') tenantId: string,
+    @Body() body: { plan: SubscriptionPlan; returnUrl: string },
+  ) {
+    return this.subscriptionService.createMPCheckout(tenantId, body.plan, body.returnUrl);
+  }
+
+  @Public()
+  @Post('webhook/mp')
+  @ApiOperation({ summary: 'Webhook Mercado Pago — ativa plano após pagamento aprovado' })
+  mpWebhook(@Body() body: any) {
+    return this.subscriptionService.handleMPWebhook(body);
   }
 }
