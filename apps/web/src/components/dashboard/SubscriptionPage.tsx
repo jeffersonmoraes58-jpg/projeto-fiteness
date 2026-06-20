@@ -140,13 +140,15 @@ function SubscriptionPageContent() {
     setLoadingPlan(plan);
     try {
       const { data } = await api.post('/subscriptions/checkout', { plan, returnUrl });
-      if (data?.checkoutUrl) {
-        window.location.href = data.checkoutUrl;
+      const checkoutUrl = data?.checkoutUrl ?? data?.data?.checkoutUrl;
+      if (checkoutUrl) {
+        window.location.href = checkoutUrl;
       } else {
         toast.error('Erro ao iniciar checkout');
       }
-    } catch {
-      toast.error('Erro ao iniciar pagamento. Tente novamente.');
+    } catch (err: any) {
+      const msg = err?.response?.data?.message || err?.message || 'Erro ao iniciar pagamento';
+      toast.error(msg);
     } finally {
       setLoadingPlan(null);
     }
