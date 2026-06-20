@@ -1,9 +1,12 @@
 'use client';
 
+import { Suspense, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Check, X, Zap, Star, ChevronLeft, Mail } from 'lucide-react';
-import { useRouter } from 'next/navigation';
+import { Check, X, Zap, Star, ChevronLeft, CreditCard, Loader2, AlertCircle, CheckCircle2, Clock } from 'lucide-react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useSubscription, SubscriptionPlan } from '@/hooks/useSubscription';
+import { api } from '@/lib/api';
+import toast from 'react-hot-toast';
 
 const PLAN_ORDER: SubscriptionPlan[] = ['FREE', 'BASIC', 'PRO', 'ENTERPRISE'];
 
@@ -90,17 +93,63 @@ const PLANS: {
   },
 ];
 
-export function SubscriptionPage() {
+function StatusBanner() {
+  const searchParams = useSearchParams();
+  const status = searchParams.get('status');
+
+  if (!status) return null;
+
+  const config = {
+    success: {
+      icon: CheckCircle2,
+      text: 'Pagamento aprovado! Seu plano será ativado em instantes.',
+      className: 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400',
+    },
+    pending: {
+      icon: Clock,
+      text: 'Pagamento em processamento. Ativaremos seu plano assim que for confirmado.',
+      className: 'bg-yellow-500/10 border-yellow-500/30 text-yellow-400',
+    },
+    failure: {
+      icon: AlertCircle,
+      text: 'Pagamento não concluído. Tente novamente ou escolha outro método.',
+      className: 'bg-destructive/10 border-destructive/30 text-destructive',
+    },
+  }[status];
+
+  if (!config) return null;
+  const Icon = config.icon;
+
+  return (
+    <div className={`flex items-center gap-3 px-4 py-3 rounded-xl border text-sm mb-2 ${config.className}`}>
+      <Icon className="w-4 h-4 flex-shrink-0" />
+      {config.text}
+    </div>
+  );
+}
+
+function SubscriptionPageContent() {
   const router = useRouter();
   const { plan: currentPlan, displayName } = useSubscription();
   const currentIndex = PLAN_ORDER.indexOf(currentPlan);
+  const [loadingPlan, setLoadingPlan] = useState<SubscriptionPlan | null>(null);
 
-  const handleUpgrade = (planName: string) => {
-    const subject = encodeURIComponent(`Upgrade de plano — ${planName}`);
-    const body = encodeURIComponent(
-      `Olá! Gostaria de fazer upgrade do meu plano Fitlynutri para o plano ${planName}.`,
-    );
-    window.open(`mailto:suporte@fitlynutri.com.br?subject=${subject}&body=${body}`, '_blank');
+  const returnUrl = typeof window !== 'undefined' ? window.location.href.split('?')[0] : '';
+
+  const handleUpgrade = async (plan: SubscriptionPlan, planName: string) => {
+    setLoadingPlan(plan);
+    try {
+      const { data } = await api.post('/subscriptions/checkout', { plan, returnUrl });
+      if (data?.checkoutUrl) {
+        window.location.href = data.checkoutUrl;
+      } else {
+        toast.error('Erro ao iniciar checkout');
+      }
+    } catch {
+      toast.error('Erro ao iniciar pagamento. Tente novamente.');
+    } finally {
+      setLoadingPlan(null);
+    }
   };
 
   return (
@@ -123,10 +172,15 @@ export function SubscriptionPage() {
         </div>
       </div>
 
+      <Suspense fallback={null}>
+        <StatusBanner />
+      </Suspense>
+
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5">
         {PLANS.map((plan, index) => {
           const isCurrent = plan.key === currentPlan;
           const isPast = index < currentIndex;
+          const isLoadingThis = loadingPlan === plan.key;
 
           return (
             <motion.div
@@ -185,15 +239,20 @@ export function SubscriptionPage() {
                 </div>
               ) : (
                 <button
-                  onClick={() => handleUpgrade(plan.name)}
-                  className={`w-full flex items-center justify-center gap-2 py-3 px-6 rounded-xl font-semibold text-sm mb-8 transition-all ${
+                  onClick={() => handleUpgrade(plan.key, plan.name)}
+                  disabled={!!loadingPlan}
+                  className={`w-full flex items-center justify-center gap-2 py-3 px-6 rounded-xl font-semibold text-sm mb-8 transition-all disabled:opacity-60 ${
                     plan.popular
                       ? 'btn-primary'
                       : 'btn-secondary border border-border hover:border-primary'
                   }`}
                 >
-                  <Mail className="w-3.5 h-3.5" />
-                  Solicitar upgrade
+                  {isLoadingThis ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <CreditCard className="w-3.5 h-3.5" />
+                  )}
+                  {isLoadingThis ? 'Aguarde...' : 'Assinar agora'}
                 </button>
               )}
 
@@ -205,11 +264,7 @@ export function SubscriptionPage() {
                     ) : (
                       <X className="w-4 h-4 text-muted-foreground/40 flex-shrink-0" />
                     )}
-                    <span
-                      className={
-                        feature.ok ? 'text-muted-foreground' : 'text-muted-foreground/40'
-                      }
-                    >
+                    <span className={feature.ok ? 'text-muted-foreground' : 'text-muted-foreground/40'}>
                       {feature.label}
                     </span>
                   </li>
@@ -221,9 +276,21 @@ export function SubscriptionPage() {
       </div>
 
       <p className="text-center text-sm text-muted-foreground pb-4">
-        Para fazer upgrade, clique em "Solicitar upgrade" — abriremos um e-mail para nossa equipe.
+        Pagamento seguro via Mercado Pago — cartão, Pix ou boleto.
         Todos os planos incluem atualizações automáticas e acesso via PWA.
       </p>
     </div>
+  );
+}
+
+export function SubscriptionPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+      </div>
+    }>
+      <SubscriptionPageContent />
+    </Suspense>
   );
 }
