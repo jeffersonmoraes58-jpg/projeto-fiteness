@@ -45,7 +45,7 @@ export function useSubscription() {
   const { data, isLoading } = useQuery<SubscriptionData>({
     queryKey: ['subscription-my'],
     queryFn: () => api.get('/subscriptions/my').then((r) => r.data?.data ?? r.data),
-    enabled: !!user,
+    enabled: !!user && user.role !== 'ADMIN',
     staleTime: 5 * 60 * 1000,
   });
 
