@@ -69,7 +69,6 @@ const navByRole: Record<string, NavItem[]> = {
     { icon: Building2, label: 'Academias', href: '/admin/tenants' },
     { icon: Users, label: 'Usuários', href: '/admin/users' },
     { icon: CreditCard, label: 'Assinaturas', href: '/admin/subscriptions' },
-    { icon: CreditCard, label: 'Meu Plano', href: '/admin/billing' },
     { icon: BarChart3, label: 'Analytics', href: '/admin/analytics' },
     { icon: Bell, label: 'Notificações', href: '/admin/notifications' },
     { icon: Settings, label: 'Configurações', href: '/admin/settings' },
@@ -90,6 +89,7 @@ export function DashboardSidebar() {
   const pathname = usePathname();
   const { user, logout } = useAuthStore();
   const { displayName, upgradePrice, upgradePlan, isMaxPlan } = useSubscription();
+  const showPlanBadge = user?.role !== 'ADMIN';
 
   const { data: unreadCount = 0 } = useQuery<number>({
     queryKey: ['chat-unread-count'],
@@ -169,7 +169,7 @@ export function DashboardSidebar() {
       </nav>
 
       {/* Plan badge + upgrade */}
-      {!collapsed && !isMaxPlan && upgradePlan && (
+      {showPlanBadge && !collapsed && !isMaxPlan && upgradePlan && (
         <div className="px-3 pb-2">
           <div className="rounded-xl bg-primary/10 border border-primary/20 p-3">
             <div className="flex items-center justify-between mb-1.5">
@@ -191,7 +191,7 @@ export function DashboardSidebar() {
           </div>
         </div>
       )}
-      {collapsed && !isMaxPlan && (
+      {showPlanBadge && collapsed && !isMaxPlan && (
         <div className="px-2 pb-2 flex justify-center">
           <div className="w-8 h-8 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center" title={`Plano ${displayName} — Upgrade disponível`}>
             <Star className="w-3.5 h-3.5 text-primary" />
