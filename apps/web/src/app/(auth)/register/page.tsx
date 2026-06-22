@@ -62,6 +62,8 @@ type Step2Data = z.infer<typeof step2Schema>;
 function RegisterPageContent() {
   const searchParams = useSearchParams();
   const studioParam = searchParams.get('studio');
+  const planParam = searchParams.get('plan');
+  const cycleParam = searchParams.get('cycle');
 
   const [step, setStep] = useState(1);
   const [selectedRole, setSelectedRole] = useState('');
@@ -99,10 +101,18 @@ function RegisterPageContent() {
         lastName: data.lastName,
         phone: data.phone || undefined,
         role: selectedRole,
+        ...(planParam ? { plan: planParam } : {}),
+        ...(cycleParam ? { cycle: cycleParam } : {}),
         ...(needsWorkspaceName ? { studioName: data.studioName } : { tenantId: data.tenantId }),
       });
       toast.success('Conta criada com sucesso!');
-      router.push('/dashboard');
+      // Se escolheu plano pago, redireciona para checkout MP; senão vai pro dashboard
+      const paid = planParam && planParam !== 'grátis' && planParam !== 'gratis' && planParam !== 'free';
+      if (paid) {
+        router.push(`/dashboard?upgrade=${planParam}&cycle=${cycleParam ?? 'monthly'}`);
+      } else {
+        router.push('/dashboard');
+      }
     } catch (err: any) {
       toast.error(err?.response?.data?.message || err?.message || 'Erro ao criar conta');
     }

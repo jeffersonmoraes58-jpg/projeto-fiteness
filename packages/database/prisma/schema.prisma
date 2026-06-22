@@ -228,6 +228,7 @@ model TenantSubscription {
   tenantId     String             @unique
   plan         SubscriptionPlan   @default(FREE)
   status       SubscriptionStatus @default(TRIAL)
+  billingCycle BillingInterval    @default(MONTHLY)
   trialEndsAt  DateTime?
   currentPeriodStart DateTime?
   currentPeriodEnd   DateTime?

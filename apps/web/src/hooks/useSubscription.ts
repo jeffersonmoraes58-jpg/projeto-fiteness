@@ -51,12 +51,20 @@ export function useSubscription() {
 
   const plan: SubscriptionPlan = data?.plan ?? 'FREE';
   const limits = data?.limits;
+  const status: string | undefined = data?.subscription?.status;
+  const isBlocked = status === 'EXPIRED' || status === 'CANCELED' || status === 'PAST_DUE';
+  const currentPeriodEnd: string | undefined = data?.subscription?.currentPeriodEnd;
+  const trialEndsAt: string | undefined = data?.subscription?.trialEndsAt;
 
   return {
     plan,
     displayName: data?.displayName ?? 'Grátis',
     limits,
     isLoading,
+    status,
+    isBlocked,
+    currentPeriodEnd,
+    trialEndsAt,
     canUseFeature: (feature: keyof PlanLimits): boolean => {
       if (feature === 'maxStudents') return true;
       return limits?.[feature as keyof Omit<PlanLimits, 'maxStudents'>] ?? false;

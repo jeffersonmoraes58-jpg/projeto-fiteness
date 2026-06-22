@@ -13,7 +13,7 @@ import { NotificationsService } from '../notifications/notifications.service';
 import * as bcrypt from 'bcryptjs';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
-import { UserRole, SubscriptionPlan, SubscriptionStatus } from '@prisma/client';
+import { UserRole, SubscriptionPlan, SubscriptionStatus, BillingInterval } from '@prisma/client';
 
 @Injectable()
 export class AuthService {
@@ -45,10 +45,13 @@ export class AuthService {
       const chosenPlan = dto.plan && planMap[dto.plan.toLowerCase()]
         ? planMap[dto.plan.toLowerCase()]
         : SubscriptionPlan.FREE;
+      const chosenCycle: BillingInterval =
+        dto.cycle?.toLowerCase() === 'annual' ? 'ANNUAL' : 'MONTHLY';
       await this.prisma.tenantSubscription.create({
         data: {
           tenantId: tenant.id,
           plan: chosenPlan,
+          billingCycle: chosenCycle,
           status: chosenPlan === SubscriptionPlan.FREE ? SubscriptionStatus.ACTIVE : SubscriptionStatus.TRIAL,
         },
       });

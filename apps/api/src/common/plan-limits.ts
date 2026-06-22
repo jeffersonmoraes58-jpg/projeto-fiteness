@@ -1,4 +1,4 @@
-import { SubscriptionPlan } from '@prisma/client';
+import { SubscriptionPlan, BillingInterval } from '@prisma/client';
 
 export interface PlanLimits {
   maxStudents: number; // -1 = unlimited
@@ -81,3 +81,15 @@ export const PLAN_PRICES: Record<SubscriptionPlan, number> = {
   PRO: 55,
   ENTERPRISE: 95,
 };
+
+// Plano anual = 10x o valor mensal (2 meses grátis)
+export const PLAN_PRICES_ANNUAL: Record<SubscriptionPlan, number> = {
+  FREE: 0,
+  BASIC: 350,
+  PRO: 550,
+  ENTERPRISE: 950,
+};
+
+export function getPlanPrice(plan: SubscriptionPlan, cycle: BillingInterval): number {
+  return cycle === 'ANNUAL' ? PLAN_PRICES_ANNUAL[plan] : PLAN_PRICES[plan];
+}
