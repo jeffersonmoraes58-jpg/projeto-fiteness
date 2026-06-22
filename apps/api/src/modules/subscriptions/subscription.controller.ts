@@ -4,7 +4,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../../decorators/current-user.decorator';
 import { SubscriptionService } from './subscription.service';
 import { Public } from '../../decorators/public.decorator';
-import { SubscriptionPlan } from '@prisma/client';
+import { SubscriptionPlan, BillingInterval } from '@prisma/client';
 
 @ApiTags('subscriptions')
 @ApiBearerAuth()
@@ -23,9 +23,14 @@ export class SubscriptionController {
   @ApiOperation({ summary: 'Cria preferência de pagamento Mercado Pago para upgrade de plano' })
   createCheckout(
     @CurrentUser('tenantId') tenantId: string,
-    @Body() body: { plan: SubscriptionPlan; returnUrl: string },
+    @Body() body: { plan: SubscriptionPlan; returnUrl: string; cycle?: BillingInterval },
   ) {
-    return this.subscriptionService.createMPCheckout(tenantId, body.plan, body.returnUrl);
+    return this.subscriptionService.createMPCheckout(
+      tenantId,
+      body.plan,
+      body.returnUrl,
+      body.cycle ?? 'MONTHLY',
+    );
   }
 
   @Public()

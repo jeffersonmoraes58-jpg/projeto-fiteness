@@ -49,4 +49,9 @@ export class RegisterDto {
   @IsOptional()
   @IsString()
   plan?: string;
+
+  @ApiPropertyOptional({ example: 'annual', description: 'Ciclo de cobrança: monthly ou annual' })
+  @IsOptional()
+  @IsString()
+  cycle?: string;
 }
