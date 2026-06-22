@@ -26,6 +26,12 @@ export class AdminController {
     return this.service.getStats();
   }
 
+  @Get('health')
+  @ApiOperation({ summary: 'Saúde dos serviços (DB, Redis, IA)' })
+  getHealth() {
+    return this.service.getHealth();
+  }
+
   @Get('analytics')
   @ApiOperation({ summary: 'Analytics de crescimento (últimos 30 dias)' })
   getAnalytics() {

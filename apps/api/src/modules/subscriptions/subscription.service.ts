@@ -2,14 +2,8 @@ import { Injectable, ForbiddenException, BadRequestException } from '@nestjs/com
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import { SubscriptionPlan, SubscriptionStatus } from '@prisma/client';
-import { PLAN_LIMITS, PLAN_DISPLAY_NAMES, PlanFeature } from '../../common/plan-limits';
+import { PLAN_LIMITS, PLAN_DISPLAY_NAMES, PLAN_PRICES, PlanFeature } from '../../common/plan-limits';
 import { MercadoPagoConfig, Payment, Preference } from 'mercadopago';
-
-const PLAN_PRICES: Partial<Record<SubscriptionPlan, number>> = {
-  BASIC: 35,
-  PRO: 55,
-  ENTERPRISE: 95,
-};
 
 @Injectable()
 export class SubscriptionService {
