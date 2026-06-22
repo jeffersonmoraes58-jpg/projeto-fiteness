@@ -1,4 +1,4 @@
-import { Controller, Get, Patch, Body, Param, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Body, Param, Query, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { UserRole } from '@prisma/client';
 import { AdminService } from './admin.service';
@@ -33,9 +33,9 @@ export class AdminController {
   }
 
   @Get('analytics')
-  @ApiOperation({ summary: 'Analytics de crescimento (últimos 30 dias)' })
-  getAnalytics() {
-    return this.service.getAnalytics();
+  @ApiOperation({ summary: 'Analytics de crescimento e uso' })
+  getAnalytics(@Query('period') period?: string) {
+    return this.service.getAnalytics(period);
   }
 
   @Get('tenants')
@@ -75,5 +75,39 @@ export class AdminController {
   @ApiOperation({ summary: 'Ativar/desativar usuário ou alterar role' })
   updateUser(@Param('id') id: string, @Body() body: { isActive?: boolean; role?: string }) {
     return this.service.updateUser(id, body);
+  }
+
+  // ── Notificações em massa ─────────────────────────────────
+
+  @Get('notifications')
+  @ApiOperation({ summary: 'Listar broadcasts enviados (agrupados)' })
+  listBroadcasts() {
+    return this.service.listBroadcasts();
+  }
+
+  @Post('notifications/broadcast')
+  @ApiOperation({ summary: 'Enviar notificação para todos os usuários (ou por role)' })
+  broadcast(@Body() body: { title: string; body: string; type?: 'INFO' | 'WARNING' | 'SUCCESS' | 'ALERT'; targetRole?: string | null }) {
+    return this.service.broadcast(body);
+  }
+
+  @Delete('notifications/:id')
+  @ApiOperation({ summary: 'Apagar broadcast (e todas as notificações geradas)' })
+  deleteBroadcast(@Param('id') id: string) {
+    return this.service.deleteBroadcast(id);
+  }
+
+  // ── Configurações da plataforma ───────────────────────────
+
+  @Get('settings')
+  @ApiOperation({ summary: 'Configurações globais da plataforma' })
+  getSettings() {
+    return this.service.getSettings();
+  }
+
+  @Patch('settings')
+  @ApiOperation({ summary: 'Atualizar configurações (features, limits, email)' })
+  updateSettings(@Body() body: { features?: any; limits?: any; email?: any }) {
+    return this.service.updateSettings(body);
   }
 }

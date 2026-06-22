@@ -8,7 +8,6 @@ import {
   Activity, Dumbbell, Calendar, X, Save, Upload,
 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import axios from 'axios';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
 
@@ -242,15 +241,11 @@ function AddPhotoModal({ onClose }: { onClose: () => void }) {
     if (!file) { setError('Selecione uma foto'); return; }
     setUploading(true);
     try {
-      const storage = typeof window !== 'undefined' ? localStorage.getItem('fitlynutri-auth') : null;
-      const token = storage ? JSON.parse(storage).state?.accessToken : null;
       const form = new FormData();
       form.append('file', file);
-      const { data } = await axios.post(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/v1/uploads/progress-photo`,
-        form,
-        { headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'multipart/form-data' } },
-      );
+      const { data } = await api.post('/uploads/progress-photo', form, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
       const photoUrl = data?.data?.url || data?.url;
       if (!photoUrl) throw new Error('URL da foto não retornada');
       saveMutation.mutate({ photoUrl, angle });

@@ -42,9 +42,9 @@ export default function AdminNotifications() {
   const [roleDropdownOpen, setRoleDropdownOpen] = useState(false);
   const queryClient = useQueryClient();
 
-  const { data: history, isLoading } = useQuery({
+  const { data: history, isLoading } = useQuery<any[]>({
     queryKey: ['admin-notifications'],
-    queryFn: () => api.get('/admin/notifications').then((r) => r.data.data),
+    queryFn: () => api.get('/admin/notifications').then((r) => r.data?.data ?? r.data ?? []),
   });
 
   const sendMutation = useMutation({
@@ -63,12 +63,7 @@ export default function AdminNotifications() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['admin-notifications'] }),
   });
 
-  const notifications: any[] = history || [
-    { id: '1', title: 'Novo recurso disponível', body: 'Acesse a IA de treinos personalizada agora mesmo!', type: 'INFO', targetRole: null, sentAt: new Date(Date.now() - 86400000 * 2).toISOString(), readCount: 842, totalCount: 1080 },
-    { id: '2', title: 'Manutenção programada', body: 'O sistema ficará em manutenção no dia 15/05 das 02h às 04h.', type: 'WARNING', targetRole: 'TRAINER', sentAt: new Date(Date.now() - 86400000 * 4).toISOString(), readCount: 156, totalCount: 210 },
-    { id: '3', title: 'Parabéns pelo desempenho!', body: 'Vocês atingiram a meta de 1.000 treinos esta semana!', type: 'SUCCESS', targetRole: 'STUDENT', sentAt: new Date(Date.now() - 86400000 * 7).toISOString(), readCount: 634, totalCount: 720 },
-    { id: '4', title: 'Pagamento pendente', body: 'Existem pagamentos em atraso. Regularize agora para não perder acesso.', type: 'ALERT', targetRole: 'STUDIO_OWNER', sentAt: new Date(Date.now() - 86400000 * 10).toISOString(), readCount: 18, totalCount: 23 },
-  ];
+  const notifications: any[] = history ?? [];
 
   const filtered = notifications.filter((n) => {
     const matchSearch = n.title.toLowerCase().includes(search.toLowerCase()) || n.body.toLowerCase().includes(search.toLowerCase());
