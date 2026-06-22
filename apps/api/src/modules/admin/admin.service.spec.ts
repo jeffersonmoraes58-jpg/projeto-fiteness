@@ -1,5 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { NotFoundException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { AdminService } from './admin.service';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -10,17 +11,12 @@ const mockPrisma = {
   trainer: { count: jest.fn() },
   nutritionist: { count: jest.fn() },
   tenantSubscription: { count: jest.fn(), findMany: jest.fn() },
+  workout: { count: jest.fn() },
   workoutLog: { count: jest.fn() },
+  $queryRaw: jest.fn(),
 };
 
-const mockStats = {
-  totalTenants: 5,
-  totalUsers: 120,
-  totalStudents: 80,
-  totalTrainers: 25,
-  totalNutritionists: 15,
-  activeSubscriptions: 4,
-};
+const mockConfig = { get: jest.fn() };
 
 describe('AdminService', () => {
   let service: AdminService;
@@ -30,6 +26,7 @@ describe('AdminService', () => {
       providers: [
         AdminService,
         { provide: PrismaService, useValue: mockPrisma },
+        { provide: ConfigService, useValue: mockConfig },
       ],
     }).compile();
 
@@ -38,19 +35,77 @@ describe('AdminService', () => {
   });
 
   describe('getStats', () => {
-    it('deve retornar estatísticas da plataforma', async () => {
-      mockPrisma.tenant.count.mockResolvedValue(mockStats.totalTenants);
-      mockPrisma.user.count.mockResolvedValue(mockStats.totalUsers);
-      mockPrisma.student.count.mockResolvedValue(mockStats.totalStudents);
-      mockPrisma.trainer.count.mockResolvedValue(mockStats.totalTrainers);
-      mockPrisma.nutritionist.count.mockResolvedValue(mockStats.totalNutritionists);
-      mockPrisma.tenantSubscription.count.mockResolvedValue(mockStats.activeSubscriptions);
+    it('deve retornar estatísticas da plataforma com MRR e plan breakdown', async () => {
+      mockPrisma.tenant.count.mockResolvedValue(5);
+      mockPrisma.user.count.mockResolvedValue(120);
+      mockPrisma.student.count.mockResolvedValue(80);
+      mockPrisma.trainer.count.mockResolvedValue(25);
+      mockPrisma.nutritionist.count.mockResolvedValue(15);
+      mockPrisma.workout.count.mockResolvedValue(42);
+      // tenantSubscription.count: 1ª chamada = activeTenants (ACTIVE+TRIAL), 2ª = canceledLast30
+      mockPrisma.tenantSubscription.count
+        .mockResolvedValueOnce(4)
+        .mockResolvedValueOnce(1);
+      // findMany: 1ª = subscriptions (plan+status), 2ª = computeMrrHistory (active só)
+      mockPrisma.tenantSubscription.findMany
+        .mockResolvedValueOnce([
+          { plan: 'PRO', status: 'ACTIVE' },
+          { plan: 'BASIC', status: 'ACTIVE' },
+          { plan: 'ENTERPRISE', status: 'ACTIVE' },
+          { plan: 'FREE', status: 'TRIAL' },
+        ])
+        .mockResolvedValueOnce([
+          { plan: 'PRO', createdAt: new Date('2020-01-01') },
+          { plan: 'BASIC', createdAt: new Date('2020-01-01') },
+          { plan: 'ENTERPRISE', createdAt: new Date('2020-01-01') },
+        ]);
 
       const result = await service.getStats();
 
       expect(result.totalTenants).toBe(5);
       expect(result.totalUsers).toBe(120);
-      expect(result.activeSubscriptions).toBe(4);
+      expect(result.activeTenants).toBe(4);
+      expect(result.totalWorkouts).toBe(42);
+      expect(result.activeSubscriptions).toBe(3); // só ACTIVE
+      expect(result.mrr).toBe(55 + 35 + 95); // PRO+BASIC+ENTERPRISE
+      expect(result.proCount).toBe(1);
+      expect(result.basicCount).toBe(1);
+      expect(result.enterpriseCount).toBe(1);
+      expect(result.freeCount).toBe(1);
+      expect(result.proRevenue).toBe(55);
+      expect(result.churnRate).toBeCloseTo(25); // 1 / (3 + 1) = 25%
+      expect(result.mrrHistory).toHaveLength(12);
+      expect(result.mrrHistory[11]).toBe(55 + 35 + 95);
+    });
+  });
+
+  describe('getHealth', () => {
+    it('deve reportar healthy quando DB e Redis respondem e ANTHROPIC_API_KEY existe', async () => {
+      mockPrisma.$queryRaw.mockResolvedValue([{ '?column?': 1 }]);
+      mockConfig.get.mockImplementation((key: string, def?: any) => {
+        if (key === 'ANTHROPIC_API_KEY') return 'sk-test';
+        return def;
+      });
+      jest.spyOn(service as any, 'checkRedis').mockResolvedValue('healthy');
+
+      const result = await service.getHealth();
+      expect(result.api).toBe('healthy');
+      expect(result.database).toBe('healthy');
+      expect(result.redis).toBe('healthy');
+      expect(result.queue).toBe('healthy');
+      expect(result.storage).toBe('healthy');
+      expect(result.ai).toBe('healthy');
+    });
+
+    it('deve reportar database down e ai degraded quando faltam', async () => {
+      mockPrisma.$queryRaw.mockRejectedValue(new Error('conn refused'));
+      mockConfig.get.mockImplementation((key: string, def?: any) => def);
+      jest.spyOn(service as any, 'checkRedis').mockResolvedValue('down');
+
+      const result = await service.getHealth();
+      expect(result.database).toBe('down');
+      expect(result.redis).toBe('down');
+      expect(result.ai).toBe('degraded');
     });
   });
 

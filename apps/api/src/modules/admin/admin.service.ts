@@ -43,7 +43,13 @@ export class AdminService {
 
   private async checkRedis(): Promise<HealthStatus> {
     const url = this.config.get<string>('REDIS_URL', 'redis://localhost:6379');
-    const client = new Redis(url, { lazyConnect: true, connectTimeout: 2000, maxRetriesPerRequest: 1 });
+    const client = new Redis(url, {
+      lazyConnect: true,
+      connectTimeout: 2000,
+      maxRetriesPerRequest: 1,
+      retryStrategy: () => null,
+      enableOfflineQueue: false,
+    });
     try {
       await client.connect();
       const pong = await client.ping();
