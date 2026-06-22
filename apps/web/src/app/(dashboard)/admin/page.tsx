@@ -15,16 +15,30 @@ import { cn } from '@/lib/utils';
 export default function AdminDashboard() {
   const { data: stats } = useQuery({
     queryKey: ['admin-stats'],
-    queryFn: () => api.get('/admin/stats').then((r) => r.data.data),
+    queryFn: () => api.get('/admin/stats').then((r) => r.data?.data ?? r.data),
   });
 
   const { data: dashboard } = useQuery({
     queryKey: ['admin-dashboard'],
-    queryFn: () => api.get('/admin/dashboard').then((r) => r.data.data),
+    queryFn: () => api.get('/admin/dashboard').then((r) => r.data?.data ?? r.data),
   });
 
   const recentActivity = dashboard?.recentUsers;
-  const systemHealth = null;
+  const systemHealth = dashboard?.health;
+  const analytics = dashboard?.analytics;
+
+  const mrrHistory: number[] = stats?.mrrHistory ?? [];
+  const currentMrr = mrrHistory[mrrHistory.length - 1] ?? stats?.mrr ?? 0;
+  const previousMrr = mrrHistory[mrrHistory.length - 2] ?? 0;
+  const mrrDeltaPct =
+    previousMrr > 0 ? ((currentMrr - previousMrr) / previousMrr) * 100 : currentMrr > 0 ? 100 : 0;
+
+  const fmtDelta = (pct: number | undefined, suffix = '%') => {
+    if (pct === undefined || pct === null || Number.isNaN(pct)) return '—';
+    const rounded = Math.round(pct * 10) / 10;
+    const sign = rounded > 0 ? '+' : '';
+    return `${sign}${rounded}${suffix}`;
+  };
 
   const kpis = [
     {
@@ -32,32 +46,32 @@ export default function AdminDashboard() {
       value: stats?.activeTenants ?? '—',
       icon: Building2,
       color: 'from-purple-600 to-indigo-600',
-      delta: '+3',
-      positive: true,
+      delta: fmtDelta(analytics?.tenantGrowthPct),
+      positive: (analytics?.tenantGrowthPct ?? 0) >= 0,
     },
     {
       label: 'Usuários totais',
       value: stats?.totalUsers ?? '—',
       icon: Users,
       color: 'from-cyan-600 to-blue-600',
-      delta: '+12%',
-      positive: true,
+      delta: fmtDelta(analytics?.userGrowthPct),
+      positive: (analytics?.userGrowthPct ?? 0) >= 0,
     },
     {
       label: 'MRR',
-      value: stats?.mrr ? `R$ ${Number(stats.mrr).toLocaleString('pt-BR')}` : '—',
+      value: stats?.mrr != null ? `R$ ${Number(stats.mrr).toLocaleString('pt-BR')}` : '—',
       icon: DollarSign,
       color: 'from-emerald-600 to-teal-600',
-      delta: '+8%',
-      positive: true,
+      delta: fmtDelta(mrrDeltaPct),
+      positive: mrrDeltaPct >= 0,
     },
     {
       label: 'Churn mensal',
-      value: stats?.churnRate ? `${stats.churnRate}%` : '—',
+      value: stats?.churnRate != null ? `${stats.churnRate}%` : '—',
       icon: TrendingUp,
       color: 'from-orange-600 to-red-600',
-      delta: '-0.5%',
-      positive: true,
+      delta: fmtDelta(stats?.churnRate, '%'),
+      positive: (stats?.churnRate ?? 0) === 0,
     },
   ];
 
@@ -263,26 +277,39 @@ export default function AdminDashboard() {
 }
 
 function MRRChart({ stats }: { stats: any }) {
-  const months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
-  const values = stats?.mrrHistory || [4200, 5100, 5800, 6200, 7100, 7800, 8400, 9200, 9800, 10500, 11200, 12000];
-  const max = Math.max(...values);
-  const currentMonth = new Date().getMonth();
+  const values: number[] = stats?.mrrHistory ?? [];
+  const now = new Date();
+  const monthLabels = Array.from({ length: 12 }, (_, i) => {
+    const d = new Date(now.getFullYear(), now.getMonth() - 11 + i, 1);
+    return d.toLocaleDateString('pt-BR', { month: 'short' }).replace('.', '');
+  });
 
-  // Build SVG path
+  if (values.length === 0 || values.every((v) => v === 0)) {
+    return (
+      <div className="text-center py-8 text-sm text-muted-foreground">
+        Sem dados de receita ainda.
+      </div>
+    );
+  }
+
+  const max = Math.max(...values, 1);
+  const current = values[values.length - 1] ?? 0;
+
   const w = 400;
   const h = 80;
   const pts = values.map((v: number, i: number) => ({
-    x: (i / (values.length - 1)) * w,
+    x: (i / Math.max(values.length - 1, 1)) * w,
     y: h - (v / max) * h,
   }));
 
-  const path = pts.map((p: { x: number; y: number }, i: number) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ');
+  const path = pts.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ');
   const area = `${path} L ${pts[pts.length - 1].x} ${h} L 0 ${h} Z`;
+  const lastIdx = values.length - 1;
 
   return (
     <div>
       <div className="text-2xl font-bold mb-1">
-        R$ {values[currentMonth]?.toLocaleString('pt-BR') ?? '—'}
+        R$ {current.toLocaleString('pt-BR')}
         <span className="text-sm text-muted-foreground font-normal ml-2">este mês</span>
       </div>
       <svg viewBox={`0 0 ${w} ${h + 10}`} className="w-full mt-4">
@@ -298,13 +325,13 @@ function MRRChart({ stats }: { stats: any }) {
         </defs>
         <path d={area} fill="url(#mrrAreaGrad)" />
         <path d={path} fill="none" stroke="url(#mrrGrad)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-        {pts.map((p: { x: number; y: number }, i: number) => (
-          <circle key={i} cx={p.x} cy={p.y} r={i === currentMonth ? 5 : 3} fill="url(#mrrGrad)" opacity={i === currentMonth ? 1 : 0.6} />
+        {pts.map((p, i) => (
+          <circle key={i} cx={p.x} cy={p.y} r={i === lastIdx ? 5 : 3} fill="url(#mrrGrad)" opacity={i === lastIdx ? 1 : 0.6} />
         ))}
       </svg>
       <div className="flex justify-between mt-2">
-        {months.map((m) => (
-          <span key={m} className="flex-1 text-center text-[9px] text-muted-foreground">{m}</span>
+        {monthLabels.map((m, i) => (
+          <span key={i} className="flex-1 text-center text-[9px] text-muted-foreground">{m}</span>
         ))}
       </div>
     </div>
@@ -312,13 +339,20 @@ function MRRChart({ stats }: { stats: any }) {
 }
 
 function SystemHealth({ health }: { health: any }) {
+  if (!health) {
+    return (
+      <div className="text-center py-4 text-xs text-muted-foreground">
+        Verificando serviços…
+      </div>
+    );
+  }
   const services = [
-    { name: 'API', status: health?.api ?? 'healthy' },
-    { name: 'Banco de Dados', status: health?.database ?? 'healthy' },
-    { name: 'Redis / Cache', status: health?.redis ?? 'healthy' },
-    { name: 'Filas (Bull)', status: health?.queue ?? 'healthy' },
-    { name: 'Storage', status: health?.storage ?? 'healthy' },
-    { name: 'IA (Claude)', status: health?.ai ?? 'healthy' },
+    { name: 'API', status: health.api ?? 'degraded' },
+    { name: 'Banco de Dados', status: health.database ?? 'degraded' },
+    { name: 'Redis / Cache', status: health.redis ?? 'degraded' },
+    { name: 'Filas (Bull)', status: health.queue ?? 'degraded' },
+    { name: 'Storage', status: health.storage ?? 'degraded' },
+    { name: 'IA (Claude)', status: health.ai ?? 'degraded' },
   ];
 
   const icons: Record<string, any> = {
@@ -364,39 +398,35 @@ function SystemHealth({ health }: { health: any }) {
 }
 
 function RecentActivity({ data }: { data: any[] }) {
-  const fallback = [
-    { label: 'Novo tenant: Academia Força Total', time: '2 min atrás', Icon: Building2, color: 'text-purple-400' },
-    { label: 'Novo usuário registrado: João Silva', time: '15 min atrás', Icon: Users, color: 'text-cyan-400' },
-    { label: 'Upgrade para Pro: Studio Wellness', time: '1h atrás', Icon: DollarSign, color: 'text-emerald-400' },
-    { label: 'Novo trainer: Maria Santos', time: '2h atrás', Icon: Dumbbell, color: 'text-orange-400' },
-    { label: 'Assinatura cancelada: FitLife', time: '5h atrás', Icon: XCircle, color: 'text-red-400' },
-  ];
+  if (!data?.length) {
+    return (
+      <div className="text-center py-6 text-xs text-muted-foreground">
+        Nenhuma atividade recente.
+      </div>
+    );
+  }
 
-  const items = data?.length
-    ? data.map((u: any) => ({
-        label: `${u.profile?.firstName || ''} ${u.profile?.lastName || ''} (${u.email})`,
-        time: new Date(u.createdAt).toLocaleDateString('pt-BR'),
-        Icon: Users,
-        color: 'text-cyan-400',
-      }))
-    : fallback;
+  const items = data.map((u: any) => {
+    const name = `${u.profile?.firstName || ''} ${u.profile?.lastName || ''}`.trim();
+    return {
+      label: name ? `${name} (${u.email})` : u.email,
+      time: new Date(u.createdAt).toLocaleDateString('pt-BR'),
+    };
+  });
 
   return (
     <div className="space-y-2">
-      {items.map((item: any, i: number) => {
-        const Icon = item.Icon || Activity;
-        return (
-          <div key={i} className="flex items-center gap-3 p-3 rounded-xl hover:bg-accent transition-all">
-            <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center flex-shrink-0">
-              <Icon className={`w-4 h-4 ${item.color || 'text-muted-foreground'}`} />
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="text-sm truncate">{item.label}</div>
-            </div>
-            <span className="text-xs text-muted-foreground flex-shrink-0">{item.time}</span>
+      {items.map((item, i) => (
+        <div key={i} className="flex items-center gap-3 p-3 rounded-xl hover:bg-accent transition-all">
+          <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center flex-shrink-0">
+            <Users className="w-4 h-4 text-cyan-400" />
           </div>
-        );
-      })}
+          <div className="flex-1 min-w-0">
+            <div className="text-sm truncate">{item.label}</div>
+          </div>
+          <span className="text-xs text-muted-foreground flex-shrink-0">{item.time}</span>
+        </div>
+      ))}
     </div>
   );
 }

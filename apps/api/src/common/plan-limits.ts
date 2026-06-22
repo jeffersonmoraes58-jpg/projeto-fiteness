@@ -74,3 +74,10 @@ export const PLAN_UPGRADE_PRICE: Record<SubscriptionPlan, string | null> = {
   PRO: 'R$95/mês',
   ENTERPRISE: null,
 };
+
+export const PLAN_PRICES: Record<SubscriptionPlan, number> = {
+  FREE: 0,
+  BASIC: 35,
+  PRO: 55,
+  ENTERPRISE: 95,
+};
