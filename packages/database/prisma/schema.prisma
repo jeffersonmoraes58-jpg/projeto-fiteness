@@ -223,6 +223,18 @@ model TenantSettings {
   @@map("tenant_settings")
 }
 
+// Configurações globais da plataforma — linha única identificada por id='singleton'
+model PlatformSettings {
+  id        String   @id @default("singleton")
+  features  Json     @default("{}")
+  limits    Json     @default("{}")
+  email     Json     @default("{}")
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+
+  @@map("platform_settings")
+}
+
 model TenantSubscription {
   id           String             @id @default(cuid())
   tenantId     String             @unique

@@ -13,90 +13,87 @@ import { cn } from '@/lib/utils';
 
 const PERIODS = ['7d', '30d', '90d', '12m'];
 
-const MOCK_GROWTH = [
-  { label: 'Jan', users: 120, revenue: 8400 },
-  { label: 'Fev', users: 185, revenue: 12300 },
-  { label: 'Mar', users: 240, revenue: 16800 },
-  { label: 'Abr', users: 310, revenue: 21700 },
-  { label: 'Mai', users: 390, revenue: 27300 },
-  { label: 'Jun', users: 460, revenue: 32200 },
-  { label: 'Jul', users: 520, revenue: 36400 },
-  { label: 'Ago', users: 610, revenue: 42700 },
-  { label: 'Set', users: 720, revenue: 50400 },
-  { label: 'Out', users: 850, revenue: 59500 },
-  { label: 'Nov', users: 940, revenue: 65800 },
-  { label: 'Dez', users: 1080, revenue: 75600 },
-];
-
 export default function AdminAnalytics() {
   const [period, setPeriod] = useState('30d');
   const [metric, setMetric] = useState<'users' | 'revenue'>('users');
 
-  const { data: analytics } = useQuery({
+  const { data: analytics } = useQuery<any>({
     queryKey: ['admin-analytics', period],
-    queryFn: () => api.get(`/admin/analytics?period=${period}`).then((r) => r.data.data),
+    queryFn: () => api.get(`/admin/analytics?period=${period}`).then((r) => r.data?.data ?? r.data),
   });
 
-  const stats = analytics?.stats || {};
-  const topTenants = analytics?.topTenants || [];
-  const featureUsage = analytics?.featureUsage || [];
-  const cohortData = analytics?.cohort || [];
+  const stats = analytics?.stats ?? {};
+  const topTenants: any[] = analytics?.topTenants ?? [];
+  const featureUsage: any[] = analytics?.featureUsage ?? [];
+  const cohortData: any[] = analytics?.cohort ?? [];
+  const chartData: Array<{ label: string; users: number; revenue: number }> = analytics?.growth ?? [];
+  const userGrowthPct: number = analytics?.userGrowthPct ?? 0;
+  const tenantGrowthPct: number = analytics?.tenantGrowthPct ?? 0;
 
-  const chartData = MOCK_GROWTH;
-  const maxVal = Math.max(...chartData.map((d) => metric === 'users' ? d.users : d.revenue));
+  const maxVal = chartData.length > 0
+    ? Math.max(1, ...chartData.map((d) => (metric === 'users' ? d.users : d.revenue)))
+    : 1;
+
+  const fmtDelta = (pct: number) => {
+    const rounded = Math.round(pct * 10) / 10;
+    const sign = rounded > 0 ? '+' : '';
+    return `${sign}${rounded}%`;
+  };
+
+  const lastTwo = chartData.slice(-2);
+  const mrrPrev = lastTwo[0]?.revenue ?? 0;
+  const mrrCurr = lastTwo[1]?.revenue ?? stats.mrr ?? 0;
+  const mrrDeltaPct = mrrPrev > 0 ? ((mrrCurr - mrrPrev) / mrrPrev) * 100 : mrrCurr > 0 ? 100 : 0;
 
   const kpis = [
     {
       label: 'Total de Usuários',
-      value: (stats.totalUsers || 1080).toLocaleString('pt-BR'),
-      delta: '+14.8%',
-      up: true,
+      value: (stats.totalUsers ?? 0).toLocaleString('pt-BR'),
+      delta: fmtDelta(userGrowthPct),
+      up: userGrowthPct >= 0,
       icon: Users,
       color: 'from-purple-600 to-indigo-600',
     },
     {
       label: 'Receita Total (MRR)',
-      value: `R$ ${(stats.mrr || 75600).toLocaleString('pt-BR')}`,
-      delta: '+22.3%',
-      up: true,
+      value: `R$ ${(stats.mrr ?? 0).toLocaleString('pt-BR')}`,
+      delta: fmtDelta(mrrDeltaPct),
+      up: mrrDeltaPct >= 0,
       icon: DollarSign,
       color: 'from-emerald-600 to-teal-600',
     },
     {
       label: 'Tenants Ativos',
-      value: (stats.activeTenants || 84).toLocaleString('pt-BR'),
-      delta: '+6.2%',
-      up: true,
+      value: (stats.activeTenants ?? 0).toLocaleString('pt-BR'),
+      delta: fmtDelta(tenantGrowthPct),
+      up: tenantGrowthPct >= 0,
       icon: Globe,
       color: 'from-blue-600 to-cyan-600',
     },
     {
       label: 'Taxa de Retenção',
-      value: `${stats.retentionRate || 87}%`,
-      delta: '+2.1%',
+      value: `${stats.retentionRate ?? 0}%`,
+      delta: '',
       up: true,
       icon: UserCheck,
       color: 'from-orange-600 to-amber-600',
     },
   ];
 
-  const featureStats = featureUsage.length > 0 ? featureUsage : [
-    { name: 'Treinos', count: 8420, icon: Dumbbell, color: 'bg-purple-500' },
-    { name: 'Dietas', count: 5310, icon: Apple, color: 'bg-emerald-500' },
-    { name: 'Chat', count: 12840, icon: Activity, color: 'bg-blue-500' },
-    { name: 'IA Fitness', count: 3290, icon: BarChart3, color: 'bg-orange-500' },
-    { name: 'Agenda', count: 6750, icon: Calendar, color: 'bg-cyan-500' },
-    { name: 'Gamificação', count: 9120, icon: TrendingUp, color: 'bg-pink-500' },
-  ];
-  const maxFeature = Math.max(...featureStats.map((f: any) => f.count));
+  const FEATURE_ICONS: Record<string, any> = {
+    Treinos: Dumbbell,
+    Dietas: Apple,
+    Chat: Activity,
+    Agenda: Calendar,
+    Gamificação: TrendingUp,
+    'IA Fitness': BarChart3,
+  };
 
-  const tenants = topTenants.length > 0 ? topTenants : [
-    { name: 'Studio FitPro', plan: 'ENTERPRISE', users: 142, mrr: 599, growth: 18 },
-    { name: 'Academia Alpha', plan: 'PRO', users: 87, mrr: 249, growth: 12 },
-    { name: 'NutriClub SP', plan: 'PRO', users: 65, mrr: 249, growth: 8 },
-    { name: 'Power Gym', plan: 'BASIC', users: 43, mrr: 99, growth: 5 },
-    { name: 'Wellness Center', plan: 'ENTERPRISE', users: 198, mrr: 599, growth: 22 },
-  ];
+  const featureStats = featureUsage.map((f) => ({
+    ...f,
+    icon: FEATURE_ICONS[f.name] ?? Activity,
+  }));
+  const maxFeature = featureStats.length > 0 ? Math.max(1, ...featureStats.map((f: any) => f.count)) : 1;
 
   const planColors: Record<string, string> = {
     FREE: 'bg-gray-500/10 text-gray-400',
@@ -104,14 +101,6 @@ export default function AdminAnalytics() {
     PRO: 'bg-purple-500/10 text-purple-400',
     ENTERPRISE: 'bg-yellow-500/10 text-yellow-400',
   };
-
-  const cohort = cohortData.length > 0 ? cohortData : [
-    { month: 'Out/25', m0: 100, m1: 82, m2: 74, m3: 68 },
-    { month: 'Nov/25', m0: 100, m1: 79, m2: 71, m3: 65 },
-    { month: 'Dez/25', m0: 100, m1: 85, m2: 76, m3: null },
-    { month: 'Jan/26', m0: 100, m1: 88, m2: null, m3: null },
-    { month: 'Fev/26', m0: 100, m1: null, m2: null, m3: null },
-  ];
 
   return (
     <div className="space-y-6">
@@ -185,6 +174,11 @@ export default function AdminAnalytics() {
             </button>
           </div>
         </div>
+        {chartData.length === 0 ? (
+          <div className="text-center py-12 text-sm text-muted-foreground">
+            Sem dados de crescimento ainda.
+          </div>
+        ) : (
         <div className="flex items-end gap-2 h-48">
           {chartData.map((d, i) => {
             const val = metric === 'users' ? d.users : d.revenue;
@@ -209,6 +203,7 @@ export default function AdminAnalytics() {
             );
           })}
         </div>
+        )}
       </motion.div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -220,6 +215,11 @@ export default function AdminAnalytics() {
           className="glass-card"
         >
           <h2 className="font-semibold mb-4">Uso de Funcionalidades</h2>
+          {featureStats.length === 0 || featureStats.every((f: any) => f.count === 0) ? (
+            <div className="text-center py-6 text-sm text-muted-foreground">
+              Sem uso registrado no período.
+            </div>
+          ) : (
           <div className="space-y-3">
             {featureStats.map((f: any) => (
               <div key={f.name} className="space-y-1">
@@ -241,6 +241,7 @@ export default function AdminAnalytics() {
               </div>
             ))}
           </div>
+          )}
         </motion.div>
 
         {/* Top tenants */}
@@ -251,8 +252,13 @@ export default function AdminAnalytics() {
           className="glass-card"
         >
           <h2 className="font-semibold mb-4">Top Tenants</h2>
+          {topTenants.length === 0 ? (
+            <div className="text-center py-6 text-sm text-muted-foreground">
+              Sem tenants cadastrados.
+            </div>
+          ) : (
           <div className="space-y-3">
-            {tenants.map((t: any, i: number) => (
+            {topTenants.map((t: any, i: number) => (
               <div key={t.name} className="flex items-center gap-3">
                 <div className="w-7 h-7 rounded-lg bg-white/5 flex items-center justify-center text-xs font-bold text-muted-foreground flex-shrink-0">
                   {i + 1}
@@ -277,54 +283,56 @@ export default function AdminAnalytics() {
               </div>
             ))}
           </div>
+          )}
         </motion.div>
       </div>
 
-      {/* Cohort retention */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.7 }}
-        className="glass-card overflow-x-auto"
-      >
-        <h2 className="font-semibold mb-4">Retenção por Coorte</h2>
-        <table className="w-full text-sm min-w-[480px]">
-          <thead>
-            <tr className="text-xs text-muted-foreground">
-              <th className="text-left pb-3 font-medium">Coorte</th>
-              <th className="pb-3 font-medium">Mês 0</th>
-              <th className="pb-3 font-medium">Mês 1</th>
-              <th className="pb-3 font-medium">Mês 2</th>
-              <th className="pb-3 font-medium">Mês 3</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-border/30">
-            {cohort.map((row: any) => (
-              <tr key={row.month}>
-                <td className="py-2.5 text-sm font-medium">{row.month}</td>
-                {[row.m0, row.m1, row.m2, row.m3].map((val: number | null, j: number) => (
-                  <td key={j} className="py-2.5 text-center">
-                    {val !== null ? (
-                      <span
-                        className={cn(
-                          'inline-block px-2 py-1 rounded-lg text-xs font-medium',
-                          val >= 80 ? 'bg-emerald-500/10 text-emerald-400' :
-                          val >= 65 ? 'bg-blue-500/10 text-blue-400' :
-                          'bg-orange-500/10 text-orange-400',
-                        )}
-                      >
-                        {val}%
-                      </span>
-                    ) : (
-                      <span className="text-muted-foreground text-xs">—</span>
-                    )}
-                  </td>
-                ))}
+      {cohortData.length > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.7 }}
+          className="glass-card overflow-x-auto"
+        >
+          <h2 className="font-semibold mb-4">Retenção por Coorte</h2>
+          <table className="w-full text-sm min-w-[480px]">
+            <thead>
+              <tr className="text-xs text-muted-foreground">
+                <th className="text-left pb-3 font-medium">Coorte</th>
+                <th className="pb-3 font-medium">Mês 0</th>
+                <th className="pb-3 font-medium">Mês 1</th>
+                <th className="pb-3 font-medium">Mês 2</th>
+                <th className="pb-3 font-medium">Mês 3</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </motion.div>
+            </thead>
+            <tbody className="divide-y divide-border/30">
+              {cohortData.map((row: any) => (
+                <tr key={row.month}>
+                  <td className="py-2.5 text-sm font-medium">{row.month}</td>
+                  {[row.m0, row.m1, row.m2, row.m3].map((val: number | null, j: number) => (
+                    <td key={j} className="py-2.5 text-center">
+                      {val !== null ? (
+                        <span
+                          className={cn(
+                            'inline-block px-2 py-1 rounded-lg text-xs font-medium',
+                            val >= 80 ? 'bg-emerald-500/10 text-emerald-400' :
+                            val >= 65 ? 'bg-blue-500/10 text-blue-400' :
+                            'bg-orange-500/10 text-orange-400',
+                          )}
+                        >
+                          {val}%
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground text-xs">—</span>
+                      )}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </motion.div>
+      )}
     </div>
   );
 }

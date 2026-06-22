@@ -11,6 +11,7 @@ import {
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
+import { PlanGate } from '@/components/ui/plan-gate';
 
 const TYPES = [
   { value: 'workout', label: 'Treino', icon: Dumbbell },
@@ -120,6 +121,7 @@ export default function TrainerChallenges() {
   const saveError = (createMut.error || editMut.error) as any;
 
   return (
+    <PlanGate feature="challenges">
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
@@ -397,5 +399,6 @@ export default function TrainerChallenges() {
         )}
       </AnimatePresence>
     </div>
+    </PlanGate>
   );
 }
