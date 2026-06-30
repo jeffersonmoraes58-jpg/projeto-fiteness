@@ -11,6 +11,7 @@ import {
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
+import { resolveVideoUrl } from '@/lib/video-url';
 import toast from 'react-hot-toast';
 
 const DAYS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
@@ -53,13 +54,15 @@ function groupExercises(exercises: any[]): { technique: Technique; items: any[] 
   return groups;
 }
 
-function getEmbedInfo(url: string): { embedUrl: string; type: 'youtube' | 'vimeo' | 'direct' } | null {
-  if (!url) return null;
+function getEmbedInfo(rawUrl: string): { embedUrl: string; type: 'youtube' | 'vimeo' | 'direct' } | null {
+  if (!rawUrl) return null;
+  const url = resolveVideoUrl(rawUrl);
   const ytMatch = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&\n?#]+)/);
   if (ytMatch) return { type: 'youtube', embedUrl: `https://www.youtube.com/embed/${ytMatch[1]}?rel=0&modestbranding=1` };
   const vimeoMatch = url.match(/(?:vimeo\.com\/)(\d+)/);
   if (vimeoMatch) return { type: 'vimeo', embedUrl: `https://player.vimeo.com/video/${vimeoMatch[1]}?title=0&byline=0` };
   if (/\.(mp4|webm|ogg)(\?|$)/i.test(url)) return { type: 'direct', embedUrl: url };
+  if (url.includes('/musclewiki/stream/')) return { type: 'direct', embedUrl: url };
   return null;
 }
 

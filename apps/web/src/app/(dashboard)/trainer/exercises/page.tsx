@@ -11,6 +11,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
+import { resolveVideoUrl } from '@/lib/video-url';
 
 const CATEGORIES = [
   { value: '', label: 'Categorias' },
@@ -52,8 +53,9 @@ function getVideoThumbnail(url: string): string | null {
   return getYoutubeThumbnail(url) || getCloudinaryThumbnail(url);
 }
 
-function getEmbedUrl(url: string): { src: string; type: 'iframe' | 'video' } | null {
-  if (!url) return null;
+function getEmbedUrl(rawUrl: string): { src: string; type: 'iframe' | 'video' } | null {
+  if (!rawUrl) return null;
+  const url = resolveVideoUrl(rawUrl);
   const yt = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&\n?#]+)/);
   if (yt) return { type: 'iframe', src: `https://www.youtube.com/embed/${yt[1]}?rel=0&modestbranding=1&autoplay=1` };
   const vim = url.match(/vimeo\.com\/(\d+)/);
@@ -61,6 +63,8 @@ function getEmbedUrl(url: string): { src: string; type: 'iframe' | 'video' } | n
   if (/\.(mp4|webm|ogg)(\?|$)/i.test(url)) return { type: 'video', src: url };
   // Cloudinary video URL
   if (url.includes('cloudinary.com')) return { type: 'video', src: url };
+  // MuscleWiki proxy stream
+  if (url.includes('/musclewiki/stream/')) return { type: 'video', src: url };
   return null;
 }
 
