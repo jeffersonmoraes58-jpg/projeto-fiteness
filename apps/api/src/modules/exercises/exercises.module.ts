@@ -1,9 +1,10 @@
 import { Module } from '@nestjs/common';
 import { ExercisesController } from './exercises.controller';
 import { ExercisesService } from './exercises.service';
+import { MuscleWikiController } from './musclewiki.controller';
 
 @Module({
-  controllers: [ExercisesController],
+  controllers: [ExercisesController, MuscleWikiController],
   providers: [ExercisesService],
   exports: [ExercisesService],
 })
