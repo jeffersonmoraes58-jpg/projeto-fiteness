@@ -58,7 +58,7 @@ const EMPTY_FORM = { name: '', description: '', instructions: '', category: 'CHE
 
 function getYoutubeThumbnail(url: string): string | null {
   if (!url) return null;
-  const m = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&\n?#]+)/);
+  const m = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube-nocookie\.com\/embed\/)([^&\n?#]+)/);
   return m ? `https://img.youtube.com/vi/${m[1]}/mqdefault.jpg` : null;
 }
 
@@ -76,8 +76,9 @@ function getVideoThumbnail(url: string): string | null {
 function getEmbedUrl(rawUrl: string): { src: string; type: 'iframe' | 'video' } | null {
   if (!rawUrl) return null;
   const url = resolveVideoUrl(rawUrl);
-  const yt = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&\n?#]+)/);
-  if (yt) return { type: 'iframe', src: `https://www.youtube.com/embed/${yt[1]}?rel=0&modestbranding=1&autoplay=1` };
+  // YouTube (supports youtube.com, youtu.be, and youtube-nocookie.com)
+  const yt = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube-nocookie\.com\/embed\/)([^&\n?#]+)/);
+  if (yt) return { type: 'iframe', src: `https://www.youtube-nocookie.com/embed/${yt[1]}?rel=0&modestbranding=1&autoplay=1` };
   const vim = url.match(/vimeo\.com\/(\d+)/);
   if (vim) return { type: 'iframe', src: `https://player.vimeo.com/video/${vim[1]}?autoplay=1` };
   if (/\.(mp4|webm|ogg)(\?|$)/i.test(url)) return { type: 'video', src: url };
@@ -552,13 +553,21 @@ export default function TrainerExercises() {
                 <span className="font-semibold">{videoModal.name}</span>
                 <button onClick={() => setVideoModal(null)} className="w-7 h-7 rounded-lg hover:bg-accent flex items-center justify-center"><X className="w-4 h-4" /></button>
               </div>
-              <div style={{ aspectRatio: '16/9' }}>
+              <div style={{ aspectRatio: '16/9' }} className="bg-black/60 flex items-center justify-center">
                 {(() => {
                   const embed = getEmbedUrl(videoModal.videoUrl);
-                  if (!embed) return null;
+                  if (!embed) {
+                    return (
+                      <div className="text-center p-8">
+                        <Video className="w-12 h-12 text-muted-foreground mx-auto mb-3" />
+                        <p className="text-sm text-muted-foreground">URL do vídeo não reconhecida</p>
+                        <p className="text-xs text-muted-foreground/60 mt-1">{videoModal.videoUrl}</p>
+                      </div>
+                    );
+                  }
                   return embed.type === 'video'
-                    ? <video src={embed.src} controls autoPlay className="w-full h-full" />
-                    : <iframe src={embed.src} className="w-full h-full" allow="autoplay; fullscreen" allowFullScreen title={videoModal.name} />;
+                    ? <video key={embed.src} src={embed.src} controls autoPlay className="w-full h-full" />
+                    : <iframe key={embed.src} src={embed.src} className="w-full h-full" allow="autoplay; fullscreen" allowFullScreen title={videoModal.name} />;
                 })()}
               </div>
             </motion.div>
