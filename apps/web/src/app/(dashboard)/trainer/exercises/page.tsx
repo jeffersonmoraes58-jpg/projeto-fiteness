@@ -34,6 +34,26 @@ const MUSCLE_GROUPS = [
 ];
 
 const DIFFICULTY_LABELS = ['', 'Iniciante', 'Básico', 'Intermediário', 'Avançado', 'Elite'];
+
+const EQUIPMENT_OPTIONS = [
+  { value: '', label: 'Equipamento' },
+  { value: 'Halteres', label: 'Halteres' },
+  { value: 'Barra', label: 'Barra' },
+  { value: 'Polia', label: 'Polia' },
+  { value: 'Kettlebell', label: 'Kettlebell' },
+  { value: 'Yoga', label: 'Yoga' },
+  { value: 'Peso corporal', label: 'Peso corporal' },
+  { value: 'Anilha', label: 'Anilha' },
+  { value: 'Elástico', label: 'Elástico' },
+  { value: 'Alongamento', label: 'Alongamento' },
+  { value: 'Smith', label: 'Smith' },
+  { value: 'Bosu', label: 'Bosu' },
+  { value: 'Medicine ball', label: 'Medicine ball' },
+  { value: 'TRX', label: 'TRX' },
+  { value: 'Vitruvian', label: 'Vitruvian' },
+  { value: 'Máquina', label: 'Máquina' },
+  { value: 'Cardio', label: 'Cardio' },
+];
 const EMPTY_FORM = { name: '', description: '', instructions: '', category: 'CHEST', difficulty: '1', equipment: '', videoUrl: '' };
 
 function getYoutubeThumbnail(url: string): string | null {
@@ -196,6 +216,7 @@ export default function TrainerExercises() {
   const [sourceFilter, setSourceFilter] = useState<'all' | 'app' | 'mine'>('all');
   const [muscleFilter, setMuscleFilter] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
+  const [equipmentFilter, setEquipmentFilter] = useState('');
   const [showForm, setShowForm] = useState(false);
   const [videoModal, setVideoModal] = useState<any>(null);
   const [added, setAdded] = useState<any[]>([]);
@@ -273,8 +294,9 @@ export default function TrainerExercises() {
   const filtered = (exercises || []).filter((e: any) => {
     const matchSearch = e.name?.toLowerCase().includes(search.toLowerCase());
     const matchMuscle = !muscleFilter || e.category === muscleFilter || e.muscleGroups?.includes(muscleFilter);
+    const matchEquipment = !equipmentFilter || (e.equipment || []).includes(equipmentFilter);
     const matchSource = sourceFilter === 'all' || (sourceFilter === 'mine' && (!e.isPublic || e.trainerId)) || (sourceFilter === 'app' && e.isPublic && !e.trainerId);
-    return matchSearch && matchMuscle && matchSource;
+    return matchSearch && matchMuscle && matchEquipment && matchSource;
   });
 
   const systemExercises = filtered.filter((e: any) => e.isPublic && !e.trainerId);
@@ -297,8 +319,8 @@ export default function TrainerExercises() {
     });
   };
 
-  const clearFilters = () => { setMuscleFilter(''); setCategoryFilter(''); setSearch(''); setSourceFilter('all'); };
-  const hasActiveFilters = !!(muscleFilter || categoryFilter || sourceFilter !== 'all');
+  const clearFilters = () => { setMuscleFilter(''); setCategoryFilter(''); setEquipmentFilter(''); setSearch(''); setSourceFilter('all'); };
+  const hasActiveFilters = !!(muscleFilter || categoryFilter || equipmentFilter || sourceFilter !== 'all');
 
   const renderList = (list: any[], offset = 0) =>
     list.map((exercise: any, i: number) => (
@@ -396,6 +418,12 @@ export default function TrainerExercises() {
           <div className="relative">
             <select value={categoryFilter} onChange={e => setCategoryFilter(e.target.value)} className={cn('appearance-none pl-3 pr-7 py-1.5 rounded-xl text-xs font-medium border transition-all bg-transparent cursor-pointer', categoryFilter ? 'border-primary text-primary' : 'border-border text-muted-foreground')}>
               {CATEGORIES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
+            </select>
+            <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 text-muted-foreground pointer-events-none" />
+          </div>
+          <div className="relative">
+            <select value={equipmentFilter} onChange={e => setEquipmentFilter(e.target.value)} className={cn('appearance-none pl-3 pr-7 py-1.5 rounded-xl text-xs font-medium border transition-all bg-transparent cursor-pointer', equipmentFilter ? 'border-primary text-primary' : 'border-border text-muted-foreground')}>
+              {EQUIPMENT_OPTIONS.map(eq => <option key={eq.value} value={eq.value}>{eq.label}</option>)}
             </select>
             <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 text-muted-foreground pointer-events-none" />
           </div>
