@@ -11,7 +11,7 @@ import {
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
-import { resolveVideoUrl } from '@/lib/video-url';
+import { resolveVideoUrl, resolveImageUrl } from '@/lib/video-url';
 import toast from 'react-hot-toast';
 
 const DAYS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
@@ -867,7 +867,8 @@ function ExerciseRow({
 }) {
   const videoUrl: string | undefined = exercise.exercise?.videoUrl;
   const name: string = exercise.exercise?.name || '';
-  const thumbnail = getVideoThumbnail(videoUrl || '');
+  const thumbnailUrl: string | undefined = exercise.exercise?.thumbnailUrl;
+  const thumbnail = thumbnailUrl ? resolveImageUrl(thumbnailUrl) : getVideoThumbnail(videoUrl || '');
   const doneCount = completedSets.filter(Boolean).length;
   const allDone = isActive && doneCount >= exercise.sets;
 
