@@ -150,12 +150,12 @@ export default function TrainerStudents() {
           <span className="text-orange-400 font-medium">
             Limite de {maxStudents} aluno(s) do plano {displayName} atingido.
           </span>
-          <a
-            href={`/register?plan=${upgradePlan}`}
+          <Link
+            href="/trainer/subscription"
             className="ml-auto flex-shrink-0 text-xs font-semibold bg-orange-500 text-white rounded-lg px-3 py-1.5 hover:bg-orange-600 transition-colors"
           >
             Upgrade {upgradePrice}
-          </a>
+          </Link>
         </div>
       )}
 
