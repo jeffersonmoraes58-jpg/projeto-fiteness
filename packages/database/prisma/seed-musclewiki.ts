@@ -93,7 +93,40 @@ const MUSCLE_TO_ENUM: Record<string, string> = {
 };
 
 const DIFFICULTY_MAP: Record<string, number> = { novice: 1, beginner: 2, intermediate: 3, advanced: 4, expert: 5 };
+
+const EQUIPMENT_TRANSLATIONS: Record<string, string> = {
+  dumbbells: 'Halteres',
+  dumbbell: 'Halteres',
+  barbell: 'Barra',
+  cables: 'Polia',
+  cable: 'Polia',
+  kettlebells: 'Kettlebell',
+  kettlebell: 'Kettlebell',
+  yoga: 'Yoga',
+  bodyweight: 'Peso corporal',
+  plate: 'Anilha',
+  plates: 'Anilha',
+  band: 'Elástico',
+  bands: 'Elástico',
+  stretches: 'Alongamento',
+  'smith-machine': 'Smith',
+  'smith machine': 'Smith',
+  'bosu-ball': 'Bosu',
+  'bosu ball': 'Bosu',
+  'medicine-ball': 'Medicine ball',
+  'medicine ball': 'Medicine ball',
+  trx: 'TRX',
+  vitruvian: 'Vitruvian',
+  machine: 'Máquina',
+  cardio: 'Cardio',
+};
+
 const normalize = (s?: string) => (s ?? '').toLowerCase().trim();
+const translateEquipment = (raw?: string): string | null => {
+  const n = normalize(raw);
+  if (!n) return null;
+  return EQUIPMENT_TRANSLATIONS[n] ?? raw ?? null;
+};
 
 function mapCategory(primaryMuscles?: string[], category?: string): string {
   for (const m of primaryMuscles ?? []) {
@@ -257,7 +290,7 @@ async function processOne(item: MWListItem, counters: { imported: number; skippe
         instructions: descriptionFinal || undefined,
         category: mapCategory(ex.primary_muscles, ex.category) as any,
         muscleGroups: mapMuscleGroups(ex.primary_muscles) as any,
-        equipment: ex.category ? [ex.category] : [],
+        equipment: (() => { const t = translateEquipment(ex.category); return t ? [t] : []; })(),
         difficulty: mapDifficulty(ex.difficulty),
         videoUrl: videoUrl ?? undefined,
         thumbnailUrl: thumbnailUrl ?? undefined,
