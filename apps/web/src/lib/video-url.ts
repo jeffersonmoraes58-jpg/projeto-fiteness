@@ -13,3 +13,17 @@ export function resolveVideoUrl(url?: string | null): string {
     return url;
   }
 }
+
+export function resolveImageUrl(url?: string | null): string {
+  if (!url) return '';
+  if (!url.includes(MW_HOST)) return url;
+  try {
+    const u = new URL(url);
+    const match = u.pathname.match(/\/stream\/images\/og_images\/([^/]+)$/);
+    if (!match) return url;
+    const apiBase = process.env.NEXT_PUBLIC_API_URL ?? '';
+    return `${apiBase}/api/v1/musclewiki/image/og/${match[1]}`;
+  } catch {
+    return url;
+  }
+}

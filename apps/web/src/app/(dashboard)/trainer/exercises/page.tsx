@@ -11,7 +11,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
-import { resolveVideoUrl } from '@/lib/video-url';
+import { resolveVideoUrl, resolveImageUrl } from '@/lib/video-url';
 
 const CATEGORIES = [
   { value: '', label: 'Categorias' },
@@ -546,7 +546,11 @@ function ExerciseRow({
   isSystem, isEditing, editForm, onEditFormChange, onEdit, onEditSave, onEditCancel, isSaving, onDelete,
   isVideoEditing, videoEditUrl, onVideoEdit, onVideoEditChange, onVideoEditSave, onVideoEditCancel, isVideoSaving,
 }: any) {
-  const thumbnail = exercise.videoUrl ? getVideoThumbnail(exercise.videoUrl) : null;
+  const thumbnail = exercise.thumbnailUrl
+    ? resolveImageUrl(exercise.thumbnailUrl)
+    : exercise.videoUrl
+      ? getVideoThumbnail(exercise.videoUrl)
+      : null;
   const catLabel = CATEGORIES.find(c => c.value === exercise.category)?.label || exercise.category;
   const hasVideo = !!exercise.videoUrl;
 
