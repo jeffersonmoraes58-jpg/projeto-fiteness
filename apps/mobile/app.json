@@ -1,6 +1,7 @@
 {
   "expo": {
     "name": "FitlyNutri",
+    "owner": "fitlynutri",
     "slug": "fitlynutri",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -11,7 +12,9 @@
       "resizeMode": "contain",
       "backgroundColor": "#0f0f1a"
     },
-    "assetBundlePatterns": ["**/*"],
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.fitlynutri.app",
@@ -29,11 +32,12 @@
       "package": "com.fitlynutri.app",
       "versionCode": 1,
       "permissions": [
-        "CAMERA",
-        "READ_EXTERNAL_STORAGE",
-        "WRITE_EXTERNAL_STORAGE",
-        "RECEIVE_BOOT_COMPLETED",
-        "VIBRATE"
+        "android.permission.CAMERA",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.RECEIVE_BOOT_COMPLETED",
+        "android.permission.VIBRATE",
+        "android.permission.RECORD_AUDIO"
       ]
     },
     "web": {
@@ -60,15 +64,8 @@
         "origin": false
       },
       "eas": {
-        "projectId": "a6539cfe-6801-42db-83fa-dcaabe8c2348"
+        "projectId": "57c97841-5fb6-450d-89f6-658fa93a7955"
       }
-    },
-    "updates": {
-      "fallbackToCacheTimeout": 0,
-      "url": "https://u.expo.dev/a6539cfe-6801-42db-83fa-dcaabe8c2348"
-    },
-    "runtimeVersion": {
-      "policy": "sdkVersion"
     }
   }
 }
