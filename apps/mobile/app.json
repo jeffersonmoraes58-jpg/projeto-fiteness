@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "FitSaaS",
-    "slug": "fitsaas",
+    "name": "FitlyNutri",
+    "slug": "fitlynutri",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -14,15 +14,19 @@
     "assetBundlePatterns": ["**/*"],
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.fitsaas.app",
-      "buildNumber": "1"
+      "bundleIdentifier": "com.fitlynutri.app",
+      "buildNumber": "1",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Precisamos da câmera para atualizar sua foto de perfil.",
+        "NSPhotoLibraryUsageDescription": "Precisamos da galeria para atualizar sua foto de perfil."
+      }
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#0f0f1a"
       },
-      "package": "com.fitsaas.app",
+      "package": "com.fitlynutri.app",
       "versionCode": 1,
       "permissions": [
         "CAMERA",
@@ -50,18 +54,18 @@
         }
       ]
     ],
-    "scheme": "fitsaas",
+    "scheme": "fitlynutri",
     "extra": {
       "router": {
         "origin": false
       },
       "eas": {
-        "projectId": "your-eas-project-id"
+        "projectId": "a6539cfe-6801-42db-83fa-dcaabe8c2348"
       }
     },
     "updates": {
       "fallbackToCacheTimeout": 0,
-      "url": "https://u.expo.dev/your-project-id"
+      "url": "https://u.expo.dev/a6539cfe-6801-42db-83fa-dcaabe8c2348"
     },
     "runtimeVersion": {
       "policy": "sdkVersion"
