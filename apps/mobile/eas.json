@@ -13,6 +13,9 @@
       "distribution": "internal",
       "android": {
         "buildType": "apk"
+      },
+      "env": {
+        "EXPO_NO_CAPABILITY_INJECTION": "1"
       }
     },
     "production": {
