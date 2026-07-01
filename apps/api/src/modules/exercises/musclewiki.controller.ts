@@ -1,12 +1,38 @@
 import { Controller, Get, Param, Req, Res, HttpException, HttpStatus } from '@nestjs/common';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import type { Request, Response } from 'express';
+import * as fs from 'fs';
+import * as path from 'path';
 
 const MW_API_BASE = process.env.MUSCLEWIKI_API_BASE ?? 'https://api.musclewiki.com';
 const MW_API_KEY = process.env.MUSCLEWIKI_API_KEY;
+const CACHE_DIR = path.resolve('/tmp/musclewiki-cache');
 
-async function pipeUpstream(req: Request, res: Response, upstreamUrl: string) {
+function ensureCacheDir() {
+  if (!fs.existsSync(CACHE_DIR)) fs.mkdirSync(CACHE_DIR, { recursive: true });
+}
+
+function getCachePath(filename: string): string {
+  return path.join(CACHE_DIR, filename);
+}
+
+async function pipeUpstream(req: Request, res: Response, upstreamUrl: string, cacheKey?: string) {
   if (!MW_API_KEY) throw new HttpException('MuscleWiki API key not configured', HttpStatus.SERVICE_UNAVAILABLE);
+
+  // Try cache first for non-streaming requests (images)
+  if (cacheKey) {
+    ensureCacheDir();
+    const cachePath = getCachePath(cacheKey);
+    if (fs.existsSync(cachePath)) {
+      const stat = fs.statSync(cachePath);
+      const maxAge = 7 * 24 * 60 * 60; // 7 days
+      res.setHeader('cache-control', `public, max-age=${maxAge}`);
+      res.setHeader('content-type', cacheKey.endsWith('.webp') ? 'image/webp' : cacheKey.endsWith('.png') ? 'image/png' : cacheKey.endsWith('.jpg') || cacheKey.endsWith('.jpeg') ? 'image/jpeg' : 'application/octet-stream');
+      res.setHeader('content-length', stat.size);
+      res.sendFile(cachePath);
+      return;
+    }
+  }
 
   const upstream = await fetch(upstreamUrl, {
     headers: {
@@ -32,14 +58,31 @@ async function pipeUpstream(req: Request, res: Response, upstreamUrl: string) {
     res.end();
     return;
   }
+
+  // Buffer the response to cache it and serve
+  const chunks: Buffer[] = [];
   const reader = upstream.body.getReader();
   res.on('close', () => reader.cancel().catch(() => {}));
   while (true) {
     const { value, done } = await reader.read();
     if (done) break;
-    if (value) res.write(Buffer.from(value));
+    if (value) {
+      const buf = Buffer.from(value);
+      chunks.push(buf);
+      res.write(buf);
+    }
   }
   res.end();
+
+  // Save to cache after serving (for images)
+  if (cacheKey && chunks.length > 0) {
+    try {
+      ensureCacheDir();
+      fs.writeFileSync(getCachePath(cacheKey), Buffer.concat(chunks));
+    } catch (e) {
+      // Silently fail if cache write fails
+    }
+  }
 }
 
 @ApiTags('musclewiki')
@@ -59,13 +102,14 @@ export class MuscleWikiController {
   }
 
   @Get('image/og/:filename')
-  @ApiOperation({ summary: 'Proxy de imagem og do MuscleWiki' })
+  @ApiOperation({ summary: 'Proxy de imagem og do MuscleWiki (com cache em disco)' })
   async image(
     @Param('filename') filename: string,
     @Req() req: Request,
     @Res() res: Response,
   ) {
     if (!/^[A-Za-z0-9_\-.]+\.(jpg|jpeg|png|webp)$/i.test(filename)) throw new HttpException('Invalid filename', HttpStatus.BAD_REQUEST);
-    await pipeUpstream(req, res, `${MW_API_BASE}/stream/images/og_images/${encodeURIComponent(filename)}`);
+    // Imagens são cacheadas em disco — só consome crédito do MuscleWiki na primeira requisição
+    await pipeUpstream(req, res, `${MW_API_BASE}/stream/images/og_images/${encodeURIComponent(filename)}`, `og_${filename}`);
   }
 }
