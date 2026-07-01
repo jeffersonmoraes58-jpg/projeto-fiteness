@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
-  View, Text, TextInput, FlatList, TouchableOpacity,
-  StyleSheet,
+  View, Text, TextInput, FlatList, TouchableOpacity, ActivityIndicator,
+  StyleSheet, Alert,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { trainerService, Exercise } from '../../src/services/trainer';
 
 const COLORS = {
   bg: '#0f0f1a',
@@ -18,30 +19,47 @@ const COLORS = {
 
 const CATEGORIES = ['Peito', 'Costas', 'Ombros', 'Bíceps', 'Tríceps', 'Pernas', 'Glúteos', 'Core', 'Cardio'];
 
-const MOCK_EXERCISES = [
-  { id: '1', name: 'Supino Reto', category: 'Peito', difficulty: 'Intermediário' },
-  { id: '2', name: 'Puxada Alta', category: 'Costas', difficulty: 'Iniciante' },
-  { id: '3', name: 'Desenvolvimento', category: 'Ombros', difficulty: 'Intermediário' },
-  { id: '4', name: 'Rosca Direta', category: 'Bíceps', difficulty: 'Iniciante' },
-  { id: '5', name: 'Tríceps Testa', category: 'Tríceps', difficulty: 'Intermediário' },
-  { id: '6', name: 'Agachamento', category: 'Pernas', difficulty: 'Avançado' },
-];
-
 export default function ExercisesScreen() {
+  const [exercises, setExercises] = useState<Exercise[]>([]);
   const [search, setSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
+  const [loading, setLoading] = useState(true);
 
-  const filteredExercises = MOCK_EXERCISES.filter(e => {
-    const matchesSearch = e.name.toLowerCase().includes(search.toLowerCase());
+  useEffect(() => {
+    loadExercises();
+  }, []);
+
+  const loadExercises = async () => {
+    try {
+      setLoading(true);
+      const data = await trainerService.getExercises();
+      setExercises(data);
+    } catch (err: any) {
+      Alert.alert('Erro', 'Não foi possível carregar os exercícios');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const filteredExercises = exercises.filter(e => {
+    const matchesSearch = e.name?.toLowerCase().includes(search.toLowerCase());
     const matchesCategory = !selectedCategory || e.category === selectedCategory;
     return matchesSearch && matchesCategory;
   });
+
+  if (loading) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color={COLORS.primary} />
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
       <LinearGradient colors={['#6f5cf020', '#06b6d420']} style={styles.header}>
         <Text style={styles.title}>Biblioteca de Exercícios</Text>
-        <Text style={styles.subtitle}>{MOCK_EXERCISES.length} exercícios disponíveis</Text>
+        <Text style={styles.subtitle}>{exercises.length} exercícios disponíveis</Text>
       </LinearGradient>
 
       <View style={styles.searchContainer}>
@@ -76,6 +94,8 @@ export default function ExercisesScreen() {
         data={filteredExercises}
         keyExtractor={(item) => item.id}
         contentContainerStyle={{ padding: 20, paddingBottom: 100 }}
+        refreshing={loading}
+        onRefresh={loadExercises}
         ListEmptyComponent={
           <View style={styles.emptyState}>
             <Text style={styles.emptyIcon}>🏋️</Text>
@@ -93,6 +113,11 @@ export default function ExercisesScreen() {
                 <View style={styles.tag}>
                   <Text style={styles.tagText}>{item.difficulty}</Text>
                 </View>
+                {item.equipment ? (
+                  <View style={styles.tag}>
+                    <Text style={styles.tagText}>{item.equipment}</Text>
+                  </View>
+                ) : null}
               </View>
             </View>
             <Text style={styles.chevron}>›</Text>
@@ -144,7 +169,7 @@ const styles = StyleSheet.create({
   },
   exerciseInfo: { flex: 1 },
   exerciseName: { color: COLORS.text, fontSize: 15, fontWeight: '600', marginBottom: 8 },
-  exerciseTags: { flexDirection: 'row', gap: 8 },
+  exerciseTags: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
   tag: {
     paddingHorizontal: 10,
     paddingVertical: 4,

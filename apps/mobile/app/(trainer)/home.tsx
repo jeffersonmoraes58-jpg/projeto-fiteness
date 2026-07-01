@@ -1,11 +1,12 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
-  View, Text, ScrollView, TouchableOpacity,
+  View, Text, ScrollView, TouchableOpacity, ActivityIndicator,
   StyleSheet,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MotiView } from 'moti';
 import { router } from 'expo-router';
+import { trainerService, DashboardData } from '../../src/services/trainer';
 
 const COLORS = {
   bg: '#0f0f1a',
@@ -27,6 +28,36 @@ const quickActions = [
 ];
 
 export default function TrainerHomeScreen() {
+  const [dashboard, setDashboard] = useState<DashboardData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    loadDashboard();
+  }, []);
+
+  const loadDashboard = async () => {
+    try {
+      setLoading(true);
+      setError('');
+      const data = await trainerService.getDashboard();
+      setDashboard(data);
+    } catch (err: any) {
+      setError(err?.message || 'Erro ao carregar dashboard');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color={COLORS.primary} />
+        <Text style={{ color: COLORS.muted, marginTop: 12 }}>Carregando...</Text>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
@@ -49,9 +80,9 @@ export default function TrainerHomeScreen() {
           {/* Quick stats */}
           <View style={styles.statsRow}>
             {[
-              { label: 'Alunos', value: '0', color: COLORS.primary },
-              { label: 'Treinos', value: '0', color: COLORS.accent },
-              { label: 'Hoje', value: '0', color: COLORS.warning },
+              { label: 'Alunos', value: dashboard?.totalStudents ?? 0, color: COLORS.primary },
+              { label: 'Treinos', value: dashboard?.totalWorkouts ?? 0, color: COLORS.accent },
+              { label: 'Hoje', value: dashboard?.todayAppointments ?? 0, color: COLORS.warning },
             ].map((stat) => (
               <View key={stat.label} style={styles.statItem}>
                 <Text style={[styles.statValue, { color: stat.color }]}>{stat.value}</Text>
@@ -60,6 +91,15 @@ export default function TrainerHomeScreen() {
             ))}
           </View>
         </LinearGradient>
+
+        {error ? (
+          <View style={styles.errorCard}>
+            <Text style={styles.errorText}>{error}</Text>
+            <TouchableOpacity style={styles.retryButton} onPress={loadDashboard}>
+              <Text style={styles.retryText}>Tentar novamente</Text>
+            </TouchableOpacity>
+          </View>
+        ) : null}
 
         {/* Quick Actions */}
         <View style={styles.section}>
@@ -93,7 +133,11 @@ export default function TrainerHomeScreen() {
           <Text style={styles.sectionTitle}>Atividade Recente</Text>
           <View style={styles.emptyCard}>
             <Text style={styles.emptyIcon}>📭</Text>
-            <Text style={styles.emptyText}>Nenhuma atividade recente</Text>
+            <Text style={styles.emptyText}>
+              {dashboard?.recentActivity?.length
+                ? `${dashboard.recentActivity.length} atividades recentes`
+                : 'Nenhuma atividade recente'}
+            </Text>
             <Text style={styles.emptySubtext}>
               Comece adicionando alunos e criando treinos
             </Text>
@@ -194,4 +238,8 @@ const styles = StyleSheet.create({
   linkTitle: { color: COLORS.text, fontSize: 15, fontWeight: '600' },
   linkSubtitle: { color: COLORS.muted, fontSize: 12, marginTop: 2 },
   linkArrow: { color: COLORS.muted, fontSize: 24, fontWeight: '300' },
+  errorCard: { margin: 20, padding: 16, backgroundColor: 'rgba(255,59,48,0.1)', borderRadius: 12, borderWidth: 1, borderColor: 'rgba(255,59,48,0.3)' },
+  errorText: { color: '#ff3b30', fontSize: 14, textAlign: 'center' },
+  retryButton: { marginTop: 12, alignItems: 'center' },
+  retryText: { color: COLORS.primary, fontSize: 14, fontWeight: '600' },
 });
