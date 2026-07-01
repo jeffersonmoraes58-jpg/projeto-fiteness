@@ -24,7 +24,9 @@
     "docker:prod:down": "docker-compose -f docker-compose.prod.yml down",
     "docker:prod:build": "docker-compose -f docker-compose.prod.yml build",
     "docker:prod:logs": "docker-compose -f docker-compose.prod.yml logs -f",
-    "migrate:prod": "docker-compose -f docker-compose.prod.yml run --rm api sh -c \"npx prisma migrate deploy\""
+    "migrate:prod": "docker-compose -f docker-compose.prod.yml run --rm api sh -c \"npx prisma migrate deploy\"",
+    "android": "expo run:android",
+    "ios": "expo run:ios"
   },
   "overrides": {
     "react": "^18.3.1",
@@ -43,5 +45,10 @@
     "node": ">=20.0.0",
     "pnpm": ">=9.0.0"
   },
-  "packageManager": "pnpm@9.0.0"
+  "packageManager": "pnpm@9.0.0",
+  "dependencies": {
+    "expo": "~51.0.28",
+    "react": "18.2.0",
+    "react-native": "0.74.5"
+  }
 }

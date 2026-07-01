@@ -39,9 +39,9 @@ export default function LoginScreen() {
 
       // Redirect based on role
       const role = user.role;
-      if (role === 'STUDENT') router.replace('/(student)');
-      else if (role === 'TRAINER') router.replace('/(trainer)');
-      else if (role === 'NUTRITIONIST') router.replace('/(nutritionist)');
+      if (role === 'STUDENT') router.replace('/(student)/home');
+      else if (role === 'TRAINER') router.replace('/(trainer)/home');
+      else if (role === 'NUTRITIONIST') router.replace('/(nutritionist)/home');
       else router.replace('/');
     } catch (err: any) {
       const msg = err?.response?.data?.message || 'Erro ao fazer login';
