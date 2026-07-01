@@ -1,10 +1,10 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
-  View, Text, TextInput, FlatList, TouchableOpacity,
-  StyleSheet,
+  View, Text, TextInput, FlatList, TouchableOpacity, ActivityIndicator,
+  StyleSheet, Alert,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { router } from 'expo-router';
+import { trainerService, Student } from '../../src/services/trainer';
 
 const COLORS = {
   bg: '#0f0f1a',
@@ -17,25 +17,46 @@ const COLORS = {
   border: 'rgba(255,255,255,0.08)',
 };
 
-// Mock data for now
-const MOCK_STUDENTS = [
-  { id: '1', name: 'João Silva', email: 'joao@email.com', workouts: 3, status: 'active' },
-  { id: '2', name: 'Maria Santos', email: 'maria@email.com', workouts: 5, status: 'active' },
-  { id: '3', name: 'Pedro Oliveira', email: 'pedro@email.com', workouts: 1, status: 'inactive' },
-];
-
 export default function StudentsScreen() {
+  const [students, setStudents] = useState<Student[]>([]);
   const [search, setSearch] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
-  const filteredStudents = MOCK_STUDENTS.filter(s =>
-    s.name.toLowerCase().includes(search.toLowerCase())
+  useEffect(() => {
+    loadStudents();
+  }, []);
+
+  const loadStudents = async () => {
+    try {
+      setLoading(true);
+      const data = await trainerService.getStudents();
+      setStudents(data);
+    } catch (err: any) {
+      Alert.alert('Erro', 'Não foi possível carregar os alunos');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const filteredStudents = students.filter(s =>
+    s.name?.toLowerCase().includes(search.toLowerCase()) ||
+    s.email?.toLowerCase().includes(search.toLowerCase())
   );
+
+  if (loading) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color={COLORS.primary} />
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
       <LinearGradient colors={['#6f5cf020', '#06b6d420']} style={styles.header}>
         <Text style={styles.title}>Meus Alunos</Text>
-        <Text style={styles.subtitle}>{MOCK_STUDENTS.length} alunos cadastrados</Text>
+        <Text style={styles.subtitle}>{students.length} alunos cadastrados</Text>
       </LinearGradient>
 
       <View style={styles.searchContainer}>
@@ -52,27 +73,38 @@ export default function StudentsScreen() {
         data={filteredStudents}
         keyExtractor={(item) => item.id}
         contentContainerStyle={{ padding: 20, paddingBottom: 100 }}
+        refreshing={refreshing}
+        onRefresh={async () => {
+          setRefreshing(true);
+          await loadStudents();
+          setRefreshing(false);
+        }}
         ListEmptyComponent={
           <View style={styles.emptyState}>
             <Text style={styles.emptyIcon}>👥</Text>
             <Text style={styles.emptyText}>Nenhum aluno encontrado</Text>
+            <Text style={styles.emptySubtext}>
+              Os alunos vinculados a você aparecerão aqui
+            </Text>
           </View>
         }
         renderItem={({ item }) => (
           <TouchableOpacity style={styles.studentCard} activeOpacity={0.8}>
             <View style={styles.avatar}>
               <Text style={styles.avatarText}>
-                {item.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
+                {item.name?.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase() || '??'}
               </Text>
             </View>
             <View style={styles.studentInfo}>
               <Text style={styles.studentName}>{item.name}</Text>
               <Text style={styles.studentEmail}>{item.email}</Text>
-              <Text style={styles.studentWorkouts}>{item.workouts} treinos ativos</Text>
+              <Text style={styles.studentWorkouts}>
+                {item._count?.workoutPlans ?? 0} treinos ativos
+              </Text>
             </View>
-            <View style={[styles.statusBadge, item.status === 'active' ? styles.activeBadge : styles.inactiveBadge]}>
-              <Text style={[styles.statusText, item.status === 'active' ? styles.activeText : styles.inactiveText]}>
-                {item.status === 'active' ? 'Ativo' : 'Inativo'}
+            <View style={[styles.statusBadge, item.status === 'ACTIVE' ? styles.activeBadge : styles.inactiveBadge]}>
+              <Text style={[styles.statusText, item.status === 'ACTIVE' ? styles.activeText : styles.inactiveText]}>
+                {item.status === 'ACTIVE' ? 'Ativo' : 'Inativo'}
               </Text>
             </View>
           </TouchableOpacity>
@@ -130,4 +162,5 @@ const styles = StyleSheet.create({
   emptyState: { alignItems: 'center', paddingTop: 60 },
   emptyIcon: { fontSize: 48, marginBottom: 12 },
   emptyText: { color: COLORS.muted, fontSize: 15 },
+  emptySubtext: { color: COLORS.muted, fontSize: 13, marginTop: 4, textAlign: 'center' },
 });

@@ -1,10 +1,10 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
-  View, Text, FlatList, TouchableOpacity,
-  StyleSheet,
+  View, Text, FlatList, TouchableOpacity, ActivityIndicator,
+  StyleSheet, Alert,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { router } from 'expo-router';
+import { trainerService, Workout } from '../../src/services/trainer';
 
 const COLORS = {
   bg: '#0f0f1a',
@@ -18,18 +18,39 @@ const COLORS = {
   border: 'rgba(255,255,255,0.08)',
 };
 
-const MOCK_WORKOUTS = [
-  { id: '1', name: 'Treino A - Superior', exercises: 6, students: 3, status: 'active' },
-  { id: '2', name: 'Treino B - Inferior', exercises: 5, students: 2, status: 'active' },
-  { id: '3', name: 'Full Body Iniciante', exercises: 8, students: 1, status: 'draft' },
-];
-
 export default function WorkoutsScreen() {
+  const [workouts, setWorkouts] = useState<Workout[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    loadWorkouts();
+  }, []);
+
+  const loadWorkouts = async () => {
+    try {
+      setLoading(true);
+      const data = await trainerService.getWorkouts();
+      setWorkouts(data);
+    } catch (err: any) {
+      Alert.alert('Erro', 'Não foi possível carregar os treinos');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color={COLORS.primary} />
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
       <LinearGradient colors={['#6f5cf020', '#06b6d420']} style={styles.header}>
         <Text style={styles.title}>Meus Treinos</Text>
-        <Text style={styles.subtitle}>{MOCK_WORKOUTS.length} treinos criados</Text>
+        <Text style={styles.subtitle}>{workouts.length} treinos criados</Text>
       </LinearGradient>
 
       <TouchableOpacity style={styles.createButton} activeOpacity={0.8}>
@@ -43,9 +64,11 @@ export default function WorkoutsScreen() {
       </TouchableOpacity>
 
       <FlatList
-        data={MOCK_WORKOUTS}
+        data={workouts}
         keyExtractor={(item) => item.id}
         contentContainerStyle={{ padding: 20, paddingBottom: 100 }}
+        refreshing={loading}
+        onRefresh={loadWorkouts}
         ListEmptyComponent={
           <View style={styles.emptyState}>
             <Text style={styles.emptyIcon}>📋</Text>
@@ -64,8 +87,8 @@ export default function WorkoutsScreen() {
               </View>
             </View>
             <View style={styles.workoutMeta}>
-              <Text style={styles.metaItem}>🏋️ {item.exercises} exercícios</Text>
-              <Text style={styles.metaItem}>👥 {item.students} alunos</Text>
+              <Text style={styles.metaItem}>🏋️ {item._count?.exercises ?? 0} exercícios</Text>
+              <Text style={styles.metaItem}>👥 {item._count?.assignedStudents ?? 0} alunos</Text>
             </View>
           </TouchableOpacity>
         )}
