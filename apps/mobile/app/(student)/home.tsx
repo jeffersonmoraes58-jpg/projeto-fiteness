@@ -1,11 +1,13 @@
-import React from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
-  View, Text, ScrollView, TouchableOpacity,
+  View, Text, ScrollView, TouchableOpacity, ActivityIndicator,
   StyleSheet, Dimensions,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MotiView } from 'moti';
 import { router } from 'expo-router';
+import { studentService, StudentDashboard } from '../../src/services/student';
+import { useAuthStore } from '../../src/store/auth';
 
 const { width } = Dimensions.get('window');
 
@@ -22,6 +24,44 @@ const COLORS = {
 };
 
 export default function StudentHomeScreen() {
+  const { user } = useAuthStore();
+  const [dashboard, setDashboard] = useState<StudentDashboard | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  const loadDashboard = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError('');
+      const data = await studentService.getDashboard();
+      setDashboard(data);
+    } catch (err: any) {
+      setError(err?.message || 'Erro ao carregar dashboard');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadDashboard();
+  }, [loadDashboard]);
+
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return 'Bom dia';
+    if (hour < 18) return 'Boa tarde';
+    return 'Boa noite';
+  };
+
+  if (loading) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color={COLORS.primary} />
+        <Text style={{ color: COLORS.muted, marginTop: 12 }}>Carregando...</Text>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
@@ -32,21 +72,23 @@ export default function StudentHomeScreen() {
         >
           <View style={styles.headerContent}>
             <View>
-              <Text style={styles.greeting}>Bom dia! 👋</Text>
+              <Text style={styles.greeting}>{getGreeting()}, {user?.name?.split(' ')[0] || 'Atleta'}! 👋</Text>
               <Text style={styles.subtitle}>Vamos treinar hoje?</Text>
             </View>
-            <View style={styles.streakBadge}>
-              <Text style={styles.streakIcon}>🔥</Text>
-              <Text style={styles.streakText}>0</Text>
-            </View>
+            {dashboard?.streak ? (
+              <View style={styles.streakBadge}>
+                <Text style={styles.streakIcon}>🔥</Text>
+                <Text style={styles.streakText}>{dashboard.streak}</Text>
+              </View>
+            ) : null}
           </View>
 
           {/* Quick stats */}
           <View style={styles.statsRow}>
             {[
-              { label: 'Pontos', value: '0', color: COLORS.primary },
-              { label: 'Nível', value: '1', color: COLORS.accent },
-              { label: 'Streak', value: '0d', color: COLORS.warning },
+              { label: 'Pontos', value: String(dashboard?.points ?? 0), color: COLORS.primary },
+              { label: 'Nível', value: String(dashboard?.level ?? 1), color: COLORS.accent },
+              { label: 'Streak', value: `${dashboard?.streak ?? 0}d`, color: COLORS.warning },
             ].map((stat) => (
               <View key={stat.label} style={styles.statItem}>
                 <Text style={[styles.statValue, { color: stat.color }]}>{stat.value}</Text>
@@ -55,6 +97,15 @@ export default function StudentHomeScreen() {
             ))}
           </View>
         </LinearGradient>
+
+        {error ? (
+          <View style={styles.errorCard}>
+            <Text style={styles.errorText}>{error}</Text>
+            <TouchableOpacity style={styles.retryButton} onPress={loadDashboard}>
+              <Text style={styles.retryText}>Tentar novamente</Text>
+            </TouchableOpacity>
+          </View>
+        ) : null}
 
         {/* Today's workout */}
         <View style={styles.section}>
@@ -73,22 +124,59 @@ export default function StudentHomeScreen() {
                 colors={[COLORS.primary + '40', COLORS.accent + '20']}
                 style={styles.workoutGradient}
               >
-                <View style={styles.workoutHeader}>
-                  <View>
-                    <Text style={styles.workoutTitle}>Treino de Hoje</Text>
-                    <Text style={styles.workoutMeta}>Nenhum treino agendado</Text>
-                  </View>
-                </View>
+                {dashboard?.todayWorkout ? (
+                  <>
+                    <View style={styles.workoutHeader}>
+                      <View>
+                        <Text style={styles.workoutTitle}>{dashboard.todayWorkout.name}</Text>
+                        <Text style={styles.workoutMeta}>
+                          {dashboard.todayWorkout.totalExercises} exercícios · ~{dashboard.todayWorkout.estimatedMinutes} min
+                        </Text>
+                      </View>
+                      <View style={styles.workoutBadge}>
+                        <Text style={styles.workoutBadgeText}>Hoje</Text>
+                      </View>
+                    </View>
 
-                <TouchableOpacity style={styles.startButton} activeOpacity={0.8}>
-                  <LinearGradient
-                    colors={[COLORS.primary, COLORS.accent]}
-                    start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-                    style={styles.startButtonGradient}
-                  >
-                    <Text style={styles.startButtonText}>Ver Treinos</Text>
-                  </LinearGradient>
-                </TouchableOpacity>
+                    <View style={styles.exercisePreview}>
+                      {(dashboard.todayWorkout.exercises || []).slice(0, 4).map((ex, i) => (
+                        <View key={i} style={[styles.exerciseTag, i === 3 && styles.exerciseTagMore]}>
+                          <Text style={[styles.exerciseTagText, i === 3 && { color: COLORS.accent }]}>
+                            {i === 3 ? `+${(dashboard.todayWorkout?.exercises?.length || 0) - 3}` : ex.name}
+                          </Text>
+                        </View>
+                      ))}
+                    </View>
+
+                    <TouchableOpacity style={styles.startButton} activeOpacity={0.8}>
+                      <LinearGradient
+                        colors={[COLORS.primary, COLORS.accent]}
+                        start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+                        style={styles.startButtonGradient}
+                      >
+                        <Text style={styles.startButtonText}>Iniciar Treino</Text>
+                      </LinearGradient>
+                    </TouchableOpacity>
+                  </>
+                ) : (
+                  <>
+                    <View style={styles.workoutHeader}>
+                      <View>
+                        <Text style={styles.workoutTitle}>Treino de Hoje</Text>
+                        <Text style={styles.workoutMeta}>Nenhum treino agendado</Text>
+                      </View>
+                    </View>
+                    <TouchableOpacity style={styles.startButton} activeOpacity={0.8}>
+                      <LinearGradient
+                        colors={[COLORS.primary, COLORS.accent]}
+                        start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+                        style={styles.startButtonGradient}
+                      >
+                        <Text style={styles.startButtonText}>Ver Treinos</Text>
+                      </LinearGradient>
+                    </TouchableOpacity>
+                  </>
+                )}
               </LinearGradient>
             </TouchableOpacity>
           </MotiView>
@@ -98,14 +186,31 @@ export default function StudentHomeScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Dieta de Hoje</Text>
           <View style={styles.dietCard}>
-            <MacroBar label="Proteína" current={0} target={160} color="#6f5cf0" />
-            <MacroBar label="Carboidratos" current={0} target={250} color="#06b6d4" />
-            <MacroBar label="Gordura" current={0} target={65} color="#f59e0b" />
-
-            <View style={styles.calorieRow}>
-              <Text style={styles.calorieText}>0 / 2.200 kcal</Text>
-              <Text style={styles.caloriePercent}>0%</Text>
-            </View>
+            {dashboard?.diet ? (
+              <>
+                <MacroBar label="Proteína" current={dashboard.diet.protein.current} target={dashboard.diet.protein.target} color="#6f5cf0" />
+                <MacroBar label="Carboidratos" current={dashboard.diet.carbs.current} target={dashboard.diet.carbs.target} color="#06b6d4" />
+                <MacroBar label="Gordura" current={dashboard.diet.fat.current} target={dashboard.diet.fat.target} color="#f59e0b" />
+                <View style={styles.calorieRow}>
+                  <Text style={styles.calorieText}>
+                    {dashboard.diet.calories.current.toLocaleString()} / {dashboard.diet.calories.target.toLocaleString()} kcal
+                  </Text>
+                  <Text style={styles.caloriePercent}>
+                    {Math.round((dashboard.diet.calories.current / dashboard.diet.calories.target) * 100)}%
+                  </Text>
+                </View>
+              </>
+            ) : (
+              <>
+                <MacroBar label="Proteína" current={0} target={160} color="#6f5cf0" />
+                <MacroBar label="Carboidratos" current={0} target={250} color="#06b6d4" />
+                <MacroBar label="Gordura" current={0} target={65} color="#f59e0b" />
+                <View style={styles.calorieRow}>
+                  <Text style={styles.calorieText}>0 / 2.200 kcal</Text>
+                  <Text style={styles.caloriePercent}>0%</Text>
+                </View>
+              </>
+            )}
           </View>
         </View>
 
@@ -114,25 +219,54 @@ export default function StudentHomeScreen() {
           <Text style={styles.sectionTitle}>Hidratação</Text>
           <View style={styles.waterCard}>
             <View style={styles.waterInfo}>
-              <Text style={styles.waterAmount}>0L</Text>
-              <Text style={styles.waterGoal}>/ 3.0L</Text>
+              <Text style={styles.waterAmount}>{(dashboard?.water?.current ?? 0) / 1000}L</Text>
+              <Text style={styles.waterGoal}>/ {(dashboard?.water?.target ?? 3000) / 1000}L</Text>
             </View>
             <View style={styles.waterGlasses}>
-              {[...Array(8)].map((_, i) => (
-                <TouchableOpacity key={i} style={styles.waterGlass}>
-                  <Text style={styles.waterGlassText}>💧</Text>
-                </TouchableOpacity>
-              ))}
+              {[...Array(8)].map((_, i) => {
+                const glassMl = (dashboard?.water?.target ?? 3000) / 8;
+                const filled = (dashboard?.water?.current ?? 0) >= glassMl * (i + 1);
+                return (
+                  <TouchableOpacity
+                    key={i}
+                    style={[styles.waterGlass, filled && styles.waterGlassFilled]}
+                    onPress={async () => {
+                      try {
+                        await studentService.logWater(glassMl);
+                        loadDashboard();
+                      } catch {}
+                    }}
+                  >
+                    <Text style={styles.waterGlassText}>💧</Text>
+                  </TouchableOpacity>
+                );
+              })}
             </View>
           </View>
         </View>
+
+        {/* Recent achievements */}
+        {dashboard?.recentAchievements?.length ? (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Conquistas Recentes</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.achievementsScroll}>
+              {dashboard.recentAchievements.map((ach) => (
+                <View key={ach.id} style={styles.achievementCard}>
+                  <Text style={styles.achievementEmoji}>{ach.emoji || '🏆'}</Text>
+                  <Text style={styles.achievementTitle}>{ach.title}</Text>
+                  <Text style={styles.achievementDesc}>{ach.description}</Text>
+                </View>
+              ))}
+            </ScrollView>
+          </View>
+        ) : null}
       </ScrollView>
     </View>
   );
 }
 
 function MacroBar({ label, current, target, color }: any) {
-  const percent = Math.min((current / target) * 100, 100);
+  const percent = target > 0 ? Math.min((current / target) * 100, 100) : 0;
   return (
     <View style={{ marginBottom: 12 }}>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
@@ -166,6 +300,12 @@ const styles = StyleSheet.create({
   workoutHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 },
   workoutTitle: { color: COLORS.text, fontSize: 16, fontWeight: '600' },
   workoutMeta: { color: COLORS.muted, fontSize: 13, marginTop: 2 },
+  workoutBadge: { backgroundColor: COLORS.primary + '30', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4 },
+  workoutBadgeText: { color: COLORS.primary, fontSize: 12, fontWeight: '600' },
+  exercisePreview: { flexDirection: 'row', gap: 8, marginBottom: 16, flexWrap: 'wrap' },
+  exerciseTag: { backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4 },
+  exerciseTagMore: { backgroundColor: COLORS.accent + '20' },
+  exerciseTagText: { color: COLORS.text, fontSize: 12 },
   startButton: { borderRadius: 14, overflow: 'hidden' },
   startButtonGradient: { paddingVertical: 14, alignItems: 'center' },
   startButtonText: { color: '#fff', fontSize: 15, fontWeight: '700' },
@@ -181,4 +321,13 @@ const styles = StyleSheet.create({
   waterGlass: { width: 44, height: 44, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.05)', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: COLORS.border },
   waterGlassFilled: { backgroundColor: COLORS.accent + '20', borderColor: COLORS.accent + '40' },
   waterGlassText: { fontSize: 20 },
+  achievementsScroll: { marginLeft: -4 },
+  achievementCard: { backgroundColor: COLORS.card, borderRadius: 16, padding: 16, marginHorizontal: 6, alignItems: 'center', width: 90, borderWidth: 1, borderColor: COLORS.border },
+  achievementEmoji: { fontSize: 28, marginBottom: 6 },
+  achievementTitle: { color: COLORS.text, fontSize: 12, fontWeight: '600' },
+  achievementDesc: { color: COLORS.muted, fontSize: 10, marginTop: 2 },
+  errorCard: { margin: 20, padding: 16, backgroundColor: 'rgba(255,59,48,0.1)', borderRadius: 12, borderWidth: 1, borderColor: 'rgba(255,59,48,0.3)' },
+  errorText: { color: '#ff3b30', fontSize: 14, textAlign: 'center' },
+  retryButton: { marginTop: 12, alignItems: 'center' },
+  retryText: { color: COLORS.primary, fontSize: 14, fontWeight: '600' },
 });

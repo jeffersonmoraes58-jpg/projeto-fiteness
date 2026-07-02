@@ -1,0 +1,10 @@
+// Resolve `expo` > `expo-modules-autolinking` dependency chain
+// Use resolve-short.js to get short path (avoid encoding issues with cmd /c)
+def autolinkingPath = ["node", "resolve-short.js", "expo-modules-autolinking/package.json"]
+apply from: new File(
+  providers.exec {
+    workingDir(rootDir)
+    commandLine(autolinkingPath)
+  }.standardOutput.asText.get().trim(), 
+  "../scripts/android/autolinking_implementation.gradle"
+)
