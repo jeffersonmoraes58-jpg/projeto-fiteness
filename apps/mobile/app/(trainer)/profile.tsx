@@ -5,6 +5,7 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
+import { useAuthStore } from '../../src/store/auth';
 
 const COLORS = {
   bg: '#0f0f1a',
@@ -26,6 +27,8 @@ const menuItems = [
 ];
 
 export default function TrainerProfileScreen() {
+  const { user, logout } = useAuthStore();
+
   const handleLogout = () => {
     Alert.alert(
       'Sair',
@@ -36,8 +39,7 @@ export default function TrainerProfileScreen() {
           text: 'Sair',
           style: 'destructive',
           onPress: () => {
-            const { useAuthStore } = require('../../src/store/auth');
-            useAuthStore.getState().logout();
+            logout();
             router.replace('/');
           },
         },
@@ -50,10 +52,12 @@ export default function TrainerProfileScreen() {
       <LinearGradient colors={['#6f5cf020', '#06b6d420']} style={styles.header}>
         <View style={styles.profileSection}>
           <View style={styles.avatar}>
-            <Text style={styles.avatarText}>TR</Text>
+            <Text style={styles.avatarText}>
+              {user?.name?.charAt(0)?.toUpperCase() || 'T'}
+            </Text>
           </View>
-          <Text style={styles.profileName}>Trainer</Text>
-          <Text style={styles.profileEmail}>trainer@fitlynutri.com</Text>
+          <Text style={styles.profileName}>{user?.name || 'Trainer'}</Text>
+          <Text style={styles.profileEmail}>{user?.email || ''}</Text>
           <View style={styles.planBadge}>
             <Text style={styles.planText}>Plano Pro</Text>
           </View>

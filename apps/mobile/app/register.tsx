@@ -38,7 +38,7 @@ export default function RegisterScreen() {
     }
     setLoading(true);
     try {
-      await api.post('/auth/register', { name, email, password, role });
+      await api.post('/api/v1/auth/register', { name, email, password, role });
       Alert.alert('Conta criada!', 'Faça login para continuar.', [
         { text: 'OK', onPress: () => router.replace('/login') },
       ]);

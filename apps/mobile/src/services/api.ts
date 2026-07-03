@@ -1,7 +1,7 @@
 import axios from 'axios';
 import { useAuthStore } from '../store/auth';
 
-const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://fitlynutri.com.br/api/v1';
+const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://fitlynutri.com.br';
 
 export const api = axios.create({
   baseURL: API_URL,
@@ -18,9 +18,15 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-// Interceptor to handle 401
+// Interceptor to unwrap NestJS response { success, data, timestamp } -> data
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    // Se a resposta tiver { success: true, data: ... }, extrai o data interno
+    if (response.data && response.data.success !== undefined && response.data.data !== undefined) {
+      response.data = response.data.data;
+    }
+    return response;
+  },
   (error) => {
     if (error.response?.status === 401) {
       useAuthStore.getState().logout();

@@ -30,8 +30,8 @@ export default function LoginScreen() {
     }
     setLoading(true);
     try {
-      const { data } = await api.post('/auth/login', { email, password });
-      const { token, user } = data.data;
+      const { data } = await api.post('/api/v1/auth/login', { email, password });
+      const { token, user } = data;
       // Store token securely
       const { useAuthStore } = await import('../src/store/auth');
       useAuthStore.getState().setToken(token);
