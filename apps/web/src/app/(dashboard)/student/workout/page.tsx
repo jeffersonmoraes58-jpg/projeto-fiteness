@@ -1060,10 +1060,14 @@ function WorkoutSummaryModal({ workoutName, startTime, isPending, onConfirm, onC
     setFacingMode('user');
 
     if (!navigator.mediaDevices?.getUserMedia) {
-      setSelfieErr('Câmera não suportada neste navegador.\nTente no Chrome.');
+      setSelfieErr('Câmera não suportada neste navegador.\nTente no Chrome ou Brave.');
       return;
     }
     try {
+      // Stop any existing stream first
+      streamRef.current?.getTracks().forEach((t) => t.stop());
+      streamRef.current = null;
+
       // Try with facingMode first, fall back to plain video:true
       let s: MediaStream;
       try {
@@ -1071,11 +1075,16 @@ function WorkoutSummaryModal({ workoutName, startTime, isPending, onConfirm, onC
       } catch {
         s = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
       }
-      streamRef.current?.getTracks().forEach((t) => t.stop());
       streamRef.current = s;
-      const video = videoRef.current!;
+      const video = videoRef.current;
+      if (!video) {
+        setSelfieErr('Erro interno: elemento de vídeo não encontrado.');
+        return;
+      }
       video.srcObject = s;
-      video.play().catch(() => {});
+      // Wait for the video to actually start playing before showing the overlay
+      await video.play();
+      setIsVideoReady(true);
       setShowSelfie(true);
     } catch (err: any) {
       const name: string = err?.name ?? '';
@@ -1085,7 +1094,7 @@ function WorkoutSummaryModal({ workoutName, startTime, isPending, onConfirm, onC
           ? '\n\n🦁 Brave detectado:\n• Toque no ícone do leão na barra de endereços\n• Mude "Bloqueio de impressão digital" para Padrão\n• Ou desative os Shields para este site'
           : '';
         setSelfieErr(
-          `Câmera bloqueada (NotAllowedError).\n\n` +
+          `Câmera bloqueada.\n\n` +
           `1. Toque no 🔒 na barra → Permissões → Câmera → Permitir\n` +
           `2. Android: Configurações → Apps → ${isBrave ? 'Brave' : 'Navegador'} → Permissões → Câmera → Permitir` +
           braveMsg
@@ -1095,7 +1104,7 @@ function WorkoutSummaryModal({ workoutName, startTime, isPending, onConfirm, onC
       } else if (name === 'NotReadableError' || name === 'TrackStartError') {
         setSelfieErr('A câmera está em uso por outro app. Feche-o e tente novamente.');
       } else {
-        setSelfieErr(`Erro: ${name || 'desconhecido'} — ${err?.message || '(sem mensagem)'}`);
+        setSelfieErr(`Erro ao acessar câmera: ${name || 'desconhecido'}`);
       }
     }
   }
