@@ -41,7 +41,23 @@ export class NutritionistsService {
       where: { nutritionistId: n.id, isActive: true },
       include: { student: { include: { user: { include: { profile: true } } } } },
     });
-    const results = relations.map((r) => ({ ...r.student, isActive: r.isActive, monthlyFee: r.monthlyFee, startedAt: r.startedAt }));
+    const results = relations.map((r) => ({
+      id: r.student.id,
+      isActive: r.isActive,
+      monthlyFee: r.monthlyFee,
+      startedAt: r.startedAt,
+      goalType: r.student.goalType || null,
+      dietCompliance: r.student.dietCompliance || 0,
+      user: {
+        email: r.student.user?.email || '',
+        profile: {
+          firstName: r.student.user?.profile?.firstName || '',
+          lastName: r.student.user?.profile?.lastName || '',
+          phone: r.student.user?.profile?.phone || null,
+          avatarUrl: r.student.user?.profile?.avatarUrl || null,
+        },
+      },
+    }));
     if (!search) return results;
     const q = search.toLowerCase();
     return results.filter((s) => {

@@ -66,7 +66,17 @@ export class TrainersService {
       weeklyCheckins.push(dailyMap[d.toISOString().split('T')[0]] || 0);
     }
 
-    return { trainer, students, workouts, checkins: todayLogs, revenue, weeklyCheckins, recentLogs, upcomingAppointments };
+    return {
+      totalStudents: students,
+      totalWorkouts: workouts,
+      todayAppointments: upcomingAppointments.length,
+      recentActivity: recentLogs,
+      trainer,
+      checkins: todayLogs,
+      revenue,
+      weeklyCheckins,
+      upcomingAppointments,
+    };
   }
 
   async getStudents(userId: string, search?: string) {
@@ -79,21 +89,27 @@ export class TrainersService {
             user: { include: { profile: true } },
             anamnesis: true,
             workoutLogs: { orderBy: { completedAt: 'desc' }, take: 1, select: { completedAt: true } },
+            workoutPlans: { where: { isActive: true }, select: { id: true } },
           },
         },
       },
     });
     const results = relations.map((r) => ({
-      ...r.student,
+      id: r.student.id,
+      name: `${r.student.user?.profile?.firstName ?? ''} ${r.student.user?.profile?.lastName ?? ''}`.trim() || r.student.user?.email || 'Sem nome',
+      email: r.student.user?.email || '',
+      phone: r.student.user?.profile?.phone || null,
+      avatarUrl: r.student.user?.profile?.avatarUrl || null,
+      status: r.isActive ? 'ACTIVE' : 'INACTIVE',
+      createdAt: r.startedAt?.toISOString() || r.student.createdAt?.toISOString() || new Date().toISOString(),
+      _count: { workoutPlans: r.student.workoutPlans?.length || 0 },
       monthlyFee: r.monthlyFee,
-      startedAt: r.startedAt,
-      isActive: r.isActive,
       lastCheckinAt: r.student.workoutLogs[0]?.completedAt ?? null,
     }));
     if (!search) return results;
     const q = search.toLowerCase();
     return results.filter((s) => {
-      const name = `${s.user?.profile?.firstName} ${s.user?.profile?.lastName} ${s.user?.email}`.toLowerCase();
+      const name = `${s.name} ${s.email}`.toLowerCase();
       return name.includes(q);
     });
   }

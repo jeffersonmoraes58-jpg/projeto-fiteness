@@ -49,7 +49,7 @@ export class WorkoutsService {
     const trainer = await this.prisma.trainer.findUnique({ where: { userId } });
     if (!trainer) throw new ForbiddenException('Usuário não é trainer');
 
-    return this.prisma.workout.findMany({
+    const workouts = await this.prisma.workout.findMany({
       where: {
         trainerId: trainer.id,
         NOT: { tags: { has: '__personalized' } },
@@ -61,6 +61,15 @@ export class WorkoutsService {
       },
       orderBy: { createdAt: 'desc' },
     });
+
+    // Mapeia para o formato esperado pelo mobile
+    return workouts.map((w) => ({
+      ...w,
+      _count: {
+        exercises: w._count?.plans ?? 0,
+        assignedStudents: w._count?.plans ?? 0,
+      },
+    }));
   }
 
   async getTemplates(search?: string) {
