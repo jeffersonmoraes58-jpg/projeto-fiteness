@@ -47,7 +47,6 @@ export class NutritionistsService {
       monthlyFee: r.monthlyFee,
       startedAt: r.startedAt,
       goalType: r.student.goalType || null,
-      dietCompliance: r.student.dietCompliance || 0,
       user: {
         email: r.student.user?.email || '',
         profile: {
