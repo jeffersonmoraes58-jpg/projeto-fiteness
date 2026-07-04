@@ -96,20 +96,32 @@ export class TrainersService {
     });
     const results = relations.map((r) => ({
       id: r.student.id,
-      name: `${r.student.user?.profile?.firstName ?? ''} ${r.student.user?.profile?.lastName ?? ''}`.trim() || r.student.user?.email || 'Sem nome',
-      email: r.student.user?.email || '',
-      phone: r.student.user?.profile?.phone || null,
-      avatarUrl: r.student.user?.profile?.avatarUrl || null,
-      status: r.isActive ? 'ACTIVE' : 'INACTIVE',
-      createdAt: r.startedAt?.toISOString() || r.student.createdAt?.toISOString() || new Date().toISOString(),
+      userId: r.student.userId,
+      isActive: r.isActive,
+      streak: r.student.streak ?? 0,
+      level: r.student.level ?? 1,
+      points: r.student.points ?? 0,
+      goalType: r.student.anamnesis?.mainGoal ?? null,
+      anamnesis: r.student.anamnesis,
+      lastCheckinAt: r.student.workoutLogs[0]?.completedAt ?? null,
       _count: { workoutPlans: r.student.workoutPlans?.length || 0 },
       monthlyFee: r.monthlyFee,
-      lastCheckinAt: r.student.workoutLogs[0]?.completedAt ?? null,
+      createdAt: r.startedAt?.toISOString() || r.student.createdAt?.toISOString() || new Date().toISOString(),
+      user: {
+        id: r.student.user.id,
+        email: r.student.user?.email || '',
+        profile: {
+          firstName: r.student.user?.profile?.firstName ?? '',
+          lastName: r.student.user?.profile?.lastName ?? '',
+          phone: r.student.user?.profile?.phone ?? null,
+          avatarUrl: r.student.user?.profile?.avatarUrl ?? null,
+        },
+      },
     }));
     if (!search) return results;
     const q = search.toLowerCase();
     return results.filter((s) => {
-      const name = `${s.name} ${s.email}`.toLowerCase();
+      const name = `${s.user?.profile?.firstName ?? ''} ${s.user?.profile?.lastName ?? ''} ${s.user?.email ?? ''}`.toLowerCase();
       return name.includes(q);
     });
   }
