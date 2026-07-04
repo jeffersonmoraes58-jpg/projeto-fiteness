@@ -16,22 +16,31 @@ function getCachePath(filename: string): string {
   return path.join(CACHE_DIR, filename);
 }
 
+/**
+ * Tenta servir do cache primeiro.
+ * Retorna true se serviu do cache, false se não encontrou.
+ */
+function tryServeFromCache(res: Response, cacheKey: string): boolean {
+  const cachePath = getCachePath(cacheKey);
+  if (fs.existsSync(cachePath)) {
+    const stat = fs.statSync(cachePath);
+    const maxAge = 7 * 24 * 60 * 60; // 7 days
+    res.setHeader('cache-control', `public, max-age=${maxAge}`);
+    res.setHeader('content-type', cacheKey.endsWith('.webp') ? 'image/webp' : cacheKey.endsWith('.png') ? 'image/png' : cacheKey.endsWith('.jpg') || cacheKey.endsWith('.jpeg') ? 'image/jpeg' : 'application/octet-stream');
+    res.setHeader('content-length', stat.size);
+    res.sendFile(cachePath);
+    return true;
+  }
+  return false;
+}
+
 async function pipeUpstream(req: Request, res: Response, upstreamUrl: string, cacheKey?: string) {
   if (!MW_API_KEY) throw new HttpException('MuscleWiki API key not configured', HttpStatus.SERVICE_UNAVAILABLE);
 
-  // Try cache first for non-streaming requests (images)
+  // Try cache first
   if (cacheKey) {
     ensureCacheDir();
-    const cachePath = getCachePath(cacheKey);
-    if (fs.existsSync(cachePath)) {
-      const stat = fs.statSync(cachePath);
-      const maxAge = 7 * 24 * 60 * 60; // 7 days
-      res.setHeader('cache-control', `public, max-age=${maxAge}`);
-      res.setHeader('content-type', cacheKey.endsWith('.webp') ? 'image/webp' : cacheKey.endsWith('.png') ? 'image/png' : cacheKey.endsWith('.jpg') || cacheKey.endsWith('.jpeg') ? 'image/jpeg' : 'application/octet-stream');
-      res.setHeader('content-length', stat.size);
-      res.sendFile(cachePath);
-      return;
-    }
+    if (tryServeFromCache(res, cacheKey)) return;
   }
 
   const upstream = await fetch(upstreamUrl, {
@@ -74,7 +83,7 @@ async function pipeUpstream(req: Request, res: Response, upstreamUrl: string, ca
   }
   res.end();
 
-  // Save to cache after serving (for images)
+  // Save to cache after serving (for images AND videos)
   if (cacheKey && chunks.length > 0) {
     try {
       ensureCacheDir();
@@ -89,7 +98,7 @@ async function pipeUpstream(req: Request, res: Response, upstreamUrl: string, ca
 @Controller('musclewiki')
 export class MuscleWikiController {
   @Get('stream/:kind/:filename')
-  @ApiOperation({ summary: 'Proxy de stream de vídeo do MuscleWiki' })
+  @ApiOperation({ summary: 'Proxy de stream de vídeo do MuscleWiki (com cache em disco após 1ª requisição)' })
   async stream(
     @Param('kind') kind: 'branded' | 'unbranded',
     @Param('filename') filename: string,
@@ -98,7 +107,9 @@ export class MuscleWikiController {
   ) {
     if (kind !== 'branded' && kind !== 'unbranded') throw new HttpException('Invalid kind', HttpStatus.BAD_REQUEST);
     if (!/^[A-Za-z0-9_\-.]+\.(mp4|webm)$/i.test(filename)) throw new HttpException('Invalid filename', HttpStatus.BAD_REQUEST);
-    await pipeUpstream(req, res, `${MW_API_BASE}/stream/videos/${kind}/${encodeURIComponent(filename)}`);
+    // Vídeos também são cacheados em disco — só consome crédito do MuscleWiki na primeira requisição
+    const cacheKey = `video_${kind}_${filename}`;
+    await pipeUpstream(req, res, `${MW_API_BASE}/stream/videos/${kind}/${encodeURIComponent(filename)}`, cacheKey);
   }
 
   @Get('image/og/:filename')
