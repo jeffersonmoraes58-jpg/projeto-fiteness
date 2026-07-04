@@ -68,28 +68,50 @@ async function pipeUpstream(req: Request, res: Response, upstreamUrl: string, ca
     return;
   }
 
-  // Buffer the response to cache it and serve
-  const chunks: Buffer[] = [];
+  // Stream directly to client (no buffering) for better video playback
   const reader = upstream.body.getReader();
-  res.on('close', () => reader.cancel().catch(() => {}));
-  while (true) {
-    const { value, done } = await reader.read();
-    if (done) break;
-    if (value) {
-      const buf = Buffer.from(value);
-      chunks.push(buf);
-      res.write(buf);
-    }
-  }
-  res.end();
+  const chunks: Buffer[] = [];
+  let streamError = false;
 
-  // Save to cache after serving (for images AND videos)
-  if (cacheKey && chunks.length > 0) {
+  res.on('close', () => {
+    reader.cancel().catch(() => {});
+  });
+
+  // Use a pipe approach: read chunks and write them as they arrive
+  try {
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      if (value) {
+        const buf = Buffer.from(value);
+        chunks.push(buf);
+        res.write(buf);
+      }
+    }
+  } catch (e) {
+    streamError = true;
+    // Client likely disconnected, that's ok
+  }
+
+  if (!streamError) {
+    res.end();
+  }
+
+  // Save to cache after serving (fire-and-forget, don't block response)
+  if (cacheKey && chunks.length > 0 && !streamError) {
     try {
       ensureCacheDir();
-      fs.writeFileSync(getCachePath(cacheKey), Buffer.concat(chunks));
+      const cachePath = getCachePath(cacheKey);
+      // Write cache asynchronously to not block the response
+      setImmediate(() => {
+        try {
+          fs.writeFileSync(cachePath, Buffer.concat(chunks));
+        } catch (e) {
+          // Silently fail if cache write fails
+        }
+      });
     } catch (e) {
-      // Silently fail if cache write fails
+      // Silently fail
     }
   }
 }
