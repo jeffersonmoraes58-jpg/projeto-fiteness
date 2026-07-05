@@ -700,7 +700,6 @@ function WorkoutMusicPlayer() {
     const onPlay = () => {
       setIsPlaying(true);
       startKeepAlive();
-      updateMediaSession(currentId, currentTitle);
     };
     const onPause = () => {
       setIsPlaying(false);

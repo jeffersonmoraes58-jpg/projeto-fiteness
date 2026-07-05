@@ -3,7 +3,7 @@ import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { Response } from 'express';
 import { Public } from '../../decorators/public.decorator';
 import ytSearch from 'yt-search';
-import ytdl from 'ytdl-core';
+import ytdl from '@distube/ytdl-core';
 
 @ApiTags('music')
 @Controller('music')

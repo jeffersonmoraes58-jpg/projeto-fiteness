@@ -1,4 +1,4 @@
-declare module 'ytdl-core' {
+declare module '@distube/ytdl-core' {
   import { Readable } from 'stream';
 
   interface VideoDetails {
