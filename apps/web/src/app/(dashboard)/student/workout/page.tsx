@@ -1525,18 +1525,69 @@ function drawSelfieOverlay(ctx: CanvasRenderingContext2D, w: number, h: number, 
   const scale = w / 1080;
   const pad = scale * 52;
 
-  // Bottom gradient (covers ~30% of height)
-  const oH = h * 0.30;
-  const oY = h - oH;
-  const grad = ctx.createLinearGradient(0, oY, 0, h);
-  grad.addColorStop(0, 'rgba(0,0,0,0)');
-  grad.addColorStop(0.4, 'rgba(0,0,0,0.74)');
-  grad.addColorStop(1, 'rgba(0,0,0,0.93)');
-  ctx.fillStyle = grad;
-  ctx.fillRect(0, oY, w, oH);
+  // ── TOP: Logo FitlyNutri ──────────────────────────────────────────────────
+  // Semi-transparent dark bar at the top — does NOT cover the photo content
+  const topBarH = scale * 100;
+  const topGrad = ctx.createLinearGradient(0, 0, 0, topBarH);
+  topGrad.addColorStop(0, 'rgba(0,0,0,0.75)');
+  topGrad.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = topGrad;
+  ctx.fillRect(0, 0, w, topBarH);
 
-  // Purple accent line
-  const lineY = oY + scale * 4;
+  // Logo icon: purple circle with "F"
+  const logoSize = scale * 52;
+  const logoX = pad;
+  const logoY = scale * 18;
+  ctx.beginPath();
+  ctx.arc(logoX + logoSize / 2, logoY + logoSize / 2, logoSize / 2, 0, Math.PI * 2);
+  ctx.fillStyle = '#7c3aed';
+  ctx.fill();
+
+  // "F" letter inside logo
+  ctx.fillStyle = '#ffffff';
+  ctx.font = `bold ${Math.round(scale * 32)}px system-ui,sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('F', logoX + logoSize / 2, logoY + logoSize / 2 + 1);
+
+  // "FitlyNutri" text next to logo
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = '#ffffff';
+  ctx.font = `bold ${Math.round(scale * 28)}px system-ui,sans-serif`;
+  ctx.fillText('FitlyNutri', logoX + logoSize + scale * 14, logoY + logoSize / 2);
+
+  // "Treino Concluído" badge on the right
+  const badgeW = scale * 220;
+  const badgeH = scale * 38;
+  const badgeX = w - pad - badgeW;
+  const badgeY = logoY + (logoSize - badgeH) / 2;
+  ctx.beginPath();
+  roundRect(ctx, badgeX, badgeY, badgeW, badgeH, badgeH / 2);
+  ctx.fillStyle = 'rgba(5, 150, 105, 0.85)';
+  ctx.fill();
+
+  ctx.fillStyle = '#ffffff';
+  ctx.font = `600 ${Math.round(scale * 20)}px system-ui,sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('✓ Treino Concluído', badgeX + badgeW / 2, badgeY + badgeH / 2);
+
+  // ── BOTTOM: Info bar with dark background for readability ─────────────────
+  const bottomBarH = scale * 200;
+  const bottomY = h - bottomBarH;
+
+  // Dark background for bottom info — fully opaque at bottom, fading up
+  const bottomGrad = ctx.createLinearGradient(0, bottomY, 0, h);
+  bottomGrad.addColorStop(0, 'rgba(0,0,0,0)');
+  bottomGrad.addColorStop(0.25, 'rgba(0,0,0,0.70)');
+  bottomGrad.addColorStop(0.6, 'rgba(0,0,0,0.88)');
+  bottomGrad.addColorStop(1, 'rgba(0,0,0,0.95)');
+  ctx.fillStyle = bottomGrad;
+  ctx.fillRect(0, bottomY, w, bottomBarH);
+
+  // Purple accent line at top of bottom bar
+  const lineY = bottomY + scale * 6;
   const lg = ctx.createLinearGradient(0, 0, w, 0);
   lg.addColorStop(0, 'rgba(124,58,237,0)');
   lg.addColorStop(0.15, '#7c3aed');
@@ -1546,45 +1597,43 @@ function drawSelfieOverlay(ctx: CanvasRenderingContext2D, w: number, h: number, 
   ctx.lineWidth = scale * 3.5;
   ctx.beginPath(); ctx.moveTo(0, lineY); ctx.lineTo(w, lineY); ctx.stroke();
 
-  const y1 = oY + scale * 60;
+  // Reset text baseline for the rest
+  ctx.textBaseline = 'alphabetic';
+
+  const y1 = bottomY + scale * 60;
   const y2 = y1 + scale * 54;
   const y3 = y2 + scale * 46;
 
-  // Row 1: App name | status
-  ctx.textAlign = 'left';
-  ctx.fillStyle = 'rgba(167,139,250,0.95)';
-  ctx.font = `600 ${Math.round(scale * 30)}px system-ui,sans-serif`;
-  ctx.fillText('Fitlynutri', pad, y1);
-
-  ctx.textAlign = 'right';
-  ctx.fillStyle = 'rgba(52,211,153,0.95)';
-  ctx.font = `600 ${Math.round(scale * 28)}px system-ui,sans-serif`;
-  ctx.fillText('✓ Treino Concluído', w - pad, y1);
-
-  // Row 2: Workout name | Duration
+  // Row 1: Workout name (left) | Duration (right)
   ctx.textAlign = 'left';
   ctx.fillStyle = '#ffffff';
-  ctx.font = `bold ${Math.round(scale * 46)}px system-ui,sans-serif`;
-  const nameShort = info.workoutName.length > 20 ? info.workoutName.slice(0, 17) + '...' : info.workoutName;
-  ctx.fillText(nameShort, pad, y2);
+  ctx.font = `bold ${Math.round(scale * 42)}px system-ui,sans-serif`;
+  const nameShort = info.workoutName.length > 22 ? info.workoutName.slice(0, 19) + '...' : info.workoutName;
+  ctx.fillText(nameShort, pad, y1);
 
   ctx.textAlign = 'right';
-  ctx.fillStyle = 'rgba(255,255,255,0.85)';
-  ctx.font = `${Math.round(scale * 34)}px system-ui,sans-serif`;
-  ctx.fillText(`${info.durationStr} min`, w - pad, y2);
+  ctx.fillStyle = '#a78bfa';
+  ctx.font = `bold ${Math.round(scale * 36)}px system-ui,sans-serif`;
+  ctx.fillText(`${info.durationStr} min`, w - pad, y1);
 
-  // Row 3: Day + Date + Time | Intensity
+  // Row 2: Day + Date + Time (left) | Intensity (right)
   ctx.textAlign = 'left';
-  ctx.fillStyle = 'rgba(255,255,255,0.65)';
+  ctx.fillStyle = 'rgba(255,255,255,0.80)';
   ctx.font = `${Math.round(scale * 28)}px system-ui,sans-serif`;
-  ctx.fillText(`${info.dayName}, ${info.dateStr} • ${info.timeStr}`, pad, y3);
+  ctx.fillText(`${info.dayName}, ${info.dateStr} • ${info.timeStr}`, pad, y2);
 
   if (info.intensity) {
     ctx.textAlign = 'right';
-    ctx.fillStyle = 'rgba(255,255,255,0.55)';
+    ctx.fillStyle = 'rgba(255,255,255,0.70)';
     ctx.font = `${Math.round(scale * 26)}px system-ui,sans-serif`;
-    ctx.fillText(info.intensity, w - pad, y3);
+    ctx.fillText(info.intensity, w - pad, y2);
   }
+
+  // Row 3: "FitlyNutri" watermark
+  ctx.textAlign = 'center';
+  ctx.fillStyle = 'rgba(255,255,255,0.20)';
+  ctx.font = `${Math.round(scale * 22)}px system-ui,sans-serif`;
+  ctx.fillText('fitlynutri.com.br', w / 2, y3);
 }
 
 const DAY_NAMES = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
