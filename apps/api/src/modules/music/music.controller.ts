@@ -2,8 +2,8 @@ import { Controller, Get, Param, Query, Res, HttpException, HttpStatus } from '@
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { Response } from 'express';
 import { Public } from '../../decorators/public.decorator';
-import * as ytSearch from 'yt-search';
-import * as ytdl from 'ytdl-core';
+import ytSearch from 'yt-search';
+import ytdl from 'ytdl-core';
 
 @ApiTags('music')
 @Controller('music')

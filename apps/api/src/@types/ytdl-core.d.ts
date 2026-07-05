@@ -23,9 +23,16 @@ declare module 'ytdl-core' {
   function getInfo(url: string): Promise<VideoInfo>;
   function getURLVideoID(url: string): string;
   function validateURL(url: string): boolean;
+  function downloadFromInfo(info: VideoInfo, options?: DownloadOptions): Readable;
 
-  function exec(url: string, options?: DownloadOptions): Readable;
+  interface YtdlFunction {
+    (url: string, options?: DownloadOptions): Readable;
+    getInfo: typeof getInfo;
+    getURLVideoID: typeof getURLVideoID;
+    validateURL: typeof validateURL;
+    downloadFromInfo: typeof downloadFromInfo;
+  }
 
-  export { getInfo, getURLVideoID, validateURL, exec };
-  export type { VideoInfo, VideoDetails, DownloadOptions };
+  const ytdl: YtdlFunction;
+  export = ytdl;
 }
