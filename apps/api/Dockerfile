@@ -3,6 +3,7 @@ RUN apk add --no-cache libc6-compat openssl
 WORKDIR /app
 
 # Install api + database dependencies (standalone — no workspace)
+COPY package-lock.json ./package-lock.json
 COPY apps/api/package.json ./package.json
 COPY packages/database/package.json ./packages/database/package.json
 RUN npm install --legacy-peer-deps && \
