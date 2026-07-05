@@ -79,7 +79,9 @@ services:
       redis:
         condition: service_healthy
     networks:
-      - fitsaas-network
+      fitsaas-network:
+        aliases:
+          - api
     deploy:
       resources:
         limits:
@@ -100,7 +102,9 @@ services:
     depends_on:
       - api
     networks:
-      - fitsaas-network
+      fitsaas-network:
+        aliases:
+          - web
     deploy:
       resources:
         limits:
