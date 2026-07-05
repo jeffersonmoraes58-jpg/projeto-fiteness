@@ -1092,16 +1092,37 @@ function WorkoutSummaryModal({ workoutName, startTime, isPending, onConfirm, onC
             const ctx = canvas.getContext('2d')!;
             ctx.drawImage(img, 0, 0, vw, vh);
             const now = new Date();
-            drawSelfieOverlay(ctx, vw, vh, {
-              workoutName,
-              durationStr,
-              intensity,
-              dayName: DAY_NAMES[now.getDay()],
-              dateStr: now.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' }),
-              timeStr: now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
-            });
-            setCapturedUrl(canvas.toDataURL('image/jpeg', 0.93));
-            setShowSelfie(true);
+
+            // Pre-load the app logo icon onto the canvas for drawSelfieOverlay
+            const logoImg = new Image();
+            logoImg.crossOrigin = 'anonymous';
+            logoImg.onload = () => {
+              (ctx.canvas as any).__logoImage = logoImg;
+              drawSelfieOverlay(ctx, vw, vh, {
+                workoutName,
+                durationStr,
+                intensity,
+                dayName: DAY_NAMES[now.getDay()],
+                dateStr: now.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' }),
+                timeStr: now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+              });
+              setCapturedUrl(canvas.toDataURL('image/jpeg', 0.93));
+              setShowSelfie(true);
+            };
+            logoImg.onerror = () => {
+              // Fallback: draw overlay without logo image
+              drawSelfieOverlay(ctx, vw, vh, {
+                workoutName,
+                durationStr,
+                intensity,
+                dayName: DAY_NAMES[now.getDay()],
+                dateStr: now.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' }),
+                timeStr: now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+              });
+              setCapturedUrl(canvas.toDataURL('image/jpeg', 0.93));
+              setShowSelfie(true);
+            };
+            logoImg.src = '/icons/icon-512.png';
           };
           img.src = dataUrl;
         };
@@ -1518,6 +1539,8 @@ function generateWorkoutCard({ workoutName, dateStr, startStr, endStr, durationS
 
 // ─── Selfie overlay renderer ──────────────────────────────────────────────────
 
+const DAY_SHORT = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+
 function drawSelfieOverlay(ctx: CanvasRenderingContext2D, w: number, h: number, info: {
   workoutName: string; durationStr: string; intensity: string;
   dayName: string; dateStr: string; timeStr: string;
@@ -1534,21 +1557,35 @@ function drawSelfieOverlay(ctx: CanvasRenderingContext2D, w: number, h: number, 
   ctx.fillStyle = topGrad;
   ctx.fillRect(0, 0, w, topBarH);
 
-  // Logo icon: purple circle with "F"
+  // Logo: try to use the app icon image (loaded via Image in handleSelfieClick)
+  // If logoImage is available on the canvas, draw it; otherwise fallback to text
   const logoSize = scale * 52;
   const logoX = pad;
   const logoY = scale * 18;
-  ctx.beginPath();
-  ctx.arc(logoX + logoSize / 2, logoY + logoSize / 2, logoSize / 2, 0, Math.PI * 2);
-  ctx.fillStyle = '#7c3aed';
-  ctx.fill();
 
-  // "F" letter inside logo
-  ctx.fillStyle = '#ffffff';
-  ctx.font = `bold ${Math.round(scale * 32)}px system-ui,sans-serif`;
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText('F', logoX + logoSize / 2, logoY + logoSize / 2 + 1);
+  // Draw the app icon (loaded from /icons/icon-512.png)
+  const logoImg = (ctx.canvas as any).__logoImage as HTMLImageElement | undefined;
+  if (logoImg && logoImg.complete && logoImg.naturalWidth > 0) {
+    // Draw the icon as a rounded square
+    const r = scale * 10;
+    ctx.save();
+    ctx.beginPath();
+    roundRect(ctx, logoX, logoY, logoSize, logoSize, r);
+    ctx.clip();
+    ctx.drawImage(logoImg, logoX, logoY, logoSize, logoSize);
+    ctx.restore();
+  } else {
+    // Fallback: purple circle with "F"
+    ctx.beginPath();
+    ctx.arc(logoX + logoSize / 2, logoY + logoSize / 2, logoSize / 2, 0, Math.PI * 2);
+    ctx.fillStyle = '#7c3aed';
+    ctx.fill();
+    ctx.fillStyle = '#ffffff';
+    ctx.font = `bold ${Math.round(scale * 32)}px system-ui,sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('F', logoX + logoSize / 2, logoY + logoSize / 2 + 1);
+  }
 
   // "FitlyNutri" text next to logo
   ctx.textAlign = 'left';
@@ -1557,21 +1594,35 @@ function drawSelfieOverlay(ctx: CanvasRenderingContext2D, w: number, h: number, 
   ctx.font = `bold ${Math.round(scale * 28)}px system-ui,sans-serif`;
   ctx.fillText('FitlyNutri', logoX + logoSize + scale * 14, logoY + logoSize / 2);
 
-  // "Treino Concluído" badge on the right
-  const badgeW = scale * 220;
-  const badgeH = scale * 38;
-  const badgeX = w - pad - badgeW;
-  const badgeY = logoY + (logoSize - badgeH) / 2;
-  ctx.beginPath();
-  roundRect(ctx, badgeX, badgeY, badgeW, badgeH, badgeH / 2);
-  ctx.fillStyle = 'rgba(5, 150, 105, 0.85)';
-  ctx.fill();
+  // ── TOP RIGHT: Day-of-week checklist ──────────────────────────────────────
+  const today = new Date().getDay(); // 0=Dom, 1=Seg, ..., 6=Sáb
+  const daySize = scale * 32;
+  const dayGap = scale * 6;
+  const dayTotalW = 7 * daySize + 6 * dayGap;
+  const dayStartX = w - pad - dayTotalW;
+  const dayCenterY = logoY + logoSize / 2;
 
-  ctx.fillStyle = '#ffffff';
-  ctx.font = `600 ${Math.round(scale * 20)}px system-ui,sans-serif`;
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText('✓ Treino Concluído', badgeX + badgeW / 2, badgeY + badgeH / 2);
+  for (let i = 0; i < 7; i++) {
+    const dx = dayStartX + i * (daySize + dayGap);
+    const isToday = i === today;
+
+    // Circle background
+    ctx.beginPath();
+    ctx.arc(dx + daySize / 2, dayCenterY, daySize / 2, 0, Math.PI * 2);
+    if (isToday) {
+      ctx.fillStyle = 'rgba(5, 150, 105, 0.85)'; // green for today
+    } else {
+      ctx.fillStyle = 'rgba(255,255,255,0.12)'; // subtle for other days
+    }
+    ctx.fill();
+
+    // Day label
+    ctx.fillStyle = isToday ? '#ffffff' : 'rgba(255,255,255,0.45)';
+    ctx.font = `600 ${Math.round(scale * 16)}px system-ui,sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(DAY_SHORT[i], dx + daySize / 2, dayCenterY);
+  }
 
   // ── BOTTOM: Info bar with dark background for readability ─────────────────
   const bottomBarH = scale * 200;
