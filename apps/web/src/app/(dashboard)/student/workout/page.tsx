@@ -679,16 +679,68 @@ function WorkoutMusicPlayer() {
   const [searchErr, setSearchErr] = useState(false);
   const [currentId, setCurrentId] = useState('');
   const [currentTitle, setCurrentTitle] = useState('');
-  const [playerReady, setPlayerReady] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
-  const playerDivRef = useRef<HTMLDivElement>(null);
-  const playerRef = useRef<any>(null);
+  const [useBackgroundMode, setUseBackgroundMode] = useState(false);
+  const [audioError, setAudioError] = useState('');
+  const audioRef = useRef<HTMLAudioElement | null>(null);
   const keepAliveRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // ─── Media Session API + Service Worker Keep-Alive ─────────────────────
-  // Mantém o áudio tocando mesmo com a tela bloqueada no TWA/Chrome/Brave
+  // ─── Audio Element (background-friendly) ───────────────────────────────
+  // Usa o elemento <audio> do HTML5 que o navegador consegue manter tocando
+  // mesmo com a tela bloqueada ou app minimizado (diferente do YouTube IFrame)
 
-  /** Atualiza a Media Session com os metadados da música atual */
+  useEffect(() => {
+    // Cria o elemento de áudio uma vez
+    const audio = new Audio();
+    audio.preload = 'auto';
+    audio.loop = true;
+    audioRef.current = audio;
+
+    // Eventos do áudio
+    const onPlay = () => {
+      setIsPlaying(true);
+      startKeepAlive();
+      updateMediaSession(currentId, currentTitle);
+    };
+    const onPause = () => {
+      setIsPlaying(false);
+      stopKeepAlive();
+    };
+    const onEnded = () => {
+      setIsPlaying(false);
+      stopKeepAlive();
+    };
+    const onError = () => {
+      setAudioError('Não foi possível carregar o áudio. Tente outra música.');
+      setIsPlaying(false);
+      stopKeepAlive();
+    };
+
+    audio.addEventListener('play', onPlay);
+    audio.addEventListener('pause', onPause);
+    audio.addEventListener('ended', onEnded);
+    audio.addEventListener('error', onError);
+
+    return () => {
+      audio.removeEventListener('play', onPlay);
+      audio.removeEventListener('pause', onPause);
+      audio.removeEventListener('ended', onEnded);
+      audio.removeEventListener('error', onError);
+      audio.pause();
+      audio.src = '';
+      audioRef.current = null;
+    };
+  }, []);
+
+  // Atualiza Media Session quando a música muda
+  useEffect(() => {
+    if (currentId && currentTitle && isPlaying) {
+      updateMediaSession(currentId, currentTitle);
+    }
+  }, [currentId, currentTitle, isPlaying]);
+
+  // ─── Media Session API ─────────────────────────────────────────────────
+
   function updateMediaSession(videoId: string, title: string) {
     if (!('mediaSession' in navigator)) return;
 
@@ -702,29 +754,24 @@ function WorkoutMusicPlayer() {
       ],
     });
 
-    // Handlers de controle da Media Session
     navigator.mediaSession.setActionHandler('play', () => {
-      playerRef.current?.playVideo();
+      audioRef.current?.play().catch(() => {});
     });
     navigator.mediaSession.setActionHandler('pause', () => {
-      playerRef.current?.pauseVideo();
+      audioRef.current?.pause();
     });
   }
 
-  /** Inicia o heartbeat com o Service Worker para manter a página ativa */
+  // ─── Service Worker Keep-Alive ─────────────────────────────────────────
+
   function startKeepAlive() {
     if (keepAliveRef.current) return;
-
-    // Notifica o SW que o áudio começou
     navigator.serviceWorker.controller?.postMessage({ type: 'AUDIO_PLAYING' });
-
-    // Heartbeat a cada 15s para manter o SW acordado
     keepAliveRef.current = setInterval(() => {
       navigator.serviceWorker.controller?.postMessage({ type: 'AUDIO_KEEPALIVE' });
     }, 15000);
   }
 
-  /** Para o heartbeat */
   function stopKeepAlive() {
     if (keepAliveRef.current) {
       clearInterval(keepAliveRef.current);
@@ -733,77 +780,67 @@ function WorkoutMusicPlayer() {
     navigator.serviceWorker.controller?.postMessage({ type: 'AUDIO_PAUSED' });
   }
 
-  // ─── YouTube Player ────────────────────────────────────────────────────
-
-  useEffect(() => {
-    function initPlayer() {
-      if (!playerDivRef.current || playerRef.current) return;
-      playerRef.current = new window.YT.Player(playerDivRef.current, {
-        width: '1',
-        height: '1',
-        playerVars: { rel: 0, playsinline: 1 },
-        events: {
-          onReady: () => setPlayerReady(true),
-          onStateChange: (e: any) => {
-            const playing = e.data === 1;
-            setIsPlaying(playing);
-
-            if (playing) {
-              startKeepAlive();
-            } else {
-              stopKeepAlive();
-            }
-          },
-        },
-      });
-    }
-
-    if (window.YT?.Player) {
-      initPlayer();
-    } else {
-      const prev = window.onYouTubeIframeAPIReady;
-      window.onYouTubeIframeAPIReady = () => { prev?.(); initPlayer(); };
-      if (!document.querySelector('script[src="https://www.youtube.com/iframe_api"]')) {
-        const s = document.createElement('script');
-        s.src = 'https://www.youtube.com/iframe_api';
-        document.head.appendChild(s);
-      }
-    }
-
-    return () => {
-      stopKeepAlive();
-      playerRef.current?.destroy();
-      playerRef.current = null;
-    };
-  }, []);
+  // ─── Busca e Reprodução ────────────────────────────────────────────────
 
   async function handleSearch(q: string) {
     if (!q.trim()) return;
     setSearching(true);
     setSearchErr(false);
     setResults([]);
+    setAudioError('');
     const found = await searchYouTube(q.trim());
     setResults(found);
     setSearchErr(found.length === 0);
     setSearching(false);
-    if (found.length > 0) playVideo(found[0]);
+    if (found.length > 0) playAudio(found[0]);
   }
 
-  function playVideo(v: MusicResult) {
+  function playAudio(v: MusicResult) {
     setCurrentId(v.videoId);
     setCurrentTitle(v.title);
-    updateMediaSession(v.videoId, v.title);
-    if (playerRef.current && playerReady) {
-      playerRef.current.loadVideoById(v.videoId);
+    setAudioError('');
+
+    // Constrói a URL de áudio via nosso backend (que faz proxy do YouTube)
+    // Usa o endpoint /api/music/audio/:videoId que converte YouTube para MP3
+    const audioUrl = `/api/music/audio/${v.videoId}`;
+
+    const audio = audioRef.current;
+    if (!audio) return;
+
+    // Para a reprodução atual
+    audio.pause();
+    audio.src = '';
+
+    // Carrega e toca o novo áudio
+    audio.src = audioUrl;
+    audio.play().catch((err) => {
+      console.error('Erro ao reproduzir áudio:', err);
+      setAudioError('Não foi possível reproduzir. Tente outra música.');
+    });
+  }
+
+  function togglePlayPause() {
+    const audio = audioRef.current;
+    if (!audio) return;
+
+    if (isPlaying) {
+      audio.pause();
+    } else if (currentId) {
+      audio.play().catch(() => {
+        // Se falhou, tenta recarregar
+        audio.load();
+        audio.play().catch((err) => {
+          console.error('Erro ao retomar:', err);
+          setAudioError('Erro ao reproduzir. Selecione a música novamente.');
+        });
+      });
     }
   }
 
   return (
     <div className="glass-card overflow-hidden">
-      {/* Hidden audio-only player — stays in DOM regardless of open state */}
-      <div className="sr-only" aria-hidden="true">
-        <div ref={playerDivRef} />
-      </div>
+      {/* Audio element — sempre presente no DOM para background playback */}
+      <audio ref={audioRef as any} className="hidden" />
 
       {/* Header toggle */}
       <button onClick={() => setOpen((o) => !o)} className="w-full flex items-center justify-between">
@@ -865,13 +902,18 @@ function WorkoutMusicPlayer() {
           <p className="text-xs text-center text-muted-foreground py-2">Nenhum resultado. Tente outro termo.</p>
         )}
 
+        {/* Audio error */}
+        {audioError && (
+          <p className="text-xs text-center text-destructive py-1">{audioError}</p>
+        )}
+
         {/* Result thumbnails — horizontal scroll */}
         {results.length > 0 && !searching && (
           <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1" style={{ scrollbarWidth: 'none' } as React.CSSProperties}>
             {results.map((v) => (
               <button
                 key={v.videoId}
-                onClick={() => playVideo(v)}
+                onClick={() => playAudio(v)}
                 className={cn(
                   'flex-shrink-0 w-32 rounded-xl overflow-hidden text-left transition-all border',
                   currentId === v.videoId
@@ -901,17 +943,36 @@ function WorkoutMusicPlayer() {
               <p className="text-xs font-medium truncate">{currentTitle}</p>
               <p className="text-[10px] text-muted-foreground flex items-center gap-1 mt-0.5">
                 {isPlaying
-                  ? <><span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse inline-block" /> Em reprodução</>
+                  ? <><span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse inline-block" /> Tocando em background</>
                   : 'Pausado'}
               </p>
             </div>
             <button
+              onClick={togglePlayPause}
+              className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-white/10 transition-all flex-shrink-0"
+              title={isPlaying ? 'Pausar' : 'Continuar'}
+            >
+              {isPlaying
+                ? <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg>
+                : <Play className="w-4 h-4" />}
+            </button>
+            <button
               onClick={() => window.open(`https://www.youtube.com/watch?v=${currentId}`, '_blank')}
-              title="Abrir no YouTube para ouvir com tela bloqueada"
+              title="Abrir no YouTube"
               className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-white/10 transition-all flex-shrink-0 text-muted-foreground"
             >
               <ExternalLink className="w-3.5 h-3.5" />
             </button>
+          </div>
+        )}
+
+        {/* Background mode info */}
+        {isPlaying && (
+          <div className="text-[10px] text-center text-emerald-400/70 flex items-center justify-center gap-1">
+            <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+            </svg>
+            Áudio continuará tocando mesmo com a tela bloqueada
           </div>
         )}
       </div>
