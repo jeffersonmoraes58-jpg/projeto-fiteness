@@ -1122,7 +1122,7 @@ function WorkoutSummaryModal({ workoutName, startTime, isPending, onConfirm, onC
               setCapturedUrl(canvas.toDataURL('image/jpeg', 0.93));
               setShowSelfie(true);
             };
-            logoImg.src = '/icons/icon-512.png';
+            logoImg.src = '/logo.png';
           };
           img.src = dataUrl;
         };
