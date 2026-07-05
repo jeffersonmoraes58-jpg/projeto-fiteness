@@ -984,6 +984,7 @@ function WorkoutSummaryModal({ workoutName, startTime, isPending, onConfirm, onC
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     return () => { streamRef.current?.getTracks().forEach((t) => t.stop()); };
@@ -1052,23 +1053,76 @@ function WorkoutSummaryModal({ workoutName, startTime, isPending, onConfirm, onC
     }
   }
 
-  async function handleSelfieClick() {
+  function handleSelfieClick() {
     setSelfieErr('');
     setCameraError('');
     setCapturedUrl(null);
     setIsVideoReady(false);
-    setFacingMode('user');
 
+    // Try native camera via input[type=file] first — works in TWA/Brave/Chrome
+    // without needing getUserMedia (which Brave Shields may block)
+    try {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = 'image/*';
+      input.capture = 'user'; // front camera
+      input.style.display = 'none';
+      document.body.appendChild(input);
+
+      input.addEventListener('change', (e) => {
+        const file = (e.target as HTMLInputElement).files?.[0];
+        document.body.removeChild(input);
+        if (!file) return;
+
+        // Read the captured photo as data URL
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          const dataUrl = ev.target?.result as string;
+          if (!dataUrl) return;
+
+          // Draw the photo onto canvas with overlay
+          const img = new Image();
+          img.onload = () => {
+            const canvas = canvasRef.current;
+            if (!canvas) return;
+            const vw = img.naturalWidth;
+            const vh = img.naturalHeight;
+            canvas.width = vw;
+            canvas.height = vh;
+            const ctx = canvas.getContext('2d')!;
+            ctx.drawImage(img, 0, 0, vw, vh);
+            const now = new Date();
+            drawSelfieOverlay(ctx, vw, vh, {
+              workoutName,
+              durationStr,
+              intensity,
+              dayName: DAY_NAMES[now.getDay()],
+              dateStr: now.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' }),
+              timeStr: now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+            });
+            setCapturedUrl(canvas.toDataURL('image/jpeg', 0.93));
+            setShowSelfie(true);
+          };
+          img.src = dataUrl;
+        };
+        reader.readAsDataURL(file);
+      });
+
+      input.click();
+    } catch (err: any) {
+      // Fallback: try getUserMedia (WebRTC) if input[type=file] fails
+      tryFallbackGetUserMedia();
+    }
+  }
+
+  async function tryFallbackGetUserMedia() {
     if (!navigator.mediaDevices?.getUserMedia) {
-      setSelfieErr('Câmera não suportada neste navegador.\nTente no Chrome ou Brave.');
+      setSelfieErr('Câmera não disponível. Verifique as permissões do app.');
       return;
     }
     try {
-      // Stop any existing stream first
       streamRef.current?.getTracks().forEach((t) => t.stop());
       streamRef.current = null;
-
-      // Try with facingMode first, fall back to plain video:true
       let s: MediaStream;
       try {
         s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false });
@@ -1077,28 +1131,15 @@ function WorkoutSummaryModal({ workoutName, startTime, isPending, onConfirm, onC
       }
       streamRef.current = s;
       const video = videoRef.current;
-      if (!video) {
-        setSelfieErr('Erro interno: elemento de vídeo não encontrado.');
-        return;
-      }
+      if (!video) { setSelfieErr('Erro interno.'); return; }
       video.srcObject = s;
-      // Wait for the video to actually start playing before showing the overlay
       await video.play();
       setIsVideoReady(true);
       setShowSelfie(true);
     } catch (err: any) {
       const name: string = err?.name ?? '';
-      const isBrave = !!(navigator as any).brave;
       if (name === 'NotAllowedError' || name === 'PermissionDeniedError') {
-        const braveMsg = isBrave
-          ? '\n\n🦁 Brave detectado:\n• Toque no ícone do leão na barra de endereços\n• Mude "Bloqueio de impressão digital" para Padrão\n• Ou desative os Shields para este site'
-          : '';
-        setSelfieErr(
-          `Câmera bloqueada.\n\n` +
-          `1. Toque no 🔒 na barra → Permissões → Câmera → Permitir\n` +
-          `2. Android: Configurações → Apps → ${isBrave ? 'Brave' : 'Navegador'} → Permissões → Câmera → Permitir` +
-          braveMsg
-        );
+        setSelfieErr('Câmera bloqueada. Vá em Configurações → Apps → FitlyNutri → Permissões → Câmera → Permitir');
       } else if (name === 'NotFoundError' || name === 'DevicesNotFoundError') {
         setSelfieErr('Nenhuma câmera encontrada neste dispositivo.');
       } else if (name === 'NotReadableError' || name === 'TrackStartError') {
