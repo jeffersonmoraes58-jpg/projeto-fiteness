@@ -683,6 +683,57 @@ function WorkoutMusicPlayer() {
   const [isPlaying, setIsPlaying] = useState(false);
   const playerDivRef = useRef<HTMLDivElement>(null);
   const playerRef = useRef<any>(null);
+  const keepAliveRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // ─── Media Session API + Service Worker Keep-Alive ─────────────────────
+  // Mantém o áudio tocando mesmo com a tela bloqueada no TWA/Chrome/Brave
+
+  /** Atualiza a Media Session com os metadados da música atual */
+  function updateMediaSession(videoId: string, title: string) {
+    if (!('mediaSession' in navigator)) return;
+
+    navigator.mediaSession.metadata = new MediaMetadata({
+      title: title || 'Música de treino',
+      artist: 'FitlyNutri',
+      album: 'Música para Treino',
+      artwork: [
+        { src: `https://img.youtube.com/vi/${videoId}/mqdefault.jpg`, sizes: '320x180', type: 'image/jpeg' },
+        { src: `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`, sizes: '480x360', type: 'image/jpeg' },
+      ],
+    });
+
+    // Handlers de controle da Media Session
+    navigator.mediaSession.setActionHandler('play', () => {
+      playerRef.current?.playVideo();
+    });
+    navigator.mediaSession.setActionHandler('pause', () => {
+      playerRef.current?.pauseVideo();
+    });
+  }
+
+  /** Inicia o heartbeat com o Service Worker para manter a página ativa */
+  function startKeepAlive() {
+    if (keepAliveRef.current) return;
+
+    // Notifica o SW que o áudio começou
+    navigator.serviceWorker.controller?.postMessage({ type: 'AUDIO_PLAYING' });
+
+    // Heartbeat a cada 15s para manter o SW acordado
+    keepAliveRef.current = setInterval(() => {
+      navigator.serviceWorker.controller?.postMessage({ type: 'AUDIO_KEEPALIVE' });
+    }, 15000);
+  }
+
+  /** Para o heartbeat */
+  function stopKeepAlive() {
+    if (keepAliveRef.current) {
+      clearInterval(keepAliveRef.current);
+      keepAliveRef.current = null;
+    }
+    navigator.serviceWorker.controller?.postMessage({ type: 'AUDIO_PAUSED' });
+  }
+
+  // ─── YouTube Player ────────────────────────────────────────────────────
 
   useEffect(() => {
     function initPlayer() {
@@ -693,7 +744,16 @@ function WorkoutMusicPlayer() {
         playerVars: { rel: 0, playsinline: 1 },
         events: {
           onReady: () => setPlayerReady(true),
-          onStateChange: (e: any) => setIsPlaying(e.data === 1),
+          onStateChange: (e: any) => {
+            const playing = e.data === 1;
+            setIsPlaying(playing);
+
+            if (playing) {
+              startKeepAlive();
+            } else {
+              stopKeepAlive();
+            }
+          },
         },
       });
     }
@@ -710,7 +770,11 @@ function WorkoutMusicPlayer() {
       }
     }
 
-    return () => { playerRef.current?.destroy(); playerRef.current = null; };
+    return () => {
+      stopKeepAlive();
+      playerRef.current?.destroy();
+      playerRef.current = null;
+    };
   }, []);
 
   async function handleSearch(q: string) {
@@ -728,6 +792,7 @@ function WorkoutMusicPlayer() {
   function playVideo(v: MusicResult) {
     setCurrentId(v.videoId);
     setCurrentTitle(v.title);
+    updateMediaSession(v.videoId, v.title);
     if (playerRef.current && playerReady) {
       playerRef.current.loadVideoById(v.videoId);
     }
