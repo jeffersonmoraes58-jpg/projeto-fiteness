@@ -52,6 +52,10 @@ function tryServeFromCache(res: Response, cacheKey: string): boolean {
       '.jpeg': 'image/jpeg',
     };
     const ext = Object.keys(mimeTypes).find((e) => cacheKey.endsWith(e));
+    // Remove headers from Helmet that could interfere with video playback
+    res.removeHeader('cross-origin-resource-policy');
+    res.removeHeader('cross-origin-opener-policy');
+    res.removeHeader('x-content-type-options');
     res.setHeader('cache-control', `public, max-age=${maxAge}`);
     res.setHeader('content-type', ext ? mimeTypes[ext] : 'application/octet-stream');
     res.setHeader('content-length', stat.size);
