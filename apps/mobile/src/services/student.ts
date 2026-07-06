@@ -40,9 +40,11 @@ export interface WorkoutExercise {
   weight?: number;
   notes?: string;
   videoUrl?: string;
+  gifUrl?: string;
   category?: string;
   completed?: boolean;
 }
+
 
 export interface WorkoutLog {
   id: string;

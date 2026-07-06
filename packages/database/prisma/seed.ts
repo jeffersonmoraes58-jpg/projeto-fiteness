@@ -3,22 +3,39 @@ import * as bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
 
-// Demo video URLs for public exercises (YouTube embed-compatible)
-const VIDEO_URLS: Record<string, string> = {
-  'Supino Reto':       'https://www.youtube.com/watch?v=4Y2ZdHCOXok',
-  'Crucifixo':         'https://www.youtube.com/watch?v=eozdVDA78K0',
-  'Puxada Frontal':    'https://www.youtube.com/watch?v=CAwf7n6Luuc',
-  'Remada Curvada':    'https://www.youtube.com/watch?v=9efgcAjQe7E',
-  'Rosca Direta':      'https://www.youtube.com/watch?v=ykJmrZ5v0Oo',
-  'Rosca Alternada':   'https://www.youtube.com/watch?v=sAq_ocpRh_I',
-  'Tríceps Corda':     'https://www.youtube.com/watch?v=2-LAMcpzODU',
-  'Agachamento Livre': 'https://www.youtube.com/watch?v=ultWZbUMPL8',
-  'Leg Press 45°':     'https://www.youtube.com/watch?v=IZxyjW7MPJQ',
-  'Prancha':           'https://www.youtube.com/watch?v=pSHjTRCQxIw',
-  'Barra Fixa':        'https://www.youtube.com/watch?v=eGo4IYlbE5g',
-  'Flexão de Braço':   'https://www.youtube.com/watch?v=IODxDxX7oi4',
-  'Elevação Lateral':  'https://www.youtube.com/watch?v=3VcKaXpzqRo',
+// GIF URLs for public exercises (Google Drive / CDN)
+// Substitua 'SEU_ID_AQUI' pelos IDs reais dos seus GIFs
+const EXERCISE_GIFS: Record<string, string> = {
+  'Supino Reto':          'https://drive.google.com/uc?export=view&id=SEU_ID_AQUI',
+  'Supino Inclinado':     'https://drive.google.com/uc?export=view&id=SEU_ID_AQUI',
+  'Crucifixo':            'https://drive.google.com/uc?export=view&id=SEU_ID_AQUI',
+  'Crossover':            'https://drive.google.com/uc?export=view&id=SEU_ID_AQUI',
+  'Flexão de Braço':      'https://drive.google.com/uc?export=view&id=SEU_ID_AQUI',
+  'Puxada Frontal':       'https://drive.google.com/uc?export=view&id=SEU_ID_AQUI',
+  'Remada Curvada':       'https://drive.google.com/uc?export=view&id=SEU_ID_AQUI',
+  'Remada Unilateral':    'https://drive.google.com/uc?export=view&id=SEU_ID_AQUI',
+  'Barra Fixa':           'https://drive.google.com/uc?export=view&id=SEU_ID_AQUI',
+  'Desenvolvimento com Barra': 'https://drive.google.com/uc?export=view&id=SEU_ID_AQUI',
+  'Elevação Lateral':     'https://drive.google.com/uc?export=view&id=SEU_ID_AQUI',
+  'Elevação Frontal':     'https://drive.google.com/uc?export=view&id=SEU_ID_AQUI',
+  'Rosca Direta':         'https://drive.google.com/uc?export=view&id=SEU_ID_AQUI',
+  'Rosca Alternada':      'https://drive.google.com/uc?export=view&id=SEU_ID_AQUI',
+  'Rosca Martelo':        'https://drive.google.com/uc?export=view&id=SEU_ID_AQUI',
+  'Tríceps Corda':        'https://drive.google.com/uc?export=view&id=SEU_ID_AQUI',
+  'Tríceps Testa':        'https://drive.google.com/uc?export=view&id=SEU_ID_AQUI',
+  'Mergulho (Tríceps)':   'https://drive.google.com/uc?export=view&id=SEU_ID_AQUI',
+  'Agachamento Livre':    'https://drive.google.com/uc?export=view&id=SEU_ID_AQUI',
+  'Leg Press 45°':        'https://drive.google.com/uc?export=view&id=SEU_ID_AQUI',
+  'Cadeira Extensora':    'https://drive.google.com/uc?export=view&id=SEU_ID_AQUI',
+  'Cadeira Flexora':      'https://drive.google.com/uc?export=view&id=SEU_ID_AQUI',
+  'Stiff':                'https://drive.google.com/uc?export=view&id=SEU_ID_AQUI',
+  'Panturrilha em Pé':    'https://drive.google.com/uc?export=view&id=SEU_ID_AQUI',
+  'Abdômen Crunch':       'https://drive.google.com/uc?export=view&id=SEU_ID_AQUI',
+  'Prancha':              'https://drive.google.com/uc?export=view&id=SEU_ID_AQUI',
+  'Esteira':              'https://drive.google.com/uc?export=view&id=SEU_ID_AQUI',
+  'Bicicleta Ergométrica':'https://drive.google.com/uc?export=view&id=SEU_ID_AQUI',
 };
+
 
 async function main() {
   console.log('Seeding database...');
@@ -131,13 +148,14 @@ async function main() {
 
   for (const ex of exercisesData) {
     const exists = await prisma.exercise.findFirst({ where: { name: ex.name, trainerId: null } });
-    const videoUrl = VIDEO_URLS[ex.name] ?? null;
+    const gifUrl = EXERCISE_GIFS[ex.name] ?? null;
     if (!exists) {
-      await prisma.exercise.create({ data: { ...ex, isPublic: true, videoUrl } });
-    } else if (videoUrl && !exists.videoUrl) {
-      await prisma.exercise.update({ where: { id: exists.id }, data: { videoUrl } });
+      await prisma.exercise.create({ data: { ...ex, isPublic: true, gifUrl } });
+    } else if (gifUrl && !exists.gifUrl) {
+      await prisma.exercise.update({ where: { id: exists.id }, data: { gifUrl } });
     }
   }
+
 
   // ─── Demo workout plans (only if student has none yet) ────────────────────────
   const existingPlan = await prisma.workoutPlan.findFirst({

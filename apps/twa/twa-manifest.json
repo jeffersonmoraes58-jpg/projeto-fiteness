@@ -1,0 +1,49 @@
+{
+  "packageId": "com.fitlynutri.app",
+  "host": "fitlynutri.com.br",
+  "name": "Fitlynutri",
+  "launcherName": "Fitlynutri",
+  "display": "standalone",
+  "themeColor": "#7c3aed",
+  "backgroundColor": "#09090b",
+  "startUrl": "/",
+  "iconUrl": "https://fitlynutri.com.br/icons/icon-512.png",
+  "maskableIconUrl": "https://fitlynutri.com.br/icons/icon-512.png",
+  "monochromeIconUrl": "https://fitlynutri.com.br/icons/icon-512.png",
+  "appVersionCode": 1,
+  "appVersionName": "1.0.0",
+  "signingKey": {
+    "path": "../mobile/android/app/release.keystore",
+    "alias": "release"
+  },
+  "signingKeyPasswords": {
+    "store": "android",
+    "key": "android"
+  },
+  "enableNotifications": false,
+  "features": {},
+  "orientation": "portrait",
+  "minSdkVersion": 21,
+  "targetSdkVersion": 34,
+  "shortcuts": [
+    {
+      "name": "Treinos",
+      "short_name": "Treinos",
+      "url": "/trainer/workouts",
+      "icons": [{"src": "https://fitlynutri.com.br/icons/icon-192.png", "sizes": "192x192"}]
+    }
+  ],
+  "generatorApp": "bubblewrap-cli",
+  "webManifestUrl": "https://fitlynutri.com.br/manifest.json",
+  "fallbackType": "customtabs",
+  "enableSiteSettingsShortcut": true,
+  "isChromeOSOnly": false,
+  "isMetaQuest": false,
+  "fullScopeUrl": "https://fitlynutri.com.br/",
+  "locationDelegation": {
+    "enabled": false
+  },
+  "googlePlayBilling": {
+    "enabled": false
+  }
+}

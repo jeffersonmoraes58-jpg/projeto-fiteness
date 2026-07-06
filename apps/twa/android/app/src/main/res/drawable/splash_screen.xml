@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Splash Screen da FitlyNutri -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Fundo gradiente roxo escuro -->
+    <item android:gravity="fill">
+        <shape android:shape="rectangle">
+            <gradient
+                android:startColor="#09090b"
+                android:endColor="#1a1a2e"
+                android:angle="270" />
+        </shape>
+    </item>
+
+    <!-- Logo centralizado -->
+    <item
+        android:width="120dp"
+        android:height="120dp"
+        android:gravity="center">
+        <shape android:shape="oval">
+            <solid android:color="#7c3aed" />
+        </shape>
+    </item>
+
+    <!-- Letra "F" estilizada como placeholder do logo -->
+    <item
+        android:width="80dp"
+        android:height="80dp"
+        android:gravity="center">
+        <shape android:shape="oval">
+            <solid android:color="#ffffff" />
+        </shape>
+    </item>
+</layer-list>

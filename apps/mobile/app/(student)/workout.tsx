@@ -6,6 +6,8 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { MotiView } from 'moti';
 import { studentService, WorkoutPlan, WorkoutLog } from '../../src/services/student';
+import ExerciseGif from '../../src/components/ExerciseGif';
+
 
 const COLORS = {
   bg: '#0f0f1a',
@@ -141,6 +143,12 @@ export default function WorkoutScreen() {
                   transition={{ delay: index * 50 }}
                 >
                   <View style={styles.exerciseCard}>
+                    <ExerciseGif
+                      gifUrl={ex.gifUrl}
+                      videoUrl={ex.videoUrl}
+                      name={ex.name}
+                      style={{ marginBottom: 12 }}
+                    />
                     <View style={styles.exerciseHeader}>
                       <View style={styles.exerciseNumber}>
                         <Text style={styles.exerciseNumberText}>{index + 1}</Text>
@@ -160,6 +168,7 @@ export default function WorkoutScreen() {
                       <Text style={styles.restText}>⏱ {ex.restSeconds}s descanso</Text>
                     </View>
                   </View>
+
                 </MotiView>
               ))}
             </>
