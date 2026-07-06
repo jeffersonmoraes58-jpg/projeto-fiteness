@@ -73,6 +73,7 @@ services:
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-disabled}
       GOOGLE_CALLBACK_URL: ${GOOGLE_CALLBACK_URL:-disabled}
       MUSCLEWIKI_API_KEY: ${MUSCLEWIKI_API_KEY}
+      JAMENDO_CLIENT_ID: ${JAMENDO_CLIENT_ID}
     depends_on:
       postgres:
         condition: service_healthy

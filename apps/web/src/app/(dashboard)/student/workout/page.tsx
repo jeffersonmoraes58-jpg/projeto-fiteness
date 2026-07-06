@@ -646,29 +646,30 @@ declare global {
 }
 
 interface MusicResult {
-  videoId: string;
+  trackId: string;
   title: string;
   thumbnail: string;
   author: string;
+  audioUrl: string;
 }
 
-async function searchYouTube(query: string): Promise<MusicResult[]> {
+async function searchMusic(query: string): Promise<MusicResult[]> {
   try {
     const res = await api.get(`/music/search?q=${encodeURIComponent(query)}`);
     const data = res.data.data ?? res.data;
     if (!Array.isArray(data)) return [];
-    return data.filter((v: any) => v.videoId);
+    return data.filter((v: any) => v.trackId && v.audioUrl);
   } catch {
     return [];
   }
 }
 
 const MUSIC_GENRES = [
-  { label: '🔥 Treino', q: 'musculação treino música 2024' },
-  { label: '⚡ HIIT', q: 'HIIT workout music high energy' },
-  { label: '🎧 EDM', q: 'EDM gym music playlist' },
-  { label: '🎸 Rock', q: 'rock workout music playlist' },
-  { label: '🇧🇷 Funk', q: 'funk carioca treino playlist' },
+  { label: '🔥 Treino', q: 'workout' },
+  { label: '⚡ HIIT', q: 'energetic hiit' },
+  { label: '🎧 EDM', q: 'electronic edm' },
+  { label: '🎸 Rock', q: 'rock energetic' },
+  { label: '🎵 Hip-Hop', q: 'hiphop' },
 ];
 
 function WorkoutMusicPlayer() {
@@ -677,10 +678,10 @@ function WorkoutMusicPlayer() {
   const [results, setResults] = useState<MusicResult[]>([]);
   const [searching, setSearching] = useState(false);
   const [searchErr, setSearchErr] = useState(false);
-  const [currentId, setCurrentId] = useState('');
+  const [currentTrackId, setCurrentTrackId] = useState('');
   const [currentTitle, setCurrentTitle] = useState('');
+  const [currentThumbnail, setCurrentThumbnail] = useState('');
   const [isPlaying, setIsPlaying] = useState(false);
-  const [useBackgroundMode, setUseBackgroundMode] = useState(false);
   const [audioError, setAudioError] = useState('');
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const keepAliveRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -733,24 +734,21 @@ function WorkoutMusicPlayer() {
 
   // Atualiza Media Session quando a música muda
   useEffect(() => {
-    if (currentId && currentTitle && isPlaying) {
-      updateMediaSession(currentId, currentTitle);
+    if (currentTrackId && currentTitle && isPlaying) {
+      updateMediaSession(currentTrackId, currentTitle, currentThumbnail);
     }
-  }, [currentId, currentTitle, isPlaying]);
+  }, [currentTrackId, currentTitle, currentThumbnail, isPlaying]);
 
   // ─── Media Session API ─────────────────────────────────────────────────
 
-  function updateMediaSession(videoId: string, title: string) {
+  function updateMediaSession(trackId: string, title: string, thumbnail: string) {
     if (!('mediaSession' in navigator)) return;
 
     navigator.mediaSession.metadata = new MediaMetadata({
       title: title || 'Música de treino',
       artist: 'FitlyNutri',
       album: 'Música para Treino',
-      artwork: [
-        { src: `https://img.youtube.com/vi/${videoId}/mqdefault.jpg`, sizes: '320x180', type: 'image/jpeg' },
-        { src: `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`, sizes: '480x360', type: 'image/jpeg' },
-      ],
+      artwork: thumbnail ? [{ src: thumbnail, sizes: '200x200', type: 'image/jpeg' }] : [],
     });
 
     navigator.mediaSession.setActionHandler('play', () => {
@@ -787,7 +785,7 @@ function WorkoutMusicPlayer() {
     setSearchErr(false);
     setResults([]);
     setAudioError('');
-    const found = await searchYouTube(q.trim());
+    const found = await searchMusic(q.trim());
     setResults(found);
     setSearchErr(found.length === 0);
     setSearching(false);
@@ -795,23 +793,17 @@ function WorkoutMusicPlayer() {
   }
 
   function playAudio(v: MusicResult) {
-    setCurrentId(v.videoId);
+    setCurrentTrackId(v.trackId);
     setCurrentTitle(v.title);
+    setCurrentThumbnail(v.thumbnail);
     setAudioError('');
-
-    // Constrói a URL de áudio via nosso backend (que faz proxy do YouTube)
-    // Usa o endpoint /api/music/audio/:videoId que converte YouTube para MP3
-    const audioUrl = `/api/music/audio/${v.videoId}`;
 
     const audio = audioRef.current;
     if (!audio) return;
 
-    // Para a reprodução atual
     audio.pause();
     audio.src = '';
-
-    // Carrega e toca o novo áudio
-    audio.src = audioUrl;
+    audio.src = v.audioUrl;
     audio.play().catch((err) => {
       console.error('Erro ao reproduzir áudio:', err);
       setAudioError('Não foi possível reproduzir. Tente outra música.');
@@ -824,7 +816,7 @@ function WorkoutMusicPlayer() {
 
     if (isPlaying) {
       audio.pause();
-    } else if (currentId) {
+    } else if (currentTrackId) {
       audio.play().catch(() => {
         // Se falhou, tenta recarregar
         audio.load();
@@ -848,7 +840,7 @@ function WorkoutMusicPlayer() {
             <Music className="w-3.5 h-3.5 text-violet-400" />
           </div>
           <span className="text-sm font-semibold truncate">
-            {isPlaying && currentTitle ? `🎵 ${currentTitle}` : 'Música de treino'}
+            {isPlaying && currentTitle ? `🎵 ${currentTitle}` : 'Música de Treino'}
           </span>
         </div>
         {open
@@ -911,11 +903,11 @@ function WorkoutMusicPlayer() {
           <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1" style={{ scrollbarWidth: 'none' } as React.CSSProperties}>
             {results.map((v) => (
               <button
-                key={v.videoId}
+                key={v.trackId}
                 onClick={() => playAudio(v)}
                 className={cn(
                   'flex-shrink-0 w-32 rounded-xl overflow-hidden text-left transition-all border',
-                  currentId === v.videoId
+                  currentTrackId === v.trackId
                     ? 'border-primary/60 ring-1 ring-primary/40'
                     : 'border-transparent opacity-60 hover:opacity-100',
                 )}
@@ -931,13 +923,12 @@ function WorkoutMusicPlayer() {
         )}
 
         {/* Now playing bar */}
-        {currentId && (
+        {currentTrackId && (
           <div className="flex items-center gap-3 p-2.5 rounded-xl bg-violet-500/10 border border-violet-500/20">
-            <img
-              src={`https://img.youtube.com/vi/${currentId}/mqdefault.jpg`}
-              alt=""
-              className="w-10 h-10 rounded-lg object-cover flex-shrink-0"
-            />
+            {currentThumbnail
+              ? <img src={currentThumbnail} alt="" className="w-10 h-10 rounded-lg object-cover flex-shrink-0" />
+              : <div className="w-10 h-10 rounded-lg bg-violet-500/20 flex items-center justify-center flex-shrink-0"><Music className="w-4 h-4 text-violet-400" /></div>
+            }
             <div className="flex-1 min-w-0">
               <p className="text-xs font-medium truncate">{currentTitle}</p>
               <p className="text-[10px] text-muted-foreground flex items-center gap-1 mt-0.5">
@@ -954,13 +945,6 @@ function WorkoutMusicPlayer() {
               {isPlaying
                 ? <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg>
                 : <Play className="w-4 h-4" />}
-            </button>
-            <button
-              onClick={() => window.open(`https://www.youtube.com/watch?v=${currentId}`, '_blank')}
-              title="Abrir no YouTube"
-              className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-white/10 transition-all flex-shrink-0 text-muted-foreground"
-            >
-              <ExternalLink className="w-3.5 h-3.5" />
             </button>
           </div>
         )}

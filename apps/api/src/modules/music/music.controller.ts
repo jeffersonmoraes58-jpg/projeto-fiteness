@@ -1,66 +1,54 @@
-import { Controller, Get, Param, Query, Res, HttpException, HttpStatus } from '@nestjs/common';
+import { Controller, Get, Query, HttpException, HttpStatus } from '@nestjs/common';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
-import { Response } from 'express';
 import { Public } from '../../decorators/public.decorator';
-import ytSearch from 'yt-search';
-import ytdl from '@distube/ytdl-core';
+import { ConfigService } from '@nestjs/config';
 
 @ApiTags('music')
 @Controller('music')
 export class MusicController {
+  constructor(private config: ConfigService) {}
+
   @Public()
   @Get('search')
-  @ApiOperation({ summary: 'Buscar músicas no YouTube' })
+  @ApiOperation({ summary: 'Buscar músicas no Jamendo (royalty-free)' })
   async search(@Query('q') q: string) {
-    if (!q?.trim()) return [];
-    const result = await (ytSearch as any)(q.trim());
-    return result.videos.slice(0, 12).map((v: any) => ({
-      videoId: v.videoId,
-      title: v.title,
-      thumbnail: v.thumbnail,
-      author: v.author?.name ?? '',
-      duration: v.timestamp ?? '',
-    }));
+    const clientId = this.config.get('JAMENDO_CLIENT_ID');
+    if (!clientId) {
+      throw new HttpException('Player de música não configurado', HttpStatus.SERVICE_UNAVAILABLE);
+    }
+
+    const query = q?.trim() || 'workout';
+    const url = new URL('https://api.jamendo.com/v3.0/tracks/');
+    url.searchParams.set('client_id', clientId);
+    url.searchParams.set('format', 'json');
+    url.searchParams.set('search', query);
+    url.searchParams.set('audioformat', 'mp32');
+    url.searchParams.set('limit', '12');
+    url.searchParams.set('order', 'popularity_total');
+    url.searchParams.set('include', 'musicinfo');
+
+    try {
+      const res = await fetch(url.toString());
+      if (!res.ok) throw new Error(`Jamendo HTTP ${res.status}`);
+      const data: any = await res.json();
+      return (data.results || []).map((t: any) => ({
+        trackId: String(t.id),
+        title: t.name,
+        thumbnail: t.album_image || '',
+        author: t.artist_name,
+        duration: this.formatDuration(t.duration),
+        audioUrl: t.audiodownload || t.audio,
+      }));
+    } catch (err: any) {
+      console.error('Jamendo API error:', err.message);
+      throw new HttpException('Erro ao buscar músicas', HttpStatus.BAD_GATEWAY);
+    }
   }
 
-  @Public()
-  @Get('audio/:videoId')
-  @ApiOperation({ summary: 'Stream de áudio do YouTube (MP3) para background playback' })
-  async streamAudio(@Param('videoId') videoId: string, @Res() res: Response) {
-    try {
-      const url = `https://www.youtube.com/watch?v=${videoId}`;
-
-      // Valida se o vídeo existe
-      const info = await ytdl.getInfo(url);
-      const title = info.videoDetails.title;
-
-      // Configura headers para streaming de áudio
-      res.setHeader('Content-Type', 'audio/mpeg');
-      res.setHeader('Content-Disposition', `inline; filename="${title}.mp3"`);
-      res.setHeader('Accept-Ranges', 'bytes');
-      res.setHeader('Cache-Control', 'public, max-age=3600');
-      res.setHeader('Access-Control-Allow-Origin', '*');
-
-      // Stream de áudio (formato MP3, qualidade mais baixa para performance)
-      const stream = ytdl(url, {
-        quality: 'lowestaudio',
-        filter: 'audioonly',
-      });
-
-      stream.on('error', (err) => {
-        console.error('Erro no stream de áudio:', err.message);
-        if (!res.headersSent) {
-          res.status(500).json({ error: 'Erro ao carregar áudio' });
-        }
-      });
-
-      stream.pipe(res);
-    } catch (error: any) {
-      console.error('Erro ao obter áudio do YouTube:', error.message);
-      throw new HttpException(
-        { error: 'Não foi possível carregar o áudio deste vídeo' },
-        HttpStatus.BAD_REQUEST,
-      );
-    }
+  private formatDuration(seconds: number): string {
+    if (!seconds) return '';
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return `${m}:${s.toString().padStart(2, '0')}`;
   }
 }
