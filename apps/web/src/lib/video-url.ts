@@ -9,8 +9,12 @@ const MW_HOST = 'api.musclewiki.com';
 export function resolveVideoUrl(url?: string | null): string {
   if (!url) return '';
   
-  // Já é URL relativa do nosso proxy — retorna como está (navegador resolve contra o domínio atual)
-  if (url.startsWith('/api/v1/musclewiki/')) return url;
+  // Já é URL relativa do proxy — converte para URL absoluta para evitar conflito com o rewrite do Next.js
+  // (o rewrite /api/:path* adiciona /v1/ e duplicaria o path)
+  if (url.startsWith('/api/v1/musclewiki/')) {
+    const apiBase = process.env.NEXT_PUBLIC_API_URL ?? '';
+    return `${apiBase}${url}`;
+  }
   
   // URL absoluta da MuscleWiki — converte para proxy local
   if (url.includes(MW_HOST)) {
