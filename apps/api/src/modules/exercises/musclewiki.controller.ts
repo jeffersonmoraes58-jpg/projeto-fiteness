@@ -42,8 +42,18 @@ function tryServeFromCache(res: Response, cacheKey: string): boolean {
   if (fs.existsSync(cachePath)) {
     const stat = fs.statSync(cachePath);
     const maxAge = 7 * 24 * 60 * 60; // 7 days
+    const mimeTypes: Record<string, string> = {
+      '.mp4': 'video/mp4',
+      '.webm': 'video/webm',
+      '.ogg': 'video/ogg',
+      '.webp': 'image/webp',
+      '.png': 'image/png',
+      '.jpg': 'image/jpeg',
+      '.jpeg': 'image/jpeg',
+    };
+    const ext = Object.keys(mimeTypes).find((e) => cacheKey.endsWith(e));
     res.setHeader('cache-control', `public, max-age=${maxAge}`);
-    res.setHeader('content-type', cacheKey.endsWith('.webp') ? 'image/webp' : cacheKey.endsWith('.png') ? 'image/png' : cacheKey.endsWith('.jpg') || cacheKey.endsWith('.jpeg') ? 'image/jpeg' : 'application/octet-stream');
+    res.setHeader('content-type', ext ? mimeTypes[ext] : 'application/octet-stream');
     res.setHeader('content-length', stat.size);
     res.sendFile(cachePath);
     return true;
