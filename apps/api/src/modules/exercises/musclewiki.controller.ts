@@ -42,6 +42,11 @@ function tryServeFromCache(req: Request, res: Response, cacheKey: string): boole
   const cachePath = getCachePath(cacheKey);
   if (fs.existsSync(cachePath)) {
     const stat = fs.statSync(cachePath);
+    // Vídeos corrompidos/parciais (< 50KB) são descartados para re-download
+    if (cacheKey.startsWith('video_') && stat.size < 50 * 1024) {
+      try { fs.unlinkSync(cachePath); } catch { /* ignore */ }
+      return false;
+    }
     const maxAge = 7 * 24 * 60 * 60; // 7 days
     const mimeTypes: Record<string, string> = {
       '.mp4': 'video/mp4',
@@ -60,17 +65,15 @@ function tryServeFromCache(req: Request, res: Response, cacheKey: string): boole
     if (rangeHeader) {
       const parts = rangeHeader.replace(/bytes=/, '').split('-');
       const start = parseInt(parts[0], 10);
-      const end = parts[1] ? parseInt(parts[1], 10) : stat.size - 1;
-      const chunkSize = end - start + 1;
+      const end = parts[1] ? Math.min(parseInt(parts[1], 10), stat.size - 1) : stat.size - 1;
 
-      if (start >= stat.size || end >= stat.size) {
-        res.writeHead(416, {
-          'content-range': `bytes */${stat.size}`,
-        });
+      if (isNaN(start) || start >= stat.size) {
+        res.writeHead(416, { 'content-range': `bytes */${stat.size}` });
         res.end();
         return true;
       }
 
+      const chunkSize = end - start + 1;
       res.writeHead(206, {
         'content-type': contentType,
         'content-length': chunkSize,
@@ -98,38 +101,33 @@ function tryServeFromCache(req: Request, res: Response, cacheKey: string): boole
 async function pipeUpstream(req: Request, res: Response, upstreamUrl: string, cacheKey?: string) {
   if (!MW_API_KEY) throw new HttpException('MuscleWiki API key not configured', HttpStatus.SERVICE_UNAVAILABLE);
 
-  // Try cache first
+  // Try cache first — cache always contains the full file, so Range requests are handled correctly
   if (cacheKey) {
     ensureCacheDir();
     if (tryServeFromCache(req, res, cacheKey)) return;
   }
 
+  // Fetch the FULL file from upstream (never forward Range header).
+  // This ensures the cache always contains the complete file.
+  // Subsequent requests are served from the cache with proper Range support.
   const upstream = await fetch(upstreamUrl, {
-    headers: {
-      'X-API-Key': MW_API_KEY,
-      ...(req.headers.range ? { Range: String(req.headers.range) } : {}),
-    },
+    headers: { 'X-API-Key': MW_API_KEY },
   });
 
-  if (!upstream.ok && upstream.status !== 206) {
+  if (!upstream.ok) {
     res.status(upstream.status).send(await upstream.text());
     return;
   }
-
-  res.status(upstream.status);
-  const passthrough = ['content-type', 'content-length', 'content-range', 'accept-ranges', 'cache-control', 'etag'];
-  for (const h of passthrough) {
-    const v = upstream.headers.get(h);
-    if (v) res.setHeader(h, v);
-  }
-  if (!upstream.headers.get('cache-control')) res.setHeader('cache-control', 'public, max-age=86400');
 
   if (!upstream.body) {
     res.end();
     return;
   }
 
-  // Stream directly to client (no buffering) for better video playback
+  const contentType = upstream.headers.get('content-type') ?? 'application/octet-stream';
+  const maxAge = 7 * 24 * 60 * 60; // 7 days
+
+  // Read full body
   const reader = upstream.body.getReader();
   const chunks: Buffer[] = [];
   let streamError = false;
@@ -138,42 +136,61 @@ async function pipeUpstream(req: Request, res: Response, upstreamUrl: string, ca
     reader.cancel().catch(() => {});
   });
 
-  // Use a pipe approach: read chunks and write them as they arrive
   try {
     while (true) {
       const { value, done } = await reader.read();
       if (done) break;
-      if (value) {
-        const buf = Buffer.from(value);
-        chunks.push(buf);
-        res.write(buf);
-      }
+      if (value) chunks.push(Buffer.from(value));
     }
-  } catch (e) {
+  } catch {
     streamError = true;
-    // Client likely disconnected, that's ok
   }
 
-  if (!streamError) {
-    res.end();
-  }
+  if (streamError) return;
 
-  // Save to cache after serving (fire-and-forget, don't block response)
-  if (cacheKey && chunks.length > 0 && !streamError) {
+  const fullBody = Buffer.concat(chunks);
+  const totalSize = fullBody.length;
+
+  // Save full file to cache (synchronously — response not yet sent)
+  if (cacheKey && totalSize > 0) {
     try {
       ensureCacheDir();
-      const cachePath = getCachePath(cacheKey);
-      // Write cache asynchronously to not block the response
-      setImmediate(() => {
-        try {
-          fs.writeFileSync(cachePath, Buffer.concat(chunks));
-        } catch (e) {
-          // Silently fail if cache write fails
-        }
-      });
-    } catch (e) {
-      // Silently fail
+      fs.writeFileSync(getCachePath(cacheKey), fullBody);
+    } catch {
+      // Silently fail cache write
     }
+  }
+
+  // Serve the file with Range support
+  const rangeHeader = req.headers.range;
+  if (rangeHeader) {
+    const parts = rangeHeader.replace(/bytes=/, '').split('-');
+    const start = parseInt(parts[0], 10);
+    const end = parts[1] ? Math.min(parseInt(parts[1], 10), totalSize - 1) : totalSize - 1;
+
+    if (isNaN(start) || start >= totalSize) {
+      res.writeHead(416, { 'content-range': `bytes */${totalSize}` });
+      res.end();
+      return;
+    }
+
+    const slice = fullBody.slice(start, end + 1);
+    res.writeHead(206, {
+      'content-type': contentType,
+      'content-length': slice.length,
+      'content-range': `bytes ${start}-${end}/${totalSize}`,
+      'accept-ranges': 'bytes',
+      'cache-control': `public, max-age=${maxAge}`,
+    });
+    res.end(slice);
+  } else {
+    res.writeHead(200, {
+      'content-type': contentType,
+      'content-length': totalSize,
+      'accept-ranges': 'bytes',
+      'cache-control': `public, max-age=${maxAge}`,
+    });
+    res.end(fullBody);
   }
 }
 

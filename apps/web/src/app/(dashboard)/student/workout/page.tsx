@@ -156,6 +156,8 @@ function VideoModal({ url, title, onClose }: { url: string; title: string; onClo
                     src={info.embedUrl}
                     controls
                     autoPlay
+                    muted
+                    playsInline
                     className="w-full h-full"
                     onError={() => setVideoError(true)}
                   />

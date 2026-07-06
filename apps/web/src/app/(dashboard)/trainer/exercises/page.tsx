@@ -599,7 +599,7 @@ export default function TrainerExercises() {
                     );
                   }
                   return embed.type === 'video'
-                    ? <video key={embed.src} src={embed.src} controls autoPlay className="w-full h-full" />
+                    ? <video key={embed.src} src={embed.src} controls autoPlay muted playsInline className="w-full h-full" />
                     : <iframe key={embed.src} src={embed.src} className="w-full h-full" allow="autoplay; fullscreen" allowFullScreen title={videoModal.name} />;
                 })()}
               </div>
