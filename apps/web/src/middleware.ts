@@ -27,17 +27,7 @@ export function middleware(request: NextRequest) {
 
   const isAuthPath = AUTH_PATHS.some((p) => pathname.startsWith(p));
   const isDashboardRedirect = pathname === '/dashboard';
-  const isRootPath = pathname === '/';
   const isProtected = Object.values(ROLE_PREFIXES).flat().some((p) => pathname.startsWith(p));
-
-  // Root path → redirect to login if not authenticated, or to dashboard if authenticated
-  if (isRootPath) {
-    if (!isAuth || !role) {
-      return NextResponse.redirect(new URL('/login', request.url));
-    }
-    const home = ROLE_HOME[role] || '/login';
-    return NextResponse.redirect(new URL(home, request.url));
-  }
 
   // Logged-in user trying to access auth pages → redirect to their dashboard
   if (isAuth && role && isAuthPath) {
@@ -76,7 +66,6 @@ export function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    '/',
     '/dashboard',
     '/login',
     '/register',
