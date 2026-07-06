@@ -6,7 +6,24 @@ import * as path from 'path';
 
 const MW_API_BASE = process.env.MUSCLEWIKI_API_BASE ?? 'https://api.musclewiki.com';
 const MW_API_KEY = process.env.MUSCLEWIKI_API_KEY;
-const CACHE_DIR = path.resolve('/tmp/musclewiki-cache');
+// Usar /data/musclewiki-cache para cache persistente (montado como volume no docker-compose)
+// Fallback para /tmp se /data não estiver disponível
+const CACHE_DIR = (() => {
+  try {
+    const dir = '/data/musclewiki-cache';
+    if (!fs.existsSync('/data')) {
+      const tmp = '/tmp/musclewiki-cache';
+      if (!fs.existsSync(tmp)) fs.mkdirSync(tmp, { recursive: true });
+      return tmp;
+    }
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    return dir;
+  } catch {
+    const tmp = '/tmp/musclewiki-cache';
+    if (!fs.existsSync(tmp)) fs.mkdirSync(tmp, { recursive: true });
+    return tmp;
+  }
+})();
 
 function ensureCacheDir() {
   if (!fs.existsSync(CACHE_DIR)) fs.mkdirSync(CACHE_DIR, { recursive: true });

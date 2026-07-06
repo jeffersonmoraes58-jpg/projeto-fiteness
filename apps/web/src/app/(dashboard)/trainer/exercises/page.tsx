@@ -6,7 +6,9 @@ import {
   Search, Plus, X, Dumbbell, Play, ChevronRight,
   Zap, Filter, ChevronDown, Trash2, Pencil, Save,
   Lock, BookOpen, User, Video, CheckCircle, Link2, Upload,
+  ExternalLink,
 } from 'lucide-react';
+
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
@@ -550,18 +552,49 @@ export default function TrainerExercises() {
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setVideoModal(null)} className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4">
             <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }} onClick={e => e.stopPropagation()} className="w-full max-w-2xl bg-card rounded-2xl overflow-hidden shadow-2xl">
               <div className="flex items-center justify-between px-4 py-3 border-b border-border">
-                <span className="font-semibold">{videoModal.name}</span>
-                <button onClick={() => setVideoModal(null)} className="w-7 h-7 rounded-lg hover:bg-accent flex items-center justify-center"><X className="w-4 h-4" /></button>
+                <span className="font-semibold truncate">{videoModal.name}</span>
+                <div className="flex items-center gap-2 flex-shrink-0 ml-3">
+                  {(() => {
+                    const ytId = videoModal.videoUrl?.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube-nocookie\.com\/embed\/)([^&\n?#]+)/)?.[1];
+                    if (!ytId) return null;
+                    return (
+                      <a
+                        href={`https://www.youtube.com/watch?v=${ytId}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="w-7 h-7 rounded-lg hover:bg-accent flex items-center justify-center transition-all"
+                        title="Abrir no YouTube"
+                      >
+                        <ExternalLink className="w-3.5 h-3.5" />
+                      </a>
+                    );
+                  })()}
+                  <button onClick={() => setVideoModal(null)} className="w-7 h-7 rounded-lg hover:bg-accent flex items-center justify-center"><X className="w-4 h-4" /></button>
+                </div>
               </div>
               <div style={{ aspectRatio: '16/9' }} className="bg-black/60 flex items-center justify-center">
                 {(() => {
                   const embed = getEmbedUrl(videoModal.videoUrl);
+                  const ytId = videoModal.videoUrl?.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube-nocookie\.com\/embed\/)([^&\n?#]+)/)?.[1];
+                  const ytLink = ytId ? `https://www.youtube.com/watch?v=${ytId}` : null;
+
                   if (!embed) {
                     return (
                       <div className="text-center p-8">
                         <Video className="w-12 h-12 text-muted-foreground mx-auto mb-3" />
                         <p className="text-sm text-muted-foreground">URL do vídeo não reconhecida</p>
                         <p className="text-xs text-muted-foreground/60 mt-1">{videoModal.videoUrl}</p>
+                        {ytLink && (
+                          <a
+                            href={ytLink}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1.5 text-primary hover:text-primary/80 text-sm font-medium transition-colors mt-3"
+                          >
+                            <ExternalLink className="w-4 h-4" />
+                            Abrir no YouTube
+                          </a>
+                        )}
                       </div>
                     );
                   }
@@ -570,10 +603,29 @@ export default function TrainerExercises() {
                     : <iframe key={embed.src} src={embed.src} className="w-full h-full" allow="autoplay; fullscreen" allowFullScreen title={videoModal.name} />;
                 })()}
               </div>
+              {/* Fallback footer */}
+              {(() => {
+                const ytId = videoModal.videoUrl?.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube-nocookie\.com\/embed\/)([^&\n?#]+)/)?.[1];
+                if (!ytId) return null;
+                return (
+                  <div className="px-4 py-2 bg-white/5 border-t border-border/50">
+                    <a
+                      href={`https://www.youtube.com/watch?v=${ytId}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center justify-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      <ExternalLink className="w-3 h-3" />
+                      Se o vídeo não reproduzir, abra no YouTube
+                    </a>
+                  </div>
+                );
+              })()}
             </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
+
     </div>
   );
 }

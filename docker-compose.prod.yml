@@ -79,6 +79,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+    volumes:
+      - musclewiki_cache:/data/musclewiki-cache
     networks:
       fitsaas-network:
         aliases:
@@ -156,6 +158,7 @@ volumes:
   redis_data:
   certbot_www:
   certbot_conf:
+  musclewiki_cache:
 
 networks:
   fitsaas-network:

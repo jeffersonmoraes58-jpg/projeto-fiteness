@@ -54,13 +54,18 @@ function groupExercises(exercises: any[]): { technique: Technique; items: any[] 
   return groups;
 }
 
+function getYouTubeId(rawUrl: string): string | null {
+  const m = rawUrl.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube-nocookie\.com\/embed\/)([^&\n?#]+)/);
+  return m ? m[1] : null;
+}
+
 function getEmbedInfo(rawUrl: string): { embedUrl: string; type: 'youtube' | 'vimeo' | 'direct' } | null {
   if (!rawUrl) return null;
   const url = resolveVideoUrl(rawUrl);
-  const ytMatch = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&\n?#]+)/);
-  if (ytMatch) return { type: 'youtube', embedUrl: `https://www.youtube.com/embed/${ytMatch[1]}?rel=0&modestbranding=1` };
+  const ytId = getYouTubeId(url);
+  if (ytId) return { type: 'youtube', embedUrl: `https://www.youtube-nocookie.com/embed/${ytId}?rel=0&modestbranding=1&autoplay=1` };
   const vimeoMatch = url.match(/(?:vimeo\.com\/)(\d+)/);
-  if (vimeoMatch) return { type: 'vimeo', embedUrl: `https://player.vimeo.com/video/${vimeoMatch[1]}?title=0&byline=0` };
+  if (vimeoMatch) return { type: 'vimeo', embedUrl: `https://player.vimeo.com/video/${vimeoMatch[1]}?title=0&byline=0&autoplay=1` };
   if (/\.(mp4|webm|ogg)(\?|$)/i.test(url)) return { type: 'direct', embedUrl: url };
   if (url.includes('/musclewiki/stream/')) return { type: 'direct', embedUrl: url };
   return null;
@@ -77,6 +82,13 @@ function getVideoThumbnail(url: string): string | null {
 
 function VideoModal({ url, title, onClose }: { url: string; title: string; onClose: () => void }) {
   const info = getEmbedInfo(url);
+  const [videoError, setVideoError] = useState(false);
+
+  // Extract raw YouTube URL for fallback link
+  const rawYtUrl = useMemo(() => {
+    const ytId = getYouTubeId(url);
+    return ytId ? `https://www.youtube.com/watch?v=${ytId}` : null;
+  }, [url]);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
@@ -103,13 +115,52 @@ function VideoModal({ url, title, onClose }: { url: string; title: string; onClo
         >
           <div className="flex items-center justify-between px-4 py-3 bg-white/5">
             <span className="font-medium text-sm truncate">{title}</span>
-            <button onClick={onClose} className="w-8 h-8 rounded-lg hover:bg-white/10 flex items-center justify-center transition-all flex-shrink-0 ml-3">
-              <X className="w-4 h-4" />
-            </button>
+            <div className="flex items-center gap-2 flex-shrink-0 ml-3">
+              {rawYtUrl && (
+                <a
+                  href={rawYtUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-8 h-8 rounded-lg hover:bg-white/10 flex items-center justify-center transition-all"
+                  title="Abrir no YouTube"
+                >
+                  <ExternalLink className="w-4 h-4" />
+                </a>
+              )}
+              <button onClick={onClose} className="w-8 h-8 rounded-lg hover:bg-white/10 flex items-center justify-center transition-all">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
           </div>
           <div className="relative aspect-video">
             {info?.type === 'direct' ? (
-              <video src={info.embedUrl} controls autoPlay className="w-full h-full" />
+              <>
+                {videoError ? (
+                  <div className="flex flex-col items-center justify-center h-full text-muted-foreground text-sm gap-3">
+                    <PlayCircle className="w-10 h-10 opacity-50" />
+                    <span>Não foi possível carregar o vídeo</span>
+                    {rawYtUrl && (
+                      <a
+                        href={rawYtUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 text-primary hover:text-primary/80 text-sm font-medium transition-colors"
+                      >
+                        <ExternalLink className="w-4 h-4" />
+                        Abrir no YouTube
+                      </a>
+                    )}
+                  </div>
+                ) : (
+                  <video
+                    src={info.embedUrl}
+                    controls
+                    autoPlay
+                    className="w-full h-full"
+                    onError={() => setVideoError(true)}
+                  />
+                )}
+              </>
             ) : info ? (
               <iframe
                 src={info.embedUrl}
@@ -118,11 +169,37 @@ function VideoModal({ url, title, onClose }: { url: string; title: string; onClo
                 className="absolute inset-0 w-full h-full border-0"
               />
             ) : (
-              <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
-                Formato de vídeo não suportado
+              <div className="flex flex-col items-center justify-center h-full text-muted-foreground text-sm gap-3">
+                <PlayCircle className="w-10 h-10 opacity-50" />
+                <span>Formato de vídeo não suportado</span>
+                {rawYtUrl && (
+                  <a
+                    href={rawYtUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 text-primary hover:text-primary/80 text-sm font-medium transition-colors"
+                  >
+                    <ExternalLink className="w-4 h-4" />
+                    Abrir no YouTube
+                  </a>
+                )}
               </div>
             )}
           </div>
+          {/* Fallback footer */}
+          {rawYtUrl && !videoError && (
+            <div className="px-4 py-2 bg-white/5 border-t border-white/10">
+              <a
+                href={rawYtUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center justify-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <ExternalLink className="w-3 h-3" />
+                Se o vídeo não reproduzir, abra no YouTube
+              </a>
+            </div>
+          )}
         </motion.div>
       </motion.div>
     </AnimatePresence>
