@@ -35,9 +35,10 @@ function getCachePath(filename: string): string {
 
 /**
  * Tenta servir do cache primeiro.
+ * Suporta Range Requests (HTTP 206 Partial Content) para streaming de vídeo.
  * Retorna true se serviu do cache, false se não encontrou.
  */
-function tryServeFromCache(res: Response, cacheKey: string): boolean {
+function tryServeFromCache(req: Request, res: Response, cacheKey: string): boolean {
   const cachePath = getCachePath(cacheKey);
   if (fs.existsSync(cachePath)) {
     const stat = fs.statSync(cachePath);
@@ -52,9 +53,38 @@ function tryServeFromCache(res: Response, cacheKey: string): boolean {
       '.jpeg': 'image/jpeg',
     };
     const ext = Object.keys(mimeTypes).find((e) => cacheKey.endsWith(e));
-    // Write headers directly and pipe file — avoids Helmet adding conflicting headers
+    const contentType = ext ? mimeTypes[ext] : 'application/octet-stream';
+
+    // Handle Range Request (for video streaming)
+    const rangeHeader = req.headers.range;
+    if (rangeHeader) {
+      const parts = rangeHeader.replace(/bytes=/, '').split('-');
+      const start = parseInt(parts[0], 10);
+      const end = parts[1] ? parseInt(parts[1], 10) : stat.size - 1;
+      const chunkSize = end - start + 1;
+
+      if (start >= stat.size || end >= stat.size) {
+        res.writeHead(416, {
+          'content-range': `bytes */${stat.size}`,
+        });
+        res.end();
+        return true;
+      }
+
+      res.writeHead(206, {
+        'content-type': contentType,
+        'content-length': chunkSize,
+        'content-range': `bytes ${start}-${end}/${stat.size}`,
+        'accept-ranges': 'bytes',
+        'cache-control': `public, max-age=${maxAge}`,
+      });
+      fs.createReadStream(cachePath, { start, end }).pipe(res);
+      return true;
+    }
+
+    // Full content request
     res.writeHead(200, {
-      'content-type': ext ? mimeTypes[ext] : 'application/octet-stream',
+      'content-type': contentType,
       'content-length': stat.size,
       'cache-control': `public, max-age=${maxAge}`,
       'accept-ranges': 'bytes',
@@ -71,7 +101,7 @@ async function pipeUpstream(req: Request, res: Response, upstreamUrl: string, ca
   // Try cache first
   if (cacheKey) {
     ensureCacheDir();
-    if (tryServeFromCache(res, cacheKey)) return;
+    if (tryServeFromCache(req, res, cacheKey)) return;
   }
 
   const upstream = await fetch(upstreamUrl, {
