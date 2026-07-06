@@ -19,15 +19,39 @@ const ROLE_PREFIXES: Record<string, string[]> = {
   STUDENT: ['/student'],
 };
 
+/**
+ * Detecta se é um dispositivo móvel (smartphone ou tablet)
+ * pelo User-Agent. Isso inclui o TWA que roda no Android.
+ */
+function isMobileDevice(userAgent: string): boolean {
+  return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|Mobile|Tablet/i.test(userAgent);
+}
+
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   const isAuth = request.cookies.get('fitlynutri-auth')?.value === '1';
   const role = request.cookies.get('fitlynutri-role')?.value || '';
+  const userAgent = request.headers.get('user-agent') || '';
 
   const isAuthPath = AUTH_PATHS.some((p) => pathname.startsWith(p));
   const isDashboardRedirect = pathname === '/dashboard';
+  const isRootPath = pathname === '/';
   const isProtected = Object.values(ROLE_PREFIXES).flat().some((p) => pathname.startsWith(p));
+
+  // Root path → comportamento diferente para mobile vs desktop
+  if (isRootPath) {
+    if (isMobileDevice(userAgent)) {
+      // Dispositivo móvel (incluindo TWA) → vai para login
+      if (!isAuth || !role) {
+        return NextResponse.redirect(new URL('/login', request.url));
+      }
+      const home = ROLE_HOME[role] || '/login';
+      return NextResponse.redirect(new URL(home, request.url));
+    }
+    // Desktop/notebook → landing page normal
+    return NextResponse.next();
+  }
 
   // Logged-in user trying to access auth pages → redirect to their dashboard
   if (isAuth && role && isAuthPath) {
@@ -66,6 +90,7 @@ export function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
+    '/',
     '/dashboard',
     '/login',
     '/register',
