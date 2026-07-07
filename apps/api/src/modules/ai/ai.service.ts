@@ -3,8 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import Anthropic from '@anthropic-ai/sdk';
 import { PrismaService } from '../prisma/prisma.service';
 import { GoalType, ActivityLevel } from '@prisma/client';
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const pdfParse = require('pdf-parse');
+import { PDFParse } from 'pdf-parse';
 
 @Injectable()
 export class AiService {
@@ -503,12 +502,16 @@ Resumo do que foi configurado acima: adapte 100% das suas respostas ao perfil, t
     const trainer = await this.prisma.trainer.findUnique({ where: { userId } });
     if (!trainer) throw new ForbiddenException('Apenas trainers podem processar PDFs');
 
-    // Extrair texto do PDF
+    // ─── 1. Extrair texto do PDF ──────────────────────────────────────────────
     let pdfText: string;
     try {
-      const pdfData = await pdfParse(pdfBuffer);
-      pdfText = pdfData.text;
+      const parser = new PDFParse({ data: pdfBuffer });
+      const result = await parser.getText();
+      pdfText = result.text;
+      await parser.destroy();
+      console.log(`[PDF] Texto extraído (${pdfText.length} caracteres) de "${fileName}"`);
     } catch (err) {
+      console.error('[PDF] Erro ao extrair texto:', (err as Error).message);
       throw new BadRequestException(`Não foi possível ler o PDF: ${(err as Error).message}`);
     }
 
@@ -516,59 +519,71 @@ Resumo do que foi configurado acima: adapte 100% das suas respostas ao perfil, t
       throw new BadRequestException('O PDF está vazio ou não contém texto legível');
     }
 
-    // Buscar exercícios disponíveis do trainer
+    // ─── 2. Buscar TODOS os exercícios disponíveis ────────────────────────────
     const exercises = await this.prisma.exercise.findMany({
       where: { OR: [{ isPublic: true }, { trainerId: trainer.id }] },
-      select: { id: true, name: true, category: true, muscleGroups: true },
-      take: 100,
+      select: { id: true, name: true, category: true, muscleGroups: true, gifUrl: true, videoUrl: true },
+      take: 200,
       orderBy: { name: 'asc' },
     });
 
-    const exerciseList = exercises.map((e) => `"${e.name}" (${e.category || (e.muscleGroups?.length ? e.muscleGroups[0] : 'geral')})`).join(', ');
+    const exerciseList = exercises.map((e) =>
+      `"${e.name}" | categoria: ${e.category || (e.muscleGroups?.length ? e.muscleGroups[0] : 'geral')}${e.gifUrl ? ' ✅ tem GIF' : ''}${e.videoUrl ? ' ✅ tem vídeo' : ''}`
+    ).join('\n');
 
+    // ─── 3. Mandar para IA interpretar o PDF ──────────────────────────────────
     const prompt = `Você é um personal trainer expert especializado em interpretar PDFs de treino.
 
 ## CONTEÚDO EXTRAÍDO DO PDF "${fileName}":
-${pdfText.slice(0, 8000)}
+${pdfText.slice(0, 10000)}
 
-## EXERCÍCIOS DISPONÍVEIS NO SISTEMA (use APENAS estes nomes exatos):
+## BANCO DE EXERCÍCIOS DISPONÍVEIS NO SISTEMA:
 ${exerciseList}
 
 ## INSTRUÇÕES:
-1. Analise o PDF e identifique os treinos descritos
-2. Para cada treino, mapeie os exercícios mencionados para os nomes EXATOS da lista disponível
-3. Se um exercício do PDF não existir na lista, use o nome mais próximo ou sugira um similar
-4. Crie um JSON com os treinos encontrados
+1. Analise o PDF e identifique os treinos descritos (nome, divisão, dias da semana)
+2. Para CADA exercício mencionado no PDF, encontre o nome MAIS PRÓXIMO na lista disponível
+3. Se um exercício do PDF não existir exatamente na lista, escolha o MAIS SIMILAR (mesmo grupo muscular, mesmo tipo de movimento)
+4. Adapte séries, repetições, descanso e carga conforme descrito no PDF
+5. Se o PDF não especificar algum campo, use valores padrão adequados
+6. Inclua dicas de execução e observações relevantes
 
-Retorne APENAS JSON válido, sem texto extra:
+## FORMATO DE RESPOSTA (APENAS JSON válido, sem texto extra):
 {
   "workouts": [
     {
-      "name": "Nome do Treino A",
-      "description": "Descrição curta do treino",
+      "name": "Nome do Treino (ex: Treino A - Peito e Tríceps)",
+      "description": "Descrição curta do treino e objetivos",
       "level": 2,
       "duration": 60,
-      "tags": ["tag1", "tag2"],
+      "tags": ["peito", "tríceps", "empurrar"],
       "tips": ["Dica importante 1", "Dica importante 2"],
       "exercises": [
         {
-          "name": "Nome Exato do Exercício",
-          "sets": 3,
-          "reps": "10-12",
+          "name": "Nome Exato do Exercício da lista",
+          "sets": 4,
+          "reps": "8-12",
           "restSeconds": 60,
-          "notes": "Observação se houver"
+          "weight": 0,
+          "notes": "Observação sobre execução ou adaptação"
         }
       ]
     }
   ]
 }
 
-IMPORTANTE: Use APENAS nomes de exercícios da lista disponível. Adapte séries, repetições e descanso conforme o PDF. Máximo 3 treinos.`;
+IMPORTANTE:
+- Use APENAS nomes de exercícios que existem na lista disponível
+- Se não encontrar correspondência exata, escolha o mais similar
+- Máximo 4 treinos
+- 4 a 8 exercícios por treino
+- level: 1(iniciante), 2(intermediário), 3(avançado)`;
 
     let raw: string;
     try {
-      raw = await this.complete(prompt, 4000);
+      raw = await this.complete(prompt, 5000);
     } catch (err) {
+      console.error('[PDF] Erro na chamada da IA:', (err as Error).message);
       throw new Error(`Falha na chamada à IA: ${(err as Error).message}`);
     }
 
@@ -576,7 +591,7 @@ IMPORTANTE: Use APENAS nomes de exercícios da lista disponível. Adapte séries
     try {
       parsed = JSON.parse(this.extractJson(raw));
     } catch {
-      console.error('[AI processPdfWorkout] JSON parse failed. Raw:', raw.slice(0, 500));
+      console.error('[PDF] JSON parse failed. Raw:', raw.slice(0, 500));
       throw new Error('A IA não conseguiu interpretar o PDF corretamente. Tente novamente com um PDF mais claro.');
     }
 
@@ -585,8 +600,10 @@ IMPORTANTE: Use APENAS nomes de exercícios da lista disponível. Adapte séries
       throw new BadRequestException('A IA não identificou treinos válidos no PDF');
     }
 
-    const exerciseMap = new Map(exercises.map((e) => [e.name.toLowerCase().trim(), e.id]));
+    // ─── 4. Mapear exercícios e criar treinos ─────────────────────────────────
+    const exerciseMap = new Map(exercises.map((e) => [e.name.toLowerCase().trim(), e]));
     const createdWorkouts: any[] = [];
+    const unmatchedExercises: string[] = [];
 
     for (const w of workouts) {
       const workout = await this.prisma.workout.create({
@@ -601,35 +618,58 @@ IMPORTANTE: Use APENAS nomes de exercícios da lista disponível. Adapte séries
         },
       });
 
-      const workoutExercises = (w.exercises || [])
-        .map((ex: any, idx: number) => {
-          const exerciseId = exerciseMap.get((ex.name || '').toLowerCase().trim());
-          if (!exerciseId) {
-            // Tenta busca aproximada
-            const found = exercises.find((e) =>
-              e.name.toLowerCase().includes((ex.name || '').toLowerCase().slice(0, 10)),
-            );
-            return found ? {
-              workoutId: workout.id,
-              exerciseId: found.id,
-              sets: Number(ex.sets) || 3,
-              reps: String(ex.reps || '10'),
-              restSeconds: Number(ex.restSeconds) || 60,
-              order: idx,
-              notes: ex.notes || `Mapeado de: ${ex.name}`,
-            } : null;
+      const workoutExercises: any[] = [];
+
+      for (const [idx, ex] of (w.exercises || []).entries()) {
+        let matched = exerciseMap.get((ex.name || '').toLowerCase().trim());
+
+        // Se não achou exato, busca aproximada por similaridade
+        if (!matched) {
+          const searchName = (ex.name || '').toLowerCase().trim();
+          // 1. Tenta por includes (parte do nome)
+          let found = exercises.find((e) =>
+            e.name.toLowerCase().includes(searchName) ||
+            searchName.includes(e.name.toLowerCase()),
+          );
+          // 2. Tenta por palavra-chave (primeira palavra)
+          if (!found) {
+            const firstWord = searchName.split(/\s+/)[0];
+            if (firstWord && firstWord.length > 3) {
+              found = exercises.find((e) =>
+                e.name.toLowerCase().includes(firstWord),
+              );
+            }
           }
-          return {
-            workoutId: workout.id,
-            exerciseId,
-            sets: Number(ex.sets) || 3,
-            reps: String(ex.reps || '10'),
-            restSeconds: Number(ex.restSeconds) || 60,
-            order: idx,
-            notes: ex.notes || null,
-          };
-        })
-        .filter(Boolean);
+          // 3. Tenta por grupo muscular (se a IA informou)
+          if (!found && ex.muscleGroup) {
+            found = exercises.find((e) =>
+              e.muscleGroups?.some((mg: string) =>
+                mg.toLowerCase().includes((ex.muscleGroup || '').toLowerCase()),
+              ),
+            );
+          }
+
+          if (found) {
+            matched = found;
+            console.log(`[PDF] Mapeado "${ex.name}" → "${found.name}" (ID: ${found.id})`);
+          } else {
+            unmatchedExercises.push(ex.name);
+            console.log(`[PDF] Exercício não encontrado: "${ex.name}"`);
+            continue; // Pula exercícios sem match
+          }
+        }
+
+        workoutExercises.push({
+          workoutId: workout.id,
+          exerciseId: matched.id,
+          sets: Number(ex.sets) || 3,
+          reps: String(ex.reps || '10'),
+          weight: ex.weight != null ? Number(ex.weight) : null,
+          restSeconds: Number(ex.restSeconds) || 60,
+          order: idx,
+          notes: ex.notes || null,
+        });
+      }
 
       if (workoutExercises.length > 0) {
         await this.prisma.workoutExercise.createMany({ data: workoutExercises });
@@ -639,14 +679,19 @@ IMPORTANTE: Use APENAS nomes de exercícios da lista disponível. Adapte séries
         workoutId: workout.id,
         name: workout.name,
         exercisesAdded: workoutExercises.length,
+        exercisesTotal: (w.exercises || []).length,
         tips: w.tips || [],
       });
     }
 
-    // Monta resposta amigável
+    // ─── 5. Montar resposta ───────────────────────────────────────────────────
     const summary = createdWorkouts.map((w) =>
-      `✅ **${w.name}** — ${w.exercisesAdded} exercícios adicionados`,
+      `✅ **${w.name}** — ${w.exercisesAdded} de ${w.exercisesTotal} exercícios adicionados`,
     ).join('\n');
+
+    const unmatchedSection = unmatchedExercises.length > 0
+      ? `\n\n⚠️ **Exercícios não encontrados na base (foram ignorados):**\n${unmatchedExercises.map((n) => `• ${n}`).join('\n')}\n\n_Você pode criar esses exercícios manualmente e adicioná-los ao treino._`
+      : '';
 
     const allTips = createdWorkouts.flatMap((w) => w.tips || []);
     const tipsSection = allTips.length > 0
@@ -654,8 +699,9 @@ IMPORTANTE: Use APENAS nomes de exercícios da lista disponível. Adapte séries
       : '';
 
     return {
-      reply: `📄 **PDF processado com sucesso!** Encontrei ${createdWorkouts.length} treino(s) no arquivo "${fileName}".\n\n${summary}${tipsSection}\n\nOs treinos foram salvos como **Rascunho**. Você pode revisá-los e ativá-los na seção de Treinos.`,
+      reply: `📄 **PDF processado com sucesso!** Encontrei ${createdWorkouts.length} treino(s) no arquivo "${fileName}".\n\n${summary}${unmatchedSection}${tipsSection}\n\nOs treinos foram salvos como **Rascunho**. Você pode revisá-los e ativá-los na seção de Treinos.`,
       workouts: createdWorkouts,
+      unmatchedExercises,
     };
   }
 
