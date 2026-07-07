@@ -191,7 +191,7 @@ const AI_SUGGESTIONS = [
 
 export default function TrainerWorkouts() {
   const [search, setSearch] = useState('');
-  const [filter, setFilter] = useState('Todos');
+  const [filter, setFilter] = useState('Ativo');
   const [templatesOpen, setTemplatesOpen] = useState(true);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
   const [categoryFilter, setCategoryFilter] = useState('Todos');
