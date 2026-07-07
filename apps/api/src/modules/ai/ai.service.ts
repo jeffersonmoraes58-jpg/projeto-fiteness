@@ -531,73 +531,67 @@ Resumo do que foi configurado acima: adapte 100% das suas respostas ao perfil, t
       `"${e.name}" | categoria: ${e.category || (e.muscleGroups?.length ? e.muscleGroups[0] : 'geral')}${e.gifUrl ? ' ✅ tem GIF' : ''}${e.videoUrl ? ' ✅ tem vídeo' : ''}`
     ).join('\n');
 
-    // ─── 3. Mandar para IA interpretar o PDF ──────────────────────────────────
-    const prompt = `Você é um personal trainer expert especializado em interpretar PDFs de treino.
+    // ─── 3. Log do texto extraído para debug ──────────────────────────────────
+    console.log('[PDF] Texto bruto extraído:', pdfText.slice(0, 2000));
+
+    // ─── 4. Mandar para IA interpretar o PDF ──────────────────────────────────
+    // Tenta até 2 vezes com prompts diferentes
+    let raw: string;
+    let parsed: any = null;
+
+    const attemptPrompt = (extraInstructions: string) => {
+      return `Você é um personal trainer expert especializado em interpretar PDFs de treino.
 
 ## CONTEÚDO EXTRAÍDO DO PDF "${fileName}":
 ${pdfText.slice(0, 10000)}
 
-## BANCO DE EXERCÍCIOS DISPONÍVEIS NO SISTEMA:
+## BANCO DE EXERCÍCIOS DISPONÍVEIS NO SISTEMA (use APENAS estes nomes):
 ${exerciseList}
 
 ## INSTRUÇÕES:
-1. Analise o PDF e identifique os treinos descritos (nome, divisão, dias da semana)
-2. Para CADA exercício mencionado no PDF, encontre o nome MAIS PRÓXIMO na lista disponível
-3. Se um exercício do PDF não existir exatamente na lista, escolha o MAIS SIMILAR (mesmo grupo muscular, mesmo tipo de movimento)
-4. Adapte séries, repetições, descanso e carga conforme descrito no PDF
-5. Se o PDF não especificar algum campo, use valores padrão adequados
-6. Inclua dicas de execução e observações relevantes
+1. Analise TODO o conteúdo do PDF e identifique os treinos descritos
+2. Para CADA exercício mencionado, encontre o nome MAIS PRÓXIMO na lista disponível
+3. Se um exercício do PDF não existir exatamente, escolha o MAIS SIMILAR (mesmo grupo muscular)
+4. Adapte séries, repetições, descanso conforme descrito no PDF
+5. ${extraInstructions}
 
-## FORMATO DE RESPOSTA (APENAS JSON válido, sem texto extra):
-{
-  "workouts": [
-    {
-      "name": "Nome do Treino (ex: Treino A - Peito e Tríceps)",
-      "description": "Descrição curta do treino e objetivos",
-      "level": 2,
-      "duration": 60,
-      "tags": ["peito", "tríceps", "empurrar"],
-      "tips": ["Dica importante 1", "Dica importante 2"],
-      "exercises": [
-        {
-          "name": "Nome Exato do Exercício da lista",
-          "sets": 4,
-          "reps": "8-12",
-          "restSeconds": 60,
-          "weight": 0,
-          "notes": "Observação sobre execução ou adaptação"
-        }
-      ]
-    }
-  ]
-}
+## FORMATO DE RESPOSTA (APENAS JSON válido, sem texto extra, sem markdown):
+{"workouts":[{"name":"Nome do Treino","description":"Descrição","level":2,"duration":60,"tags":["tag1"],"tips":["dica"],"exercises":[{"name":"Nome Exato do Exercício","sets":3,"reps":"10-12","restSeconds":60,"weight":0,"notes":""}]}]}
 
-IMPORTANTE:
-- Use APENAS nomes de exercícios que existem na lista disponível
-- Se não encontrar correspondência exata, escolha o mais similar
-- Máximo 4 treinos
-- 4 a 8 exercícios por treino
-- level: 1(iniciante), 2(intermediário), 3(avançado)`;
+REGRAS ABSOLUTAS:
+- Retorne APENAS o JSON, nada mais
+- workouts DEVE ter pelo menos 1 item
+- Cada workout DEVE ter pelo menos 3 exercises
+- Use APENAS nomes de exercícios da lista disponível
+- NÃO use markdown, NÃO use \`\`\`json, NÃO use explicações
+- Apenas o JSON puro`;
+    };
 
-    let raw: string;
+    // Primeira tentativa
     try {
-      raw = await this.complete(prompt, 5000);
-    } catch (err) {
-      console.error('[PDF] Erro na chamada da IA:', (err as Error).message);
-      throw new Error(`Falha na chamada à IA: ${(err as Error).message}`);
-    }
-
-    let parsed: any;
-    try {
+      raw = await this.complete(attemptPrompt('Inclua dicas de execução e observações relevantes.'), 5000);
+      console.log('[PDF] Resposta bruta da IA (primeira tentativa):', raw.slice(0, 500));
       parsed = JSON.parse(this.extractJson(raw));
-    } catch {
-      console.error('[PDF] JSON parse failed. Raw:', raw.slice(0, 500));
-      throw new Error('A IA não conseguiu interpretar o PDF corretamente. Tente novamente com um PDF mais claro.');
+    } catch (err) {
+      console.log('[PDF] Primeira tentativa falhou, tentando novamente com prompt mais direto...');
     }
 
-    const workouts = parsed.workouts || [];
+    // Segunda tentativa se falhou
+    if (!parsed || !parsed.workouts || parsed.workouts.length === 0) {
+      try {
+        raw = await this.complete(attemptPrompt('Seja extremamente direto. Liste TODOS os exercícios encontrados no PDF, mesmo que o formato esteja confuso. Crie pelo menos 1 treino com no mínimo 3 exercícios.'), 5000);
+        console.log('[PDF] Resposta bruta da IA (segunda tentativa):', raw.slice(0, 500));
+        parsed = JSON.parse(this.extractJson(raw));
+      } catch (err) {
+        console.error('[PDF] Segunda tentativa também falhou. Raw:', raw?.slice(0, 500));
+        throw new Error('A IA não conseguiu interpretar o PDF corretamente. Tente novamente com um PDF mais claro.');
+      }
+    }
+
+    const workouts = parsed?.workouts || [];
     if (workouts.length === 0) {
-      throw new BadRequestException('A IA não identificou treinos válidos no PDF');
+      console.error('[PDF] IA retornou workouts vazio. Resposta completa:', JSON.stringify(parsed).slice(0, 1000));
+      throw new BadRequestException('A IA não identificou treinos válidos no PDF. Verifique se o PDF contém descrições de treinos legíveis.');
     }
 
     // ─── 4. Mapear exercícios e criar treinos ─────────────────────────────────
