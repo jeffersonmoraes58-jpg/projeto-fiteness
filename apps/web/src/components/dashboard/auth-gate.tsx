@@ -26,6 +26,9 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (hydrated && !accessToken && !user) {
+      // Clear cookies so middleware doesn't redirect back to dashboard
+      document.cookie = 'fitlynutri-auth=;path=/;max-age=0';
+      document.cookie = 'fitlynutri-role=;path=/;max-age=0';
       router.replace(`/login?next=${encodeURIComponent(pathname)}`);
     }
   }, [hydrated, accessToken, user, router, pathname]);
