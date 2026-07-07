@@ -52,11 +52,16 @@ export const useAuthStore = create<AuthState>()(
         set({ isLoading: true });
         try {
           const res = await api.post('/auth/register', data);
-          const { user, accessToken, refreshToken } = res.data.data;
+          const { user, accessToken, refreshToken, checkoutUrl } = res.data.data;
           set({ user, accessToken, refreshToken });
           api.defaults.headers.Authorization = `Bearer ${accessToken}`;
           document.cookie = `fitlynutri-role=${user.role};path=/;max-age=${7 * 24 * 3600};SameSite=Lax`;
           document.cookie = `fitlynutri-auth=1;path=/;max-age=${7 * 24 * 3600};SameSite=Lax`;
+
+          // Se tiver checkoutUrl (plano pago), redireciona para o Mercado Pago
+          if (checkoutUrl) {
+            window.location.href = checkoutUrl;
+          }
         } finally {
           set({ isLoading: false });
         }

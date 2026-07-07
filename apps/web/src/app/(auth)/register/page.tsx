@@ -106,11 +106,10 @@ function RegisterPageContent() {
         ...(needsWorkspaceName ? { studioName: data.studioName } : { tenantId: data.tenantId }),
       });
       toast.success('Conta criada com sucesso!');
-      // Se escolheu plano pago, redireciona para checkout MP; senão vai pro dashboard
+      // Se for plano FREE, redireciona direto pro dashboard
+      // Se for plano pago, o store/auth.ts redireciona automaticamente para o checkout MP
       const paid = planParam && planParam !== 'grátis' && planParam !== 'gratis' && planParam !== 'free';
-      if (paid) {
-        router.push(`/dashboard?upgrade=${planParam}&cycle=${cycleParam ?? 'monthly'}`);
-      } else {
+      if (!paid) {
         router.push('/dashboard');
       }
     } catch (err: any) {

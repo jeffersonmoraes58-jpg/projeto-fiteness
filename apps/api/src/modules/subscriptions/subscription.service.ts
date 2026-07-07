@@ -176,18 +176,31 @@ export class SubscriptionService {
   }
 
   async handleMPWebhook(body: any) {
+    this.logger.log(`[MP Webhook] Recebido: ${JSON.stringify(body)}`);
+
     // Suporta ambos os formatos de notificação do MP (IPN legado e Webhooks)
     const paymentId = body?.data?.id ?? body?.id;
-    if (!paymentId || body?.type === 'test') return { received: true };
+    if (!paymentId || body?.type === 'test') {
+      this.logger.log('[MP Webhook] Ignorado (test ou sem paymentId)');
+      return { received: true };
+    }
 
     try {
       const paymentApi = new Payment(this.mpClient());
       const payment = await paymentApi.get({ id: String(paymentId) });
 
-      if (payment.status !== 'approved') return { received: true };
+      this.logger.log(`[MP Webhook] Payment ${paymentId}: status=${payment.status}, ref=${payment.external_reference}`);
+
+      if (payment.status !== 'approved') {
+        this.logger.log(`[MP Webhook] Pagamento não aprovado (status=${payment.status}), ignorando`);
+        return { received: true };
+      }
 
       const ref = payment.external_reference;
-      if (!ref || !ref.includes(':')) return { received: true };
+      if (!ref || !ref.includes(':')) {
+        this.logger.log('[MP Webhook] external_reference inválida ou ausente');
+        return { received: true };
+      }
 
       // Formato: tenantId:PLAN[:CYCLE] — CYCLE opcional para compatibilidade
       const parts = ref.split(':');
@@ -196,7 +209,12 @@ export class SubscriptionService {
       const cycle: BillingInterval =
         parts[2] === 'ANNUAL' ? 'ANNUAL' : 'MONTHLY';
 
-      if (!tenantId || !Object.values(SubscriptionPlan).includes(plan)) return { received: true };
+      if (!tenantId || !Object.values(SubscriptionPlan).includes(plan)) {
+        this.logger.log(`[MP Webhook] Dados inválidos: tenantId=${tenantId}, plan=${plan}`);
+        return { received: true };
+      }
+
+      this.logger.log(`[MP Webhook] Ativando plano ${plan} (${cycle}) para tenant ${tenantId}`);
 
       await this.prisma.tenantSubscription.upsert({
         where: { tenantId },
@@ -216,7 +234,10 @@ export class SubscriptionService {
           currentPeriodEnd: this.nextPeriodEnd(cycle),
         },
       });
-    } catch {
+
+      this.logger.log(`[MP Webhook] Plano ativado com sucesso para tenant ${tenantId}`);
+    } catch (err) {
+      this.logger.error(`[MP Webhook] Erro ao processar pagamento ${paymentId}:`, err);
       // não rejeitar a requisição — MP pode reenviar se receber erro
     }
 

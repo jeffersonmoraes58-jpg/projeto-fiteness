@@ -4,12 +4,14 @@ import {
   ConflictException,
   BadRequestException,
   NotFoundException,
+  Logger,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import { UsersService } from '../users/users.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { SubscriptionService } from '../subscriptions/subscription.service';
 import * as bcrypt from 'bcryptjs';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
@@ -17,12 +19,15 @@ import { UserRole, SubscriptionPlan, SubscriptionStatus, BillingInterval } from 
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     private prisma: PrismaService,
     private usersService: UsersService,
     private jwtService: JwtService,
     private config: ConfigService,
     private notifications: NotificationsService,
+    private subscriptionService: SubscriptionService,
   ) {}
 
   async register(dto: RegisterDto) {
@@ -118,7 +123,35 @@ export class AuthService {
     const tokens = await this.generateTokens(user.id, user.email, user.role, user.tenantId);
     await this.saveRefreshToken(user.id, tokens.refreshToken);
 
-    return { user: this.sanitizeUser(user), ...tokens };
+    // Se o plano for pago, cria checkout do Mercado Pago e retorna a URL
+    const planMap: Record<string, SubscriptionPlan> = {
+      starter: SubscriptionPlan.BASIC,
+      pro: SubscriptionPlan.PRO,
+      elite: SubscriptionPlan.ENTERPRISE,
+    };
+    const chosenPlan = dto.plan && planMap[dto.plan.toLowerCase()]
+      ? planMap[dto.plan.toLowerCase()]
+      : SubscriptionPlan.FREE;
+
+    let checkoutUrl: string | null = null;
+    if (chosenPlan !== SubscriptionPlan.FREE) {
+      try {
+        const returnUrl = dto.returnUrl || `${this.config.get('FRONTEND_URL', 'https://fitlynutri.com.br')}/dashboard`;
+        const checkout = await this.subscriptionService.createMPCheckout(
+          tenantId,
+          chosenPlan,
+          returnUrl,
+          (dto.cycle?.toLowerCase() === 'annual' ? 'ANNUAL' : 'MONTHLY') as BillingInterval,
+        );
+        checkoutUrl = checkout.checkoutUrl;
+        this.logger.log(`[Register] Checkout criado para tenant ${tenantId}: ${checkoutUrl}`);
+      } catch (err) {
+        this.logger.error(`[Register] Erro ao criar checkout para tenant ${tenantId}:`, err);
+        // Não impede o registro — usuário pode pagar depois
+      }
+    }
+
+    return { user: this.sanitizeUser(user), ...tokens, checkoutUrl };
   }
 
   async login(dto: LoginDto) {

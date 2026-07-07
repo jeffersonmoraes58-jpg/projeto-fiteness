@@ -19,6 +19,7 @@ const STATUS_LABEL: Record<string, string> = {
   EXPIRED: 'Plano expirado',
   CANCELED: 'Plano cancelado',
   PAST_DUE: 'Pagamento em atraso',
+  TRIAL: 'Pagamento pendente',
 };
 
 export function SubscriptionGate({ children }: { children: React.ReactNode }) {
@@ -29,11 +30,19 @@ export function SubscriptionGate({ children }: { children: React.ReactNode }) {
   // STUDENT acessa via tenant do trainer e paga mensalidade direto pro trainer.
   const exempt = !user || user.role === 'ADMIN' || user.role === 'STUDENT';
 
-  if (exempt || isLoading || !isBlocked) {
+  // Plano FREE nunca é bloqueado
+  if (plan === 'FREE') {
     return <>{children}</>;
   }
 
-  return <ExpiredOverlay statusKey={status ?? 'EXPIRED'} currentPlan={plan} />;
+  // Se está em TRIAL (pagamento pendente), bloqueia até pagar
+  const isTrialBlocked = status === 'TRIAL';
+
+  if (exempt || isLoading || (!isBlocked && !isTrialBlocked)) {
+    return <>{children}</>;
+  }
+
+  return <ExpiredOverlay statusKey={isTrialBlocked ? 'TRIAL' : (status ?? 'EXPIRED')} currentPlan={plan} />;
 }
 
 function ExpiredOverlay({ statusKey, currentPlan }: { statusKey: string; currentPlan: string }) {

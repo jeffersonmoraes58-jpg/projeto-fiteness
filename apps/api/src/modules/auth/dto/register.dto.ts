@@ -54,4 +54,9 @@ export class RegisterDto {
   @IsOptional()
   @IsString()
   cycle?: string;
+
+  @ApiPropertyOptional({ example: 'https://fitlynutri.com.br/dashboard', description: 'URL de retorno após pagamento' })
+  @IsOptional()
+  @IsString()
+  returnUrl?: string;
 }
