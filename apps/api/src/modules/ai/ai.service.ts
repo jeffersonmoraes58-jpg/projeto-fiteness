@@ -1,8 +1,10 @@
-import { Injectable, ForbiddenException } from '@nestjs/common';
+import { Injectable, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import Anthropic from '@anthropic-ai/sdk';
 import { PrismaService } from '../prisma/prisma.service';
 import { GoalType, ActivityLevel } from '@prisma/client';
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const pdfParse = require('pdf-parse');
 
 @Injectable()
 export class AiService {
@@ -495,6 +497,166 @@ Resumo do que foi configurado acima: adapte 100% das suas respostas ao perfil, t
 
     const block = response.content[0];
     return { analysis: block.type === 'text' ? block.text : '' };
+  }
+
+  async processPdfWorkout(pdfBuffer: Buffer, fileName: string, userId: string) {
+    const trainer = await this.prisma.trainer.findUnique({ where: { userId } });
+    if (!trainer) throw new ForbiddenException('Apenas trainers podem processar PDFs');
+
+    // Extrair texto do PDF
+    let pdfText: string;
+    try {
+      const pdfData = await pdfParse(pdfBuffer);
+      pdfText = pdfData.text;
+    } catch (err) {
+      throw new BadRequestException(`Não foi possível ler o PDF: ${(err as Error).message}`);
+    }
+
+    if (!pdfText || pdfText.trim().length < 10) {
+      throw new BadRequestException('O PDF está vazio ou não contém texto legível');
+    }
+
+    // Buscar exercícios disponíveis do trainer
+    const exercises = await this.prisma.exercise.findMany({
+      where: { OR: [{ isPublic: true }, { trainerId: trainer.id }] },
+      select: { id: true, name: true, category: true, muscleGroups: true },
+      take: 100,
+      orderBy: { name: 'asc' },
+    });
+
+    const exerciseList = exercises.map((e) => `"${e.name}" (${e.category || (e.muscleGroups?.length ? e.muscleGroups[0] : 'geral')})`).join(', ');
+
+    const prompt = `Você é um personal trainer expert especializado em interpretar PDFs de treino.
+
+## CONTEÚDO EXTRAÍDO DO PDF "${fileName}":
+${pdfText.slice(0, 8000)}
+
+## EXERCÍCIOS DISPONÍVEIS NO SISTEMA (use APENAS estes nomes exatos):
+${exerciseList}
+
+## INSTRUÇÕES:
+1. Analise o PDF e identifique os treinos descritos
+2. Para cada treino, mapeie os exercícios mencionados para os nomes EXATOS da lista disponível
+3. Se um exercício do PDF não existir na lista, use o nome mais próximo ou sugira um similar
+4. Crie um JSON com os treinos encontrados
+
+Retorne APENAS JSON válido, sem texto extra:
+{
+  "workouts": [
+    {
+      "name": "Nome do Treino A",
+      "description": "Descrição curta do treino",
+      "level": 2,
+      "duration": 60,
+      "tags": ["tag1", "tag2"],
+      "tips": ["Dica importante 1", "Dica importante 2"],
+      "exercises": [
+        {
+          "name": "Nome Exato do Exercício",
+          "sets": 3,
+          "reps": "10-12",
+          "restSeconds": 60,
+          "notes": "Observação se houver"
+        }
+      ]
+    }
+  ]
+}
+
+IMPORTANTE: Use APENAS nomes de exercícios da lista disponível. Adapte séries, repetições e descanso conforme o PDF. Máximo 3 treinos.`;
+
+    let raw: string;
+    try {
+      raw = await this.complete(prompt, 4000);
+    } catch (err) {
+      throw new Error(`Falha na chamada à IA: ${(err as Error).message}`);
+    }
+
+    let parsed: any;
+    try {
+      parsed = JSON.parse(this.extractJson(raw));
+    } catch {
+      console.error('[AI processPdfWorkout] JSON parse failed. Raw:', raw.slice(0, 500));
+      throw new Error('A IA não conseguiu interpretar o PDF corretamente. Tente novamente com um PDF mais claro.');
+    }
+
+    const workouts = parsed.workouts || [];
+    if (workouts.length === 0) {
+      throw new BadRequestException('A IA não identificou treinos válidos no PDF');
+    }
+
+    const exerciseMap = new Map(exercises.map((e) => [e.name.toLowerCase().trim(), e.id]));
+    const createdWorkouts: any[] = [];
+
+    for (const w of workouts) {
+      const workout = await this.prisma.workout.create({
+        data: {
+          name: w.name || `Treino: ${fileName.replace('.pdf', '')}`,
+          description: w.description || 'Importado de PDF',
+          level: Math.min(Math.max(w.level || 1, 1), 5),
+          duration: w.duration || 60,
+          tags: [...(w.tags || []), 'pdf-import'],
+          status: 'DRAFT',
+          trainerId: trainer.id,
+        },
+      });
+
+      const workoutExercises = (w.exercises || [])
+        .map((ex: any, idx: number) => {
+          const exerciseId = exerciseMap.get((ex.name || '').toLowerCase().trim());
+          if (!exerciseId) {
+            // Tenta busca aproximada
+            const found = exercises.find((e) =>
+              e.name.toLowerCase().includes((ex.name || '').toLowerCase().slice(0, 10)),
+            );
+            return found ? {
+              workoutId: workout.id,
+              exerciseId: found.id,
+              sets: Number(ex.sets) || 3,
+              reps: String(ex.reps || '10'),
+              restSeconds: Number(ex.restSeconds) || 60,
+              order: idx,
+              notes: ex.notes || `Mapeado de: ${ex.name}`,
+            } : null;
+          }
+          return {
+            workoutId: workout.id,
+            exerciseId,
+            sets: Number(ex.sets) || 3,
+            reps: String(ex.reps || '10'),
+            restSeconds: Number(ex.restSeconds) || 60,
+            order: idx,
+            notes: ex.notes || null,
+          };
+        })
+        .filter(Boolean);
+
+      if (workoutExercises.length > 0) {
+        await this.prisma.workoutExercise.createMany({ data: workoutExercises });
+      }
+
+      createdWorkouts.push({
+        workoutId: workout.id,
+        name: workout.name,
+        exercisesAdded: workoutExercises.length,
+        tips: w.tips || [],
+      });
+    }
+
+    // Monta resposta amigável
+    const summary = createdWorkouts.map((w) =>
+      `✅ **${w.name}** — ${w.exercisesAdded} exercícios adicionados`,
+    ).join('\n');
+
+    const allTips = createdWorkouts.flatMap((w) => w.tips || []);
+    const tipsSection = allTips.length > 0
+      ? `\n\n💡 **Dicas da IA:**\n${allTips.map((t: string) => `• ${t}`).join('\n')}`
+      : '';
+
+    return {
+      reply: `📄 **PDF processado com sucesso!** Encontrei ${createdWorkouts.length} treino(s) no arquivo "${fileName}".\n\n${summary}${tipsSection}\n\nOs treinos foram salvos como **Rascunho**. Você pode revisá-los e ativá-los na seção de Treinos.`,
+      workouts: createdWorkouts,
+    };
   }
 
   calculateTMB(weight: number, height: number, age: number, gender: string): number {

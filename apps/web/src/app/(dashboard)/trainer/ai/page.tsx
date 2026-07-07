@@ -7,7 +7,7 @@ import {
   Dumbbell, Target, Zap, TrendingUp, ChevronRight,
   FlaskConical, CheckCircle2, AlertTriangle, Star,
   ChevronDown, ChevronUp, Loader2, Check, ArrowRight,
-  MessageSquare,
+  MessageSquare, Paperclip, FileText, X,
 } from 'lucide-react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
@@ -114,11 +114,13 @@ function ChatTab() {
     {
       id: '0',
       role: 'assistant',
-      content: 'Olá! Sou sua assistente de IA especializada em fitness e treinamento. Posso ajudar com:\n\n• Criação de programas de treino personalizados\n• Periodização e progressão de cargas\n• Exercícios alternativos e substituições\n• Estratégias para objetivos específicos\n\nPara analisar um aluno específico com acesso ao histórico completo dele, use a aba **Análise de Aluno**.',
+      content: 'Olá! Sou sua assistente de IA especializada em fitness e treinamento. Posso ajudar com:\n\n• Criação de programas de treino personalizados\n• Periodização e progressão de cargas\n• Exercícios alternativos e substituições\n• Estratégias para objetivos específicos\n\n📎 **Novidade!** Agora você pode anexar arquivos PDF com treinos prontos e a IA vai ler e criar os exercícios automaticamente no sistema!',
       timestamp: new Date(),
     },
   ]);
   const [input, setInput] = useState('');
+  const [attachedFile, setAttachedFile] = useState<File | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const buildHistory = (msgs: ChatMessage[]) =>
@@ -145,6 +147,49 @@ function ChatTab() {
     },
   });
 
+  const uploadPdfMutation = useMutation({
+    mutationFn: (file: File) => {
+      const formData = new FormData();
+      formData.append('file', file);
+      return api.post('/ai/upload-pdf', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+        timeout: 60000,
+      }).then((r) => r.data?.data ?? r.data);
+    },
+    onSuccess: (data) => {
+      // Adiciona mensagem do usuário com o nome do arquivo
+      const fileName = attachedFile?.name || 'PDF';
+      const userMsg: ChatMessage = {
+        id: Date.now().toString(),
+        role: 'user',
+        content: `📎 Anexei o arquivo: **${fileName}**`,
+        timestamp: new Date(),
+      };
+      setMessages((prev) => [...prev, userMsg]);
+
+      // Adiciona resposta da IA com o resultado
+      const responseText = data.reply || data.response || data.message || JSON.stringify(data);
+      const assistantMsg: ChatMessage = {
+        id: (Date.now() + 1).toString(),
+        role: 'assistant',
+        content: responseText,
+        timestamp: new Date(),
+      };
+      setMessages((prev) => [...prev, assistantMsg]);
+      setAttachedFile(null);
+    },
+    onError: (err: any) => {
+      const errorMsg = err?.response?.data?.message || err?.message || 'Erro ao processar o PDF';
+      setMessages((prev) => [...prev, {
+        id: Date.now().toString(),
+        role: 'assistant',
+        content: `❌ Erro ao processar o PDF: ${errorMsg}`,
+        timestamp: new Date(),
+      }]);
+      setAttachedFile(null);
+    },
+  });
+
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
@@ -161,6 +206,33 @@ function ChatTab() {
     setInput('');
   };
 
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.type !== 'application/pdf') {
+      setMessages((prev) => [...prev, {
+        id: Date.now().toString(),
+        role: 'assistant',
+        content: '⚠️ Apenas arquivos PDF são aceitos. Por favor, selecione um arquivo PDF.',
+        timestamp: new Date(),
+      }]);
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      setMessages((prev) => [...prev, {
+        id: Date.now().toString(),
+        role: 'assistant',
+        content: '⚠️ O arquivo é muito grande. Tamanho máximo: 10MB.',
+        timestamp: new Date(),
+      }]);
+      return;
+    }
+    setAttachedFile(file);
+    uploadPdfMutation.mutate(file);
+    // Limpa o input file pra poder selecionar o mesmo arquivo de novo
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
   return (
     <>
       <div className="flex-1 overflow-y-auto scrollbar-hide space-y-4 pr-1">
@@ -170,7 +242,9 @@ function ChatTab() {
           ))}
         </AnimatePresence>
 
-        {sendMutation.isPending && <TypingIndicator />}
+        {(sendMutation.isPending || uploadPdfMutation.isPending) && (
+          <TypingIndicator />
+        )}
 
         {messages.length === 1 && (
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} className="space-y-2">
@@ -191,12 +265,37 @@ function ChatTab() {
         <div ref={messagesEndRef} />
       </div>
 
+      {/* File attachment indicator */}
+      {attachedFile && (
+        <div className="flex items-center gap-2 px-4 py-2 glass rounded-xl mb-2">
+          <FileText className="w-4 h-4 text-purple-400" />
+          <span className="text-sm flex-1 truncate">{attachedFile.name}</span>
+          {uploadPdfMutation.isPending ? (
+            <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+          ) : (
+            <button onClick={() => setAttachedFile(null)} className="text-muted-foreground hover:text-foreground">
+              <X className="w-4 h-4" />
+            </button>
+          )}
+        </div>
+      )}
+
       <ChatInput
         value={input}
         onChange={setInput}
         onSend={handleSend}
         onClear={() => setMessages([messages[0]])}
-        pending={sendMutation.isPending}
+        pending={sendMutation.isPending || uploadPdfMutation.isPending}
+        onAttach={() => fileInputRef.current?.click()}
+      />
+
+      {/* Hidden file input */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".pdf,application/pdf"
+        className="hidden"
+        onChange={handleFileSelect}
       />
     </>
   );
@@ -601,7 +700,7 @@ function TypingIndicator({ compact }: { compact?: boolean }) {
 }
 
 function ChatInput({
-  value, onChange, onSend, onClear, pending, placeholder, compact,
+  value, onChange, onSend, onClear, pending, placeholder, compact, onAttach,
 }: {
   value: string;
   onChange: (v: string) => void;
@@ -610,6 +709,7 @@ function ChatInput({
   pending: boolean;
   placeholder?: string;
   compact?: boolean;
+  onAttach?: () => void;
 }) {
   return (
     <div className={cn('glass rounded-2xl p-2', compact && 'mt-0')}>
@@ -624,6 +724,11 @@ function ChatInput({
           style={{ fieldSizing: 'content' } as any}
         />
         <div className="flex items-center gap-1.5 pb-1">
+          {onAttach && (
+            <button onClick={onAttach} className="w-8 h-8 rounded-xl hover:bg-accent flex items-center justify-center transition-all" title="Anexar PDF">
+              <Paperclip className="w-3.5 h-3.5 text-muted-foreground" />
+            </button>
+          )}
           <button onClick={onClear} className="w-8 h-8 rounded-xl hover:bg-accent flex items-center justify-center transition-all" title="Limpar conversa">
             <RefreshCw className="w-3.5 h-3.5 text-muted-foreground" />
           </button>

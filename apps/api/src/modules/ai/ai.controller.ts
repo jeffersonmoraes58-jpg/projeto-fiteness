@@ -1,5 +1,6 @@
-import { Controller, Get, Post, Body, Param, UseGuards, InternalServerErrorException } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import { Controller, Get, Post, Body, Param, UseGuards, InternalServerErrorException, UseInterceptors, UploadedFile, BadRequestException } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiBearerAuth, ApiConsumes } from '@nestjs/swagger';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { AiService } from './ai.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../../decorators/current-user.decorator';
@@ -83,5 +84,27 @@ export class AiController {
     @CurrentUser('id') userId: string,
   ) {
     return this.aiService.applyStudentChanges(body.planId, body.exercises, userId);
+  }
+
+  @Post('upload-pdf')
+  @ApiOperation({ summary: 'Upload de PDF com treinos para IA analisar e criar exercícios' })
+  @ApiConsumes('multipart/form-data')
+  @UseInterceptors(FileInterceptor('file', {
+    limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
+    fileFilter: (_req, file, cb) => {
+      if (file.mimetype !== 'application/pdf') {
+        return cb(new BadRequestException('Apenas arquivos PDF são aceitos'), false);
+      }
+      cb(null, true);
+    },
+  }))
+  async uploadPdf(
+    @UploadedFile() file: Express.Multer.File,
+    @CurrentUser('id') userId: string,
+  ) {
+    if (!file) {
+      throw new BadRequestException('Nenhum arquivo enviado');
+    }
+    return this.aiService.processPdfWorkout(file.buffer, file.originalname, userId);
   }
 }
