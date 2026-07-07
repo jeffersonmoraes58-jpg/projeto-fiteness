@@ -169,6 +169,10 @@ export const studentService = {
   // Workout Plan
   async getWorkoutPlan(): Promise<WorkoutPlan | null> {
     const { data } = await api.get('/students/me/workout-plan');
+    // API retorna sempre array; extrai o primeiro se existir
+    if (Array.isArray(data)) {
+      return data.length > 0 ? data[0] : null;
+    }
     return data;
   },
 
