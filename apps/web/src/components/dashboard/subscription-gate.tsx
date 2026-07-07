@@ -35,14 +35,66 @@ export function SubscriptionGate({ children }: { children: React.ReactNode }) {
     return <>{children}</>;
   }
 
-  // Se está em TRIAL (pagamento pendente), bloqueia até pagar
-  const isTrialBlocked = status === 'TRIAL';
+  // Se está em TRIAL (pagamento pendente), mostra banner mas não bloqueia
+  const isTrial = status === 'TRIAL';
 
-  if (exempt || isLoading || (!isBlocked && !isTrialBlocked)) {
+  if (exempt || isLoading || (!isBlocked && !isTrial)) {
     return <>{children}</>;
   }
 
-  return <ExpiredOverlay statusKey={isTrialBlocked ? 'TRIAL' : (status ?? 'EXPIRED')} currentPlan={plan} />;
+  // TRIAL: mostra banner no topo + conteúdo normalmente
+  if (isTrial) {
+    return (
+      <>
+        <TrialBanner />
+        {children}
+      </>
+    );
+  }
+
+  // EXPIRED/CANCELED/PAST_DUE: bloqueia completamente
+  return <ExpiredOverlay statusKey={status ?? 'EXPIRED'} currentPlan={plan} />;
+}
+
+function TrialBanner() {
+  const [loading, setLoading] = useState(false);
+
+  const handlePayNow = async () => {
+    setLoading(true);
+    try {
+      const returnUrl = `${window.location.origin}/dashboard`;
+      const res = await api.post('/subscriptions/checkout', {
+        plan: 'PRO',
+        cycle: 'MONTHLY',
+        returnUrl,
+      });
+      const checkoutUrl = res.data?.data?.checkoutUrl ?? res.data?.checkoutUrl;
+      if (!checkoutUrl) throw new Error('Sem URL de checkout');
+      window.location.href = checkoutUrl;
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Erro ao iniciar pagamento');
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="bg-amber-500/10 border-b border-amber-500/20 px-4 py-3">
+      <div className="max-w-7xl mx-auto flex items-center justify-between gap-4 flex-wrap">
+        <div className="flex items-center gap-2 text-sm text-amber-400">
+          <AlertTriangle className="w-4 h-4 flex-shrink-0" />
+          <span>Pagamento pendente. Seu plano será ativado após a confirmação do pagamento.</span>
+        </div>
+        <button
+          onClick={handlePayNow}
+          disabled={loading}
+          className="text-sm font-semibold bg-amber-500 hover:bg-amber-600 text-white px-4 py-1.5 rounded-lg transition-colors disabled:opacity-50 flex items-center gap-2"
+        >
+          {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+          Pagar agora
+        </button>
+      </div>
+    </div>
+  );
 }
 
 function ExpiredOverlay({ statusKey, currentPlan }: { statusKey: string; currentPlan: string }) {

@@ -104,6 +104,7 @@ function RegisterPageContent() {
         ...(planParam ? { plan: planParam } : {}),
         ...(cycleParam ? { cycle: cycleParam } : {}),
         ...(needsWorkspaceName ? { studioName: data.studioName } : { tenantId: data.tenantId }),
+        returnUrl: `${window.location.origin}/dashboard`,
       });
       toast.success('Conta criada com sucesso!');
       // Se for plano FREE, redireciona direto pro dashboard

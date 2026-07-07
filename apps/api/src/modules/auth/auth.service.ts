@@ -147,7 +147,10 @@ export class AuthService {
         this.logger.log(`[Register] Checkout criado para tenant ${tenantId}: ${checkoutUrl}`);
       } catch (err) {
         this.logger.error(`[Register] Erro ao criar checkout para tenant ${tenantId}:`, err);
-        // Não impede o registro — usuário pode pagar depois
+        // Se falhou ao criar checkout, não retorna tokens — usuário precisa tentar novamente
+        throw new BadRequestException(
+          'Erro ao iniciar o pagamento. Tente novamente ou entre em contato com o suporte.',
+        );
       }
     }
 
