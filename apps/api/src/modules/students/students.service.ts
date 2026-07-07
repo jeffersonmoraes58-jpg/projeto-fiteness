@@ -107,7 +107,7 @@ export class StudentsService {
 
   async getWorkoutPlan(userId: string) {
     const student = await this.getStudent(userId);
-    return this.prisma.workoutPlan.findMany({
+    const plans = await this.prisma.workoutPlan.findMany({
       where: { studentId: student.id, isActive: true },
       include: {
         workout: {
@@ -119,6 +119,54 @@ export class StudentsService {
       },
       orderBy: { order: 'asc' },
     });
+
+    // Se não tem planos ativos, retorna null
+    if (plans.length === 0) return null;
+
+    // Se tem apenas 1 plano, retorna ele formatado (compatibilidade com mobile)
+    if (plans.length === 1) {
+      const p = plans[0];
+      return {
+        id: p.id,
+        name: p.workout.name,
+        description: p.workout.description,
+        estimatedMinutes: p.workout.duration,
+        exercises: p.workout.exercises.map((we) => ({
+          id: we.id,
+          exerciseId: we.exerciseId,
+          name: we.exercise.name,
+          sets: we.sets,
+          reps: we.reps,
+          restSeconds: we.restSeconds,
+          weight: we.weight,
+          notes: we.notes,
+          videoUrl: we.exercise.videoUrl,
+          gifUrl: we.exercise.gifUrl,
+          category: we.exercise.category,
+        })),
+      };
+    }
+
+    // Se tem múltiplos planos ativos, retorna todos (para web/trainer)
+    return plans.map((p) => ({
+      id: p.id,
+      name: p.workout.name,
+      description: p.workout.description,
+      estimatedMinutes: p.workout.duration,
+      exercises: p.workout.exercises.map((we) => ({
+        id: we.id,
+        exerciseId: we.exerciseId,
+        name: we.exercise.name,
+        sets: we.sets,
+        reps: we.reps,
+        restSeconds: we.restSeconds,
+        weight: we.weight,
+        notes: we.notes,
+        videoUrl: we.exercise.videoUrl,
+        gifUrl: we.exercise.gifUrl,
+        category: we.exercise.category,
+      })),
+    }));
   }
 
   async getWorkoutLogs(userId: string) {
