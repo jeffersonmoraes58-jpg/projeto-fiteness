@@ -6,7 +6,7 @@
   "display": "standalone",
   "themeColor": "#7c3aed",
   "backgroundColor": "#09090b",
-  "startUrl": "/login",
+  "startUrl": "/",
   "iconUrl": "https://fitlynutri.com.br/icons/icon-512.png",
   "maskableIconUrl": "https://fitlynutri.com.br/icons/icon-512.png",
   "monochromeIconUrl": "https://fitlynutri.com.br/icons/icon-512.png",

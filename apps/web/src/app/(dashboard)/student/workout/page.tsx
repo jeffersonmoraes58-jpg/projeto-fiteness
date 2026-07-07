@@ -253,12 +253,21 @@ export default function StudentWorkout() {
   // Auto-select when only 1 trainer; respect manual selection for 2+
   const effectiveTrainerId = selectedTrainerId ?? (trainers.length === 1 ? trainers[0]?.id : null);
 
-  const filteredPlans = useMemo(
-    () => (workoutPlans || []).filter((p: any) => !effectiveTrainerId || p.workout?.trainer?.id === effectiveTrainerId),
-    [workoutPlans, effectiveTrainerId],
-  );
+  const filteredPlans = useMemo(() => {
+    const today = new Date().getDay();
+    return (workoutPlans || []).filter((p: any) => {
+      // Filtra por trainer
+      if (effectiveTrainerId && p.workout?.trainer?.id !== effectiveTrainerId) return false;
+      // Filtra por dia da semana: se dayOfWeek estiver definido, só mostra se inclui hoje
+      if (p.dayOfWeek && Array.isArray(p.dayOfWeek) && p.dayOfWeek.length > 0) {
+        return p.dayOfWeek.includes(today);
+      }
+      // Se não tem dayOfWeek definido, mostra (compatibilidade com planos antigos)
+      return true;
+    });
+  }, [workoutPlans, effectiveTrainerId]);
 
-  const selectedPlan = filteredPlans.find((p: any) => p.id === selectedPlanId);
+  const selectedPlan = (workoutPlans || []).find((p: any) => p.id === selectedPlanId);
   const activePlan = (workoutPlans || []).find((p: any) => p.id === activePlanId);
   const isSelectedPlanActive = selectedPlanId === activePlanId && activeWorkout;
 
@@ -296,7 +305,7 @@ export default function StudentWorkout() {
     const dayBlocks = filteredPlans.map((plan: any) => {
       const exercises = (plan.workout?.exercises ?? []).map((ex: any, i: number) => `
         <tr>
-          <td style="padding:8px 12px;font-size:13px;color:#111827;">${i + 1}. ${ex.exercise?.name ?? '—'}</td>
+          <td style="padding:8px 12px;font-size:13px;color:#111827;">${i + 1}. ${ex.name ?? '—'}</td>
           <td style="padding:8px 8px;text-align:center;font-size:13px;color:#374151;">${ex.sets}</td>
           <td style="padding:8px 8px;text-align:center;font-size:13px;color:#374151;">${ex.reps ?? '—'}</td>
           <td style="padding:8px 8px;text-align:center;font-size:13px;color:#374151;">${ex.weight ? ex.weight + ' kg' : '—'}</td>
@@ -393,6 +402,20 @@ export default function StudentWorkout() {
                   <span className="flex items-center gap-1"><Dumbbell className="w-3 h-3" />{planExercises.length} exercícios</span>
                   <span className="flex items-center gap-1"><Flame className="w-3 h-3 text-orange-400" />~{(selectedPlan.workout?.duration || 45) * 7} kcal</span>
                 </div>
+                {selectedPlan.dayOfWeek && Array.isArray(selectedPlan.dayOfWeek) && selectedPlan.dayOfWeek.length > 0 && (
+                  <div className="flex items-center gap-1 mt-1">
+                    {DAYS.map((day, i) => (
+                      <span key={day} className={cn(
+                        'text-[10px] px-1.5 py-0.5 rounded-full',
+                        selectedPlan.dayOfWeek.includes(i)
+                          ? 'bg-primary/20 text-primary font-medium'
+                          : 'text-muted-foreground/30',
+                      )}>
+                        {day}
+                      </span>
+                    ))}
+                  </div>
+                )}
               </div>
               <div className="flex items-center gap-2 flex-shrink-0">
                 {(() => {
@@ -630,6 +653,39 @@ export default function StudentWorkout() {
                   );
                 })}
               </div>
+            ) : workoutPlans && workoutPlans.length > 0 ? (
+              // Has plans but none for today — show all with day labels
+              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-3">
+                <div className="glass-card flex flex-col items-center py-6 text-center gap-2 border border-amber-500/20">
+                  <Dumbbell className="w-7 h-7 text-amber-400/70" />
+                  <p className="text-sm font-semibold">Nenhum treino para hoje</p>
+                  <p className="text-xs text-muted-foreground">Confira seus treinos agendados abaixo</p>
+                </div>
+                {(workoutPlans as any[]).map((plan: any) => (
+                  <motion.button
+                    key={plan.id}
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    onClick={() => setSelectedPlanId(plan.id)}
+                    className="glass-card w-full text-left hover:bg-accent/50 transition-all cursor-pointer opacity-70"
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        {plan.division && <div className="text-xs text-muted-foreground mb-0.5">{plan.division}</div>}
+                        <div className="font-bold text-base truncate">{plan.workout?.name}</div>
+                        <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
+                          <span className="flex items-center gap-1"><Clock className="w-3 h-3" />{plan.workout?.duration || 45} min</span>
+                          <span className="flex items-center gap-1"><Dumbbell className="w-3 h-3" />{plan.workout?.exercises?.length || 0} exercícios</span>
+                          {plan.dayOfWeek?.length > 0 && (
+                            <span>{plan.dayOfWeek.map((d: number) => DAYS[d]).join(', ')}</span>
+                          )}
+                        </div>
+                      </div>
+                      <ChevronRight className="w-5 h-5 text-muted-foreground" />
+                    </div>
+                  </motion.button>
+                ))}
+              </motion.div>
             ) : (
               <motion.div
                 initial={{ opacity: 0 }}
@@ -1053,9 +1109,9 @@ function ExerciseRow({
   onToggleSet: (i: number) => void;
   onOpenVideo: (url: string, title: string) => void;
 }) {
-  const videoUrl: string | undefined = exercise.exercise?.videoUrl;
-  const name: string = exercise.exercise?.name || '';
-  const thumbnailUrl: string | undefined = exercise.exercise?.thumbnailUrl;
+  const videoUrl: string | undefined = exercise.videoUrl;
+  const name: string = exercise.name || '';
+  const thumbnailUrl: string | undefined = exercise.gifUrl;
   const thumbnail = thumbnailUrl ? resolveImageUrl(thumbnailUrl) : getVideoThumbnail(videoUrl || '');
   const doneCount = completedSets.filter(Boolean).length;
   const allDone = isActive && doneCount >= exercise.sets;

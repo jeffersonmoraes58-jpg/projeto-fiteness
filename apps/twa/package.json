@@ -1,0 +1,12 @@
+{
+  "name": "twa",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "build": "bubblewrap build"
+  },
+  "devDependencies": {
+    "@bubblewrap/cli": "^1.24.1",
+    "@pwabuilder/cli": "^0.0.17"
+  }
+}

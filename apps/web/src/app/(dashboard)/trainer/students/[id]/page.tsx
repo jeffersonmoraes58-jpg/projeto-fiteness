@@ -52,6 +52,11 @@ export default function StudentDetailPage() {
   const [endDate, setEndDate] = useState('');
   const [notes, setNotes] = useState('');
   const [assignError, setAssignError] = useState('');
+  const [selectedDays, setSelectedDays] = useState<number[]>([]);
+  const DAYS_SHORT = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+  const toggleDay = (day: number) => {
+    setSelectedDays(prev => prev.includes(day) ? prev.filter(d => d !== day) : [...prev, day]);
+  };
   const [editingPlan, setEditingPlan] = useState<any | null>(null);
   const [showAssessForm, setShowAssessForm] = useState(false);
   const EMPTY_ASSESS = { weight: '', height: '', bodyFatPercent: '', muscleMassKg: '', waistCm: '', hipCm: '', chestCm: '', rightArmCm: '', rightThighCm: '' };
@@ -129,6 +134,7 @@ export default function StudentDetailPage() {
         startDate: data.startDate,
         endDate: data.endDate || undefined,
         notes: data.notes || undefined,
+        dayOfWeek: data.dayOfWeek || undefined,
       }),
     onSuccess: () => {
       setSelectedWorkout(''); setStartDate(new Date().toISOString().split('T')[0]);
@@ -169,7 +175,13 @@ export default function StudentDetailPage() {
     if (!selectedWorkout) { setAssignError('Selecione um treino'); return; }
     if (!startDate) { setAssignError('Informe a data de início'); return; }
     setAssignError('');
-    assignMutation.mutate({ workoutId: selectedWorkout, startDate, endDate, notes });
+    assignMutation.mutate({
+      workoutId: selectedWorkout,
+      startDate,
+      endDate,
+      notes,
+      dayOfWeek: selectedDays.length > 0 ? selectedDays : undefined,
+    });
   };
 
   if (isLoading) {
@@ -368,6 +380,26 @@ export default function StudentDetailPage() {
                   <label className="text-sm font-medium mb-1.5 block">Data de término</label>
                   <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="input-field" min={startDate} />
                 </div>
+              </div>
+              <div>
+                <label className="text-sm font-medium mb-1.5 block">Dias da semana</label>
+                <div className="flex gap-1.5 flex-wrap">
+                  {DAYS_SHORT.map((dayLabel, dayIndex) => (
+                    <button
+                      key={dayIndex}
+                      type="button"
+                      onClick={() => toggleDay(dayIndex)}
+                      className={`w-10 h-10 rounded-xl text-xs font-medium transition-all border ${
+                        selectedDays.includes(dayIndex)
+                          ? 'bg-primary text-primary-foreground border-primary'
+                          : 'glass border-transparent hover:bg-accent text-muted-foreground'
+                      }`}
+                    >
+                      {dayLabel}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">Selecione os dias em que este treino será realizado</p>
               </div>
               <div>
                 <label className="text-sm font-medium mb-1.5 block">Observações</label>
