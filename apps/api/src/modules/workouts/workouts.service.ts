@@ -169,6 +169,7 @@ export class WorkoutsService {
         startDate: new Date(dto.startDate),
         endDate: dto.endDate ? new Date(dto.endDate) : undefined,
         notes: dto.notes,
+        isActive: true,
       },
       include: { workout: true, student: { include: { user: { include: { profile: true } } } } },
     });

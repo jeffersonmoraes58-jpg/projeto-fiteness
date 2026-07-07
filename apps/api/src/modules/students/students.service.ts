@@ -100,7 +100,7 @@ export class StudentsService {
         workoutsThisWeek,
         waterToday: totalWaterToday,
       },
-      activeWorkout: activePlan?.workout ?? null,
+      todayWorkout: activePlan?.workout ?? null,
       activeDiet: activeDiet?.diet ?? null,
     };
   }

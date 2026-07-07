@@ -4,7 +4,7 @@ import { useAuthStore } from '../store/auth';
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://fitlynutri.com.br';
 
 export const api = axios.create({
-  baseURL: API_URL,
+  baseURL: API_URL + '/api/v1',
   timeout: 30000,
   headers: { 'Content-Type': 'application/json' },
 });
