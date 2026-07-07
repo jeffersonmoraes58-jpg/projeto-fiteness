@@ -148,6 +148,15 @@ export class SubscriptionService {
     const price = getPlanPrice(plan, cycle);
     if (!price) throw new BadRequestException('Plano inválido para checkout');
 
+    // Verifica se o token do Mercado Pago está configurado
+    const mpToken = this.config.get<string>('MP_ACCESS_TOKEN', '');
+    if (!mpToken) {
+      this.logger.error('[MP Checkout] MP_ACCESS_TOKEN não configurado nas variáveis de ambiente');
+      throw new BadRequestException(
+        'Pagamento via Mercado Pago não configurado. Entre em contato com o suporte.',
+      );
+    }
+
     const cycleLabel = cycle === 'ANNUAL' ? 'Anual' : 'Mensal';
     const preference = new Preference(this.mpClient());
     const result = await preference.create({
