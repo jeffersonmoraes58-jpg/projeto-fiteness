@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Check, X, Zap, Star } from 'lucide-react';
 import Link from 'next/link';
+import { useAuthStore } from '@/store/auth';
 
 type Cycle = 'monthly' | 'annual';
 
@@ -101,6 +102,7 @@ const plans = [
 
 export function LandingPricing() {
   const [cycle, setCycle] = useState<Cycle>('monthly');
+  const { user } = useAuthStore();
 
   return (
     <section id="pricing" className="py-16 md:py-32 bg-background">
@@ -161,10 +163,18 @@ export function LandingPricing() {
           {plans.map((plan, index) => {
             const displayPrice = cycle === 'annual' ? plan.annual : plan.monthly;
             const perMonth = cycle === 'annual' && plan.annual > 0 ? Math.round((plan.annual / 12) * 100) / 100 : null;
+            const subscriptionPath =
+              user?.role === 'NUTRITIONIST' ? '/nutritionist/subscription' : '/trainer/subscription';
+            const slugToEnum: Record<string, string> = {
+              'starter': 'BASIC', 'pro': 'PRO', 'elite': 'ENTERPRISE',
+            };
+            const planEnum = slugToEnum[plan.slug] ?? plan.slug.toUpperCase();
             const href =
               plan.monthly === 0
-                ? `/register?plan=${plan.slug}`
-                : `/register?plan=${plan.slug}&cycle=${cycle}`;
+                ? (user ? '/dashboard' : `/register?plan=${plan.slug}`)
+                : (user
+                    ? `${subscriptionPath}?plan=${planEnum}&cycle=${cycle === 'annual' ? 'ANNUAL' : 'MONTHLY'}`
+                    : `/register?plan=${plan.slug}&cycle=${cycle}`);
 
             return (
               <motion.div

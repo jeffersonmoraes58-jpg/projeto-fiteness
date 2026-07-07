@@ -6,7 +6,7 @@ import {
   Dumbbell, Play, CheckCircle2, Clock, ChevronLeft,
   Flame, RotateCcw, Timer, ChevronRight,
   X, PlayCircle, Trophy, Share2, Download, Camera, SwitchCamera,
-  Music, ChevronUp, ChevronDown, ExternalLink, Loader2,
+  Music, ChevronUp, ChevronDown, ExternalLink,
 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
@@ -773,209 +773,152 @@ export default function StudentWorkout() {
 
 // ─── Workout Music Player ────────────────────────────────────────────────────
 
-declare global {
-  interface Window {
-    YT: any;
-    onYouTubeIframeAPIReady?: () => void;
-  }
+type MusicService = 'youtube' | 'spotify' | 'deezer';
+
+interface MusicPreset {
+  label: string;
+  embedId: string;
+  embedType: 'video' | 'playlist' | 'album' | 'track';
 }
 
-interface MusicResult {
-  trackId: string;
-  title: string;
-  thumbnail: string;
-  author: string;
-  audioUrl: string;
-}
-
-async function searchMusic(query: string): Promise<MusicResult[]> {
-  try {
-    const res = await api.get(`/music/search?q=${encodeURIComponent(query)}`);
-    const data = res.data.data ?? res.data;
-    if (!Array.isArray(data)) return [];
-    return data.filter((v: any) => v.trackId && v.audioUrl);
-  } catch {
-    return [];
-  }
-}
-
-const MUSIC_GENRES = [
-  { label: '🔥 Treino', q: 'workout' },
-  { label: '⚡ HIIT', q: 'energetic hiit' },
-  { label: '🎧 EDM', q: 'electronic edm' },
-  { label: '🎸 Rock', q: 'rock energetic' },
-  { label: '🎵 Hip-Hop', q: 'hiphop' },
+const YOUTUBE_PRESETS: MusicPreset[] = [
+  { label: '🔥 Treino',  embedId: 'PLRBp0Fe2GpgmsW46rSmyiWte46RCfH5JC', embedType: 'playlist' },
+  { label: '⚡ HIIT',   embedId: 'PLFgquLnL59alCl_2TQvOiD5Vgm1hCaGSK', embedType: 'playlist' },
+  { label: '🎧 EDM',    embedId: 'PLx0sYbCqOb8QFavkVW4Ly3WEHrmXVJJM-', embedType: 'playlist' },
+  { label: '🎸 Rock',   embedId: 'PLx0sYbCqOb8TBPRdmBHs5Iftvv9TPboYg', embedType: 'playlist' },
+  { label: '🎵 Hip-Hop', embedId: 'PLx0sYbCqOb8Q3FbXN6-l8Hni9YLiN2WYd', embedType: 'playlist' },
 ];
+
+const SPOTIFY_PRESETS: MusicPreset[] = [
+  { label: '🔥 Treino',  embedId: '37i9dQZF1DXdoiVBe0Ni9X', embedType: 'playlist' },
+  { label: '⚡ HIIT',   embedId: '37i9dQZF1DWUVpAXiEPK8P', embedType: 'playlist' },
+  { label: '🎧 EDM',    embedId: '37i9dQZF1DX8a1tdzq5tbM', embedType: 'playlist' },
+  { label: '🎵 Hip-Hop', embedId: '37i9dQZF1DX2RxBh64BHjQ', embedType: 'playlist' },
+  { label: '🎸 Rock',   embedId: '37i9dQZF1DX70RN3TfWWJh', embedType: 'playlist' },
+];
+
+const DEEZER_PRESETS: MusicPreset[] = [
+  { label: '🔥 Workout', embedId: '1282694775', embedType: 'playlist' },
+  { label: '🎧 EDM',     embedId: '4531411342', embedType: 'playlist' },
+  { label: '🎵 Hip-Hop', embedId: '1111143121', embedType: 'playlist' },
+];
+
+function buildYouTubeEmbed(id: string, type: string): string {
+  if (type === 'playlist') {
+    return `https://www.youtube.com/embed/videoseries?list=${id}&autoplay=1`;
+  }
+  return `https://www.youtube.com/embed/${id}?autoplay=1&loop=1&playlist=${id}`;
+}
+
+function buildSpotifyEmbed(id: string, type: string): string {
+  return `https://open.spotify.com/embed/${type}/${id}?utm_source=generator&theme=0`;
+}
+
+function buildDeezerEmbed(id: string, type: string): string {
+  return `https://widget.deezer.com/widget/auto/${type}/${id}`;
+}
+
+function parseYouTubeUrl(input: string): { id: string; type: 'video' | 'playlist' } | null {
+  const listMatch = input.match(/[?&]list=([a-zA-Z0-9_-]+)/);
+  if (listMatch) return { id: listMatch[1], type: 'playlist' };
+  const videoMatch = input.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([a-zA-Z0-9_-]{11})/);
+  if (videoMatch) return { id: videoMatch[1], type: 'video' };
+  if (/^[a-zA-Z0-9_-]{11}$/.test(input)) return { id: input, type: 'video' };
+  if (/^PL[a-zA-Z0-9_-]{16,}$/.test(input)) return { id: input, type: 'playlist' };
+  return null;
+}
+
+function parseSpotifyUrl(input: string): { id: string; type: string } | null {
+  const match = input.match(/spotify\.com\/(playlist|track|album)\/([A-Za-z0-9]+)/);
+  if (match) return { id: match[2], type: match[1] };
+  const uri = input.match(/spotify:(playlist|track|album):([A-Za-z0-9]+)/);
+  if (uri) return { id: uri[2], type: uri[1] };
+  return null;
+}
+
+function parseDeezerUrl(input: string): { id: string; type: string } | null {
+  const match = input.match(/deezer\.com\/(?:[a-z]+\/)?(playlist|album|track)\/(\d+)/);
+  if (match) return { id: match[2], type: match[1] };
+  return null;
+}
 
 function WorkoutMusicPlayer() {
   const [open, setOpen] = useState(true);
-  const [searchInput, setSearchInput] = useState('');
-  const [results, setResults] = useState<MusicResult[]>([]);
-  const [searching, setSearching] = useState(false);
-  const [searchErr, setSearchErr] = useState(false);
-  const [currentTrackId, setCurrentTrackId] = useState('');
-  const [currentTitle, setCurrentTitle] = useState('');
-  const [currentThumbnail, setCurrentThumbnail] = useState('');
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [audioError, setAudioError] = useState('');
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-  const keepAliveRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  // ─── Audio Element (background-friendly) ───────────────────────────────
-  // Usa o elemento <audio> do HTML5 que o navegador consegue manter tocando
-  // mesmo com a tela bloqueada ou app minimizado (diferente do YouTube IFrame)
+  const [service, setService] = useState<MusicService>('youtube');
+  const [activeLabel, setActiveLabel] = useState(YOUTUBE_PRESETS[0].label);
+  const [embedSrc, setEmbedSrc] = useState(() =>
+    buildYouTubeEmbed(YOUTUBE_PRESETS[0].embedId, YOUTUBE_PRESETS[0].embedType),
+  );
+  const [customUrl, setCustomUrl] = useState('');
+  const [urlError, setUrlError] = useState('');
 
   useEffect(() => {
-    // Cria o elemento de áudio uma vez
-    const audio = new Audio();
-    audio.preload = 'auto';
-    audio.loop = true;
-    audioRef.current = audio;
-
-    // Eventos do áudio
-    const onPlay = () => {
-      setIsPlaying(true);
-      startKeepAlive();
-    };
-    const onPause = () => {
-      setIsPlaying(false);
-      stopKeepAlive();
-    };
-    const onEnded = () => {
-      setIsPlaying(false);
-      stopKeepAlive();
-    };
-    const onError = () => {
-      setAudioError('Não foi possível carregar o áudio. Tente outra música.');
-      setIsPlaying(false);
-      stopKeepAlive();
-    };
-
-    audio.addEventListener('play', onPlay);
-    audio.addEventListener('pause', onPause);
-    audio.addEventListener('ended', onEnded);
-    audio.addEventListener('error', onError);
-
-    return () => {
-      audio.removeEventListener('play', onPlay);
-      audio.removeEventListener('pause', onPause);
-      audio.removeEventListener('ended', onEnded);
-      audio.removeEventListener('error', onError);
-      audio.pause();
-      audio.src = '';
-      audioRef.current = null;
-    };
+    const saved = localStorage.getItem('fitlynutri-music-service') as MusicService | null;
+    if (saved === 'spotify') {
+      setService('spotify');
+      setActiveLabel(SPOTIFY_PRESETS[0].label);
+      setEmbedSrc(buildSpotifyEmbed(SPOTIFY_PRESETS[0].embedId, SPOTIFY_PRESETS[0].embedType));
+    } else if (saved === 'deezer') {
+      setService('deezer');
+      setActiveLabel(DEEZER_PRESETS[0].label);
+      setEmbedSrc(buildDeezerEmbed(DEEZER_PRESETS[0].embedId, DEEZER_PRESETS[0].embedType));
+    }
   }, []);
 
-  // Atualiza Media Session quando a música muda
-  useEffect(() => {
-    if (currentTrackId && currentTitle && isPlaying) {
-      updateMediaSession(currentTrackId, currentTitle, currentThumbnail);
+  function switchService(svc: MusicService) {
+    localStorage.setItem('fitlynutri-music-service', svc);
+    setService(svc);
+    setCustomUrl('');
+    setUrlError('');
+    const first = svc === 'youtube' ? YOUTUBE_PRESETS[0] : svc === 'spotify' ? SPOTIFY_PRESETS[0] : DEEZER_PRESETS[0];
+    setActiveLabel(first.label);
+    if (svc === 'youtube') setEmbedSrc(buildYouTubeEmbed(first.embedId, first.embedType));
+    else if (svc === 'spotify') setEmbedSrc(buildSpotifyEmbed(first.embedId, first.embedType));
+    else setEmbedSrc(buildDeezerEmbed(first.embedId, first.embedType));
+  }
+
+  function selectPreset(preset: MusicPreset) {
+    setActiveLabel(preset.label);
+    setCustomUrl('');
+    setUrlError('');
+    if (service === 'youtube') setEmbedSrc(buildYouTubeEmbed(preset.embedId, preset.embedType));
+    else if (service === 'spotify') setEmbedSrc(buildSpotifyEmbed(preset.embedId, preset.embedType));
+    else setEmbedSrc(buildDeezerEmbed(preset.embedId, preset.embedType));
+  }
+
+  function applyCustomUrl() {
+    const url = customUrl.trim();
+    if (!url) return;
+    if (service === 'youtube') {
+      const parsed = parseYouTubeUrl(url);
+      if (!parsed) { setUrlError('Link inválido. Ex: youtube.com/watch?v=... ou youtube.com/playlist?list=...'); return; }
+      setEmbedSrc(buildYouTubeEmbed(parsed.id, parsed.type));
+    } else if (service === 'spotify') {
+      const parsed = parseSpotifyUrl(url);
+      if (!parsed) { setUrlError('Link inválido. Ex: open.spotify.com/playlist/...'); return; }
+      setEmbedSrc(buildSpotifyEmbed(parsed.id, parsed.type));
+    } else {
+      const parsed = parseDeezerUrl(url);
+      if (!parsed) { setUrlError('Link inválido. Ex: deezer.com/playlist/...'); return; }
+      setEmbedSrc(buildDeezerEmbed(parsed.id, parsed.type));
     }
-  }, [currentTrackId, currentTitle, currentThumbnail, isPlaying]);
-
-  // ─── Media Session API ─────────────────────────────────────────────────
-
-  function updateMediaSession(trackId: string, title: string, thumbnail: string) {
-    if (!('mediaSession' in navigator)) return;
-
-    navigator.mediaSession.metadata = new MediaMetadata({
-      title: title || 'Música de treino',
-      artist: 'FitlyNutri',
-      album: 'Música para Treino',
-      artwork: thumbnail ? [{ src: thumbnail, sizes: '200x200', type: 'image/jpeg' }] : [],
-    });
-
-    navigator.mediaSession.setActionHandler('play', () => {
-      audioRef.current?.play().catch(() => {});
-    });
-    navigator.mediaSession.setActionHandler('pause', () => {
-      audioRef.current?.pause();
-    });
+    setUrlError('');
+    setActiveLabel('Personalizado');
+    setCustomUrl('');
   }
 
-  // ─── Service Worker Keep-Alive ─────────────────────────────────────────
-
-  function startKeepAlive() {
-    if (keepAliveRef.current) return;
-    navigator.serviceWorker.controller?.postMessage({ type: 'AUDIO_PLAYING' });
-    keepAliveRef.current = setInterval(() => {
-      navigator.serviceWorker.controller?.postMessage({ type: 'AUDIO_KEEPALIVE' });
-    }, 15000);
-  }
-
-  function stopKeepAlive() {
-    if (keepAliveRef.current) {
-      clearInterval(keepAliveRef.current);
-      keepAliveRef.current = null;
-    }
-    navigator.serviceWorker.controller?.postMessage({ type: 'AUDIO_PAUSED' });
-  }
-
-  // ─── Busca e Reprodução ────────────────────────────────────────────────
-
-  async function handleSearch(q: string) {
-    if (!q.trim()) return;
-    setSearching(true);
-    setSearchErr(false);
-    setResults([]);
-    setAudioError('');
-    const found = await searchMusic(q.trim());
-    setResults(found);
-    setSearchErr(found.length === 0);
-    setSearching(false);
-    if (found.length > 0) playAudio(found[0]);
-  }
-
-  function playAudio(v: MusicResult) {
-    setCurrentTrackId(v.trackId);
-    setCurrentTitle(v.title);
-    setCurrentThumbnail(v.thumbnail);
-    setAudioError('');
-
-    const audio = audioRef.current;
-    if (!audio) return;
-
-    audio.pause();
-    audio.src = '';
-    audio.src = v.audioUrl;
-    audio.play().catch((err) => {
-      console.error('Erro ao reproduzir áudio:', err);
-      setAudioError('Não foi possível reproduzir. Tente outra música.');
-    });
-  }
-
-  function togglePlayPause() {
-    const audio = audioRef.current;
-    if (!audio) return;
-
-    if (isPlaying) {
-      audio.pause();
-    } else if (currentTrackId) {
-      audio.play().catch(() => {
-        // Se falhou, tenta recarregar
-        audio.load();
-        audio.play().catch((err) => {
-          console.error('Erro ao retomar:', err);
-          setAudioError('Erro ao reproduzir. Selecione a música novamente.');
-        });
-      });
-    }
-  }
+  const presets = service === 'youtube' ? YOUTUBE_PRESETS : service === 'spotify' ? SPOTIFY_PRESETS : DEEZER_PRESETS;
 
   return (
     <div className="glass-card overflow-hidden">
-      {/* Audio element — sempre presente no DOM para background playback */}
-      <audio ref={audioRef as any} className="hidden" />
-
-      {/* Header toggle */}
+      {/* Header */}
       <button onClick={() => setOpen((o) => !o)} className="w-full flex items-center justify-between">
         <div className="flex items-center gap-2 min-w-0">
           <div className="w-7 h-7 rounded-lg bg-violet-500/20 flex items-center justify-center flex-shrink-0">
             <Music className="w-3.5 h-3.5 text-violet-400" />
           </div>
-          <span className="text-sm font-semibold truncate">
-            {isPlaying && currentTitle ? `🎵 ${currentTitle}` : 'Música de Treino'}
+          <span className="text-sm font-semibold">
+            {activeLabel ? `Música — ${activeLabel}` : 'Música de Treino'}
           </span>
         </div>
         {open
@@ -983,115 +926,93 @@ function WorkoutMusicPlayer() {
           : <ChevronDown className="w-4 h-4 text-muted-foreground flex-shrink-0" />}
       </button>
 
-      <div className={cn('mt-4 space-y-3', !open && 'hidden')}>
-        {/* Search input */}
-        <div className="flex gap-2">
-          <input
-            type="text"
-            placeholder="Pesquisar músicas ou artistas..."
-            value={searchInput}
-            onChange={(e) => setSearchInput(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter') handleSearch(searchInput); }}
-            className="input-field flex-1 text-sm"
-          />
-          <button
-            onClick={() => handleSearch(searchInput)}
-            disabled={searching}
-            className="btn-primary text-sm px-3 flex-shrink-0 disabled:opacity-50 flex items-center gap-1.5"
-          >
-            {searching && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-            Buscar
-          </button>
-        </div>
-
-        {/* Genre chips */}
-        <div className="flex flex-wrap gap-1.5">
-          {MUSIC_GENRES.map((g) => (
+      <div className={cn('mt-3 space-y-3', !open && 'hidden')}>
+        {/* Service selector */}
+        <div className="flex gap-1 p-1 rounded-xl bg-black/20">
+          {(['youtube', 'spotify', 'deezer'] as MusicService[]).map((svc) => (
             <button
-              key={g.label}
-              disabled={searching}
-              onClick={() => { setSearchInput(g.q); handleSearch(g.q); }}
-              className="text-xs px-3 py-1.5 rounded-full glass hover:bg-accent transition-all disabled:opacity-40"
+              key={svc}
+              onClick={() => switchService(svc)}
+              className={cn(
+                'flex-1 py-1.5 rounded-lg text-xs font-semibold transition-all',
+                service === svc ? 'bg-violet-600 text-white shadow' : 'text-muted-foreground hover:text-foreground',
+              )}
             >
-              {g.label}
+              {svc === 'youtube' ? 'YouTube' : svc === 'spotify' ? 'Spotify' : 'Deezer'}
             </button>
           ))}
         </div>
 
-        {/* Search status */}
-        {searching && (
-          <div className="flex items-center justify-center gap-2 py-3 text-muted-foreground text-sm">
-            <Loader2 className="w-4 h-4 animate-spin" /> Buscando...
-          </div>
-        )}
-        {searchErr && !searching && (
-          <p className="text-xs text-center text-muted-foreground py-2">Nenhum resultado. Tente outro termo.</p>
-        )}
-
-        {/* Audio error */}
-        {audioError && (
-          <p className="text-xs text-center text-destructive py-1">{audioError}</p>
+        {/* Login hint for Spotify / Deezer */}
+        {service !== 'youtube' && (
+          <p className="text-[10px] text-muted-foreground text-center">
+            {service === 'spotify'
+              ? 'Faça login no Spotify pelo player abaixo para reprodução completa'
+              : 'Faça login no Deezer pelo player abaixo para reprodução completa'}
+          </p>
         )}
 
-        {/* Result thumbnails — horizontal scroll */}
-        {results.length > 0 && !searching && (
-          <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1" style={{ scrollbarWidth: 'none' } as React.CSSProperties}>
-            {results.map((v) => (
-              <button
-                key={v.trackId}
-                onClick={() => playAudio(v)}
-                className={cn(
-                  'flex-shrink-0 w-32 rounded-xl overflow-hidden text-left transition-all border',
-                  currentTrackId === v.trackId
-                    ? 'border-primary/60 ring-1 ring-primary/40'
-                    : 'border-transparent opacity-60 hover:opacity-100',
-                )}
-              >
-                <img src={v.thumbnail} alt={v.title} className="w-full aspect-video object-cover" loading="lazy" />
-                <div className="px-1.5 py-1 bg-white/5">
-                  <p className="text-[10px] font-medium line-clamp-2 leading-tight">{v.title}</p>
-                  <p className="text-[9px] text-muted-foreground mt-0.5 truncate">{v.author}</p>
-                </div>
-              </button>
-            ))}
-          </div>
-        )}
-
-        {/* Now playing bar */}
-        {currentTrackId && (
-          <div className="flex items-center gap-3 p-2.5 rounded-xl bg-violet-500/10 border border-violet-500/20">
-            {currentThumbnail
-              ? <img src={currentThumbnail} alt="" className="w-10 h-10 rounded-lg object-cover flex-shrink-0" />
-              : <div className="w-10 h-10 rounded-lg bg-violet-500/20 flex items-center justify-center flex-shrink-0"><Music className="w-4 h-4 text-violet-400" /></div>
-            }
-            <div className="flex-1 min-w-0">
-              <p className="text-xs font-medium truncate">{currentTitle}</p>
-              <p className="text-[10px] text-muted-foreground flex items-center gap-1 mt-0.5">
-                {isPlaying
-                  ? <><span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse inline-block" /> Tocando em background</>
-                  : 'Pausado'}
-              </p>
-            </div>
+        {/* Genre presets */}
+        <div className="flex flex-wrap gap-1.5">
+          {presets.map((p) => (
             <button
-              onClick={togglePlayPause}
-              className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-white/10 transition-all flex-shrink-0"
-              title={isPlaying ? 'Pausar' : 'Continuar'}
+              key={p.label}
+              onClick={() => selectPreset(p)}
+              className={cn(
+                'text-xs px-3 py-1.5 rounded-full glass hover:bg-accent transition-all',
+                activeLabel === p.label && 'bg-violet-500/20 text-violet-300 border border-violet-500/30',
+              )}
             >
-              {isPlaying
-                ? <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg>
-                : <Play className="w-4 h-4" />}
+              {p.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Embedded player */}
+        <div className="rounded-xl overflow-hidden bg-black/10">
+          <iframe
+            key={embedSrc}
+            src={embedSrc}
+            width="100%"
+            height={service === 'youtube' ? 200 : 152}
+            allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+            allowFullScreen
+            className="w-full block"
+            style={{ border: 'none' }}
+            title="Music Player"
+          />
+        </div>
+
+        {/* Custom URL */}
+        <div className="space-y-1">
+          <div className="flex gap-2">
+            <input
+              type="url"
+              placeholder={
+                service === 'youtube' ? 'Cole um link do YouTube...' :
+                service === 'spotify' ? 'Cole um link do Spotify...' :
+                'Cole um link do Deezer...'
+              }
+              value={customUrl}
+              onChange={(e) => { setCustomUrl(e.target.value); setUrlError(''); }}
+              onKeyDown={(e) => { if (e.key === 'Enter') applyCustomUrl(); }}
+              className="input-field flex-1 text-xs"
+            />
+            <button
+              onClick={applyCustomUrl}
+              disabled={!customUrl.trim()}
+              className="btn-primary text-xs px-3 flex-shrink-0 disabled:opacity-40"
+            >
+              Tocar
             </button>
           </div>
-        )}
+          {urlError && <p className="text-[10px] text-destructive">{urlError}</p>}
+        </div>
 
-        {/* Background mode info */}
-        {isPlaying && (
-          <div className="text-[10px] text-center text-emerald-400/70 flex items-center justify-center gap-1">
-            <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-            </svg>
-            Áudio continuará tocando mesmo com a tela bloqueada
-          </div>
+        {service === 'youtube' && (
+          <p className="text-[10px] text-center text-muted-foreground">
+            YouTube funciona sem login • Cole qualquer link do YouTube para personalizar
+          </p>
         )}
       </div>
     </div>

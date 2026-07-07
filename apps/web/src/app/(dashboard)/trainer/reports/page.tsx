@@ -4,12 +4,14 @@ import { useState } from 'react';
 import { motion } from 'framer-motion';
 import {
   Users, Dumbbell, Activity,
-  BarChart3, Flame, Trophy, Target, Clock, FileDown,
+  BarChart3, Flame, Trophy, Target, Clock, FileDown, Lock,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
+import { useSubscription } from '@/hooks/useSubscription';
+import toast from 'react-hot-toast';
 
 const PERIODS: { label: string; days: number }[] = [
   { label: '7 dias', days: 7 },
@@ -32,6 +34,9 @@ const GOAL_LABELS: Record<string, string> = {
 export default function TrainerReports() {
   const [periodIdx, setPeriodIdx] = useState(1);
   const period = PERIODS[periodIdx];
+  const { canUseFeature } = useSubscription();
+  const hasCsv = canUseFeature('csvReports');
+  const hasPdf = canUseFeature('pdfReports');
 
   const { data: stats, isLoading: statsLoading } = useQuery({
     queryKey: ['trainer-reports', period.days],
@@ -44,6 +49,7 @@ export default function TrainerReports() {
   });
 
   function exportCSV() {
+    if (!hasCsv) { toast.error('Relatório CSV disponível no plano Starter ou superior. Faça upgrade em Assinatura.'); return; }
     if (!students?.length) return;
     const rows = [
       ['Nome', 'Email', 'Objetivo', 'Sequência', 'Nível', 'Pontos', 'Status', 'Último treino'],
@@ -69,6 +75,7 @@ export default function TrainerReports() {
   }
 
   function exportPDF() {
+    if (!hasPdf) { toast.error('Relatório PDF disponível no plano Pro ou superior. Faça upgrade em Assinatura.'); return; }
     if (!students?.length && !stats) return;
     const date = new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' });
     const rows = (students ?? [])
@@ -180,22 +187,28 @@ export default function TrainerReports() {
         <div className="flex gap-2">
           <button
             onClick={exportPDF}
-            disabled={!students?.length}
-            className="btn-primary flex items-center gap-2 text-sm py-2 disabled:opacity-40"
-            title="Exportar relatório em PDF"
+            disabled={!students?.length && hasPdf}
+            className={cn(
+              'flex items-center gap-2 text-sm py-2 disabled:opacity-40',
+              hasPdf ? 'btn-primary' : 'btn-secondary border border-border opacity-60',
+            )}
+            title={hasPdf ? 'Exportar relatório em PDF' : 'Disponível no plano Pro ou superior'}
           >
-            <FileDown className="w-4 h-4" />
+            {hasPdf ? <FileDown className="w-4 h-4" /> : <Lock className="w-4 h-4" />}
             Exportar PDF
           </button>
           <button
             onClick={exportCSV}
-            disabled={!students?.length}
-            className="btn-secondary flex items-center gap-2 text-sm py-2 disabled:opacity-40"
-            title="Exportar lista de alunos em CSV"
+            disabled={!students?.length && hasCsv}
+            className={cn(
+              'flex items-center gap-2 text-sm py-2 disabled:opacity-40',
+              hasCsv ? 'btn-secondary' : 'btn-secondary border border-border opacity-60',
+            )}
+            title={hasCsv ? 'Exportar lista de alunos em CSV' : 'Disponível no plano Starter ou superior'}
           >
-            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-              <path d="M12 15V3m0 12-4-4m4 4 4-4M2 17l.621 2.485A2 2 0 004.561 21h14.878a2 2 0 001.94-1.515L22 17" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
+            {hasCsv
+              ? <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><path d="M12 15V3m0 12-4-4m4 4 4-4M2 17l.621 2.485A2 2 0 004.561 21h14.878a2 2 0 001.94-1.515L22 17" strokeLinecap="round" strokeLinejoin="round" /></svg>
+              : <Lock className="w-4 h-4" />}
             CSV
           </button>
         </div>

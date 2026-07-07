@@ -10,6 +10,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import toast from 'react-hot-toast';
 import { useRouter } from 'next/navigation';
+import { PlanGate } from '@/components/ui/plan-gate';
 
 const STATUS_LABEL: Record<string, { label: string; color: string }> = {
   ACTIVE:    { label: 'Ativo',     color: 'text-green-400 bg-green-400/10' },
@@ -95,6 +96,7 @@ export default function TrainerBillingPage() {
   const mrr = active.reduce((s: number, b: any) => s + (b.amount ?? 0), 0);
 
   return (
+    <PlanGate feature="billing">
     <div className="space-y-6 max-w-2xl mx-auto">
       <div className="page-header">
         <div className="flex items-center gap-3">
@@ -257,5 +259,6 @@ export default function TrainerBillingPage() {
         )}
       </motion.div>
     </div>
+    </PlanGate>
   );
 }

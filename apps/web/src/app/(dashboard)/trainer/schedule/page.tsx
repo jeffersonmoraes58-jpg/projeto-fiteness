@@ -11,6 +11,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
+import { PlanGate } from '@/components/ui/plan-gate';
 
 const WEEKDAYS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 const MONTHS = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
@@ -177,6 +178,7 @@ export default function TrainerSchedule() {
   const isPending = createMutation.isPending || updateMutation.isPending;
 
   return (
+    <PlanGate feature="scheduleCalendar">
     <div className="space-y-6">
       <div className="page-header">
         <div>
@@ -408,6 +410,7 @@ export default function TrainerSchedule() {
         )}
       </div>
     </div>
+    </PlanGate>
   );
 }
 

@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useState } from 'react';
+import { Suspense, useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Check, X, Zap, Star, ChevronLeft, CreditCard, Loader2, AlertCircle, CheckCircle2, Clock } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -130,16 +130,17 @@ function StatusBanner() {
 
 function SubscriptionPageContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { plan: currentPlan, displayName } = useSubscription();
   const currentIndex = PLAN_ORDER.indexOf(currentPlan);
   const [loadingPlan, setLoadingPlan] = useState<SubscriptionPlan | null>(null);
 
   const returnUrl = typeof window !== 'undefined' ? window.location.href.split('?')[0] : '';
 
-  const handleUpgrade = async (plan: SubscriptionPlan, planName: string) => {
+  const handleUpgrade = async (plan: SubscriptionPlan, planName: string, cycle = 'MONTHLY') => {
     setLoadingPlan(plan);
     try {
-      const { data } = await api.post('/subscriptions/checkout', { plan, returnUrl });
+      const { data } = await api.post('/subscriptions/checkout', { plan, cycle, returnUrl });
       const checkoutUrl = data?.checkoutUrl ?? data?.data?.checkoutUrl;
       if (checkoutUrl) {
         window.location.href = checkoutUrl;
@@ -153,6 +154,16 @@ function SubscriptionPageContent() {
       setLoadingPlan(null);
     }
   };
+
+  useEffect(() => {
+    const planParam = searchParams.get('plan') as SubscriptionPlan | null;
+    const cycleParam = searchParams.get('cycle') ?? 'MONTHLY';
+    const validPlans: SubscriptionPlan[] = ['BASIC', 'PRO', 'ENTERPRISE'];
+    if (planParam && validPlans.includes(planParam)) {
+      handleUpgrade(planParam, planParam, cycleParam);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <div className="space-y-6 max-w-5xl mx-auto">
