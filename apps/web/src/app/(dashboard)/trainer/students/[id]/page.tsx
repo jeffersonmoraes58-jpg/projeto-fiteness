@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Users, ChevronLeft, Flame, Dumbbell, Star, Calendar,
-  MessageCircle, Trash2,
+  MessageCircle, Trash2, Link2,
   Clock, Zap, ChevronRight, ClipboardList, TrendingUp,
   Heart, Activity, Moon, Brain, Target, Info,
   Plus, X, Search, Pencil, Scale, Save,
@@ -556,7 +556,7 @@ function PlanEditForm({ plan, isPending, onSave, onCancel, onPlansChange }: {
   function addExercise(ex: any) {
     setExercises((prev) => [
       ...prev,
-      { _key: ex.id + Date.now(), exerciseId: ex.id, name: ex.name, sets: 3, reps: '10', weight: '', restSeconds: 60, notes: '', technique: 'NORMAL', groupId: null },
+      { _key: ex.id + Date.now(), exerciseId: ex.id, name: ex.name, sets: 3, reps: '10', weight: '', restSeconds: 60, notes: '', isDropSet: false, groupId: null },
     ]);
     setExSearch('');
     setSearchResults([]);
@@ -568,6 +568,31 @@ function PlanEditForm({ plan, isPending, onSave, onCancel, onPlansChange }: {
 
   function updateExField(idx: number, field: string, value: any) {
     setExercises((prev) => prev.map((ex, i) => i === idx ? { ...ex, [field]: value } : ex));
+  }
+
+  function toggleDropSet(idx: number) {
+    setExercises((prev) => prev.map((ex, i) => i === idx ? { ...ex, isDropSet: !ex.isDropSet } : ex));
+  }
+
+  function toggleLink(idx: number) {
+    setExercises((prev) => {
+      const updated = [...prev];
+      const ex1 = { ...updated[idx] };
+      const ex2 = { ...updated[idx + 1] };
+      if (ex1.groupId && ex1.groupId === ex2.groupId) {
+        // Unlink: remove ex2 from group; if ex1 is now alone, also remove its groupId
+        ex2.groupId = null;
+        const stillInGroup = updated.filter((e, i) => i !== idx + 1 && e.groupId === ex1.groupId);
+        if (stillInGroup.length <= 1) ex1.groupId = null;
+      } else {
+        const newGroupId = ex1.groupId ?? ex2.groupId ?? `g${Date.now()}`;
+        ex1.groupId = newGroupId;
+        ex2.groupId = newGroupId;
+      }
+      updated[idx] = ex1;
+      updated[idx + 1] = ex2;
+      return updated;
+    });
   }
 
   async function saveExercises() {
@@ -582,9 +607,9 @@ function PlanEditForm({ plan, isPending, onSave, onCancel, onPlansChange }: {
           restSeconds: ex.restSeconds !== '' && ex.restSeconds != null ? Number(ex.restSeconds) : null,
           tempo: ex.tempo || null,
           notes: ex.notes || null,
-          isDropSet: ex.technique === 'DROP_SET',
-          isSuperSet: ['BI_SET', 'SUPER_SET', 'TRI_SET', 'GIANT_SET', 'CIRCUIT'].includes(ex.technique),
-          superSetGroupId: ex.technique !== 'NORMAL' ? (ex.groupId || null) : null,
+          isDropSet: ex.isDropSet || false,
+          isSuperSet: !!ex.groupId && !ex.isDropSet,
+          superSetGroupId: ex.groupId || null,
         })),
       });
       toast.success('Exercícios salvos!');
@@ -648,56 +673,50 @@ function PlanEditForm({ plan, isPending, onSave, onCancel, onPlansChange }: {
               <p className="text-xs text-muted-foreground text-center py-3">Nenhum exercício. Adicione abaixo.</p>
             )}
             {exercises.map((ex, idx) => {
-              const cfg = TECHNIQUE_CONFIG[(ex.technique as Technique) ?? 'NORMAL'] ?? TECHNIQUE_CONFIG.NORMAL;
-              const isGrouped = ex.technique && ex.technique !== 'NORMAL';
+              const groupSize = ex.groupId ? exercises.filter(e => e.groupId === ex.groupId).length : 0;
+              const groupLabel = ex.isDropSet ? 'Drop Set'
+                : ex.groupId ? (groupSize === 2 ? 'Bi-set' : groupSize === 3 ? 'Tri-set' : groupSize >= 4 ? 'Giant Set' : 'Super Set')
+                : '';
+              const groupColor = ex.isDropSet
+                ? { badge: 'bg-red-500/10 text-red-400', card: 'border-l-4 border-red-500/60', connector: 'text-red-400', connectorBg: 'bg-red-500/10 border-red-500/30' }
+                : groupSize === 2
+                ? { badge: 'bg-orange-500/10 text-orange-400', card: 'border-l-4 border-orange-500/60', connector: 'text-orange-400', connectorBg: 'bg-orange-500/10 border-orange-500/30' }
+                : groupSize === 3
+                ? { badge: 'bg-purple-500/10 text-purple-400', card: 'border-l-4 border-purple-500/60', connector: 'text-purple-400', connectorBg: 'bg-purple-500/10 border-purple-500/30' }
+                : { badge: 'bg-pink-500/10 text-pink-400', card: 'border-l-4 border-pink-500/60', connector: 'text-pink-400', connectorBg: 'bg-pink-500/10 border-pink-500/30' };
+
               const nextEx = exercises[idx + 1];
-              const showConnector = isGrouped && ex.groupId && nextEx?.groupId === ex.groupId && nextEx?.technique === ex.technique;
+              const isLinkedToNext = !!(ex.groupId && nextEx?.groupId === ex.groupId);
+
               return (
                 <div key={ex._key ?? idx}>
-                  <div className={cn('glass rounded-xl p-2.5 space-y-2', isGrouped && cfg.border)}>
+                  <div className={cn('glass rounded-xl p-2.5 space-y-2', groupLabel && groupColor.card)}>
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-1.5 flex-1 mr-2 min-w-0">
                         <span className="text-xs font-medium truncate">{idx + 1}. {ex.name}</span>
-                        {isGrouped && (
-                          <span className={cn('text-[10px] font-semibold px-1.5 py-0.5 rounded-full flex-shrink-0', cfg.bg, cfg.color)}>
-                            {cfg.label}{ex.groupId ? ` · ${ex.groupId}` : ''}
+                        {groupLabel && (
+                          <span className={cn('text-[10px] font-semibold px-1.5 py-0.5 rounded-full flex-shrink-0', groupColor.badge)}>
+                            {groupLabel}
                           </span>
                         )}
                       </div>
-                      <button onClick={() => removeExercise(idx)} className="w-5 h-5 rounded flex items-center justify-center hover:bg-red-500/10 flex-shrink-0">
-                        <X className="w-3 h-3 text-red-400" />
-                      </button>
-                    </div>
-
-                    <div className="flex gap-1.5">
-                      <div className="flex-1">
-                        <label className="text-[10px] text-muted-foreground block mb-0.5">Tipo de série</label>
-                        <select
-                          value={ex.technique || 'NORMAL'}
-                          onChange={(e) => {
-                            updateExField(idx, 'technique', e.target.value);
-                            if (e.target.value === 'NORMAL') updateExField(idx, 'groupId', null);
-                          }}
-                          className="input-field text-xs py-1 px-2"
+                      <div className="flex items-center gap-1 flex-shrink-0">
+                        <button
+                          onClick={() => toggleDropSet(idx)}
+                          title={ex.isDropSet ? 'Remover Drop Set' : 'Marcar como Drop Set'}
+                          className={cn(
+                            'text-[10px] px-2 py-0.5 rounded-full border transition-all font-medium',
+                            ex.isDropSet
+                              ? 'bg-red-500/10 border-red-500/30 text-red-400'
+                              : 'border-border/30 text-muted-foreground/50 hover:border-red-500/30 hover:text-red-400',
+                          )}
                         >
-                          {(Object.keys(TECHNIQUE_CONFIG) as Technique[]).map((k) => (
-                            <option key={k} value={k}>{TECHNIQUE_CONFIG[k].label}</option>
-                          ))}
-                        </select>
+                          Drop
+                        </button>
+                        <button onClick={() => removeExercise(idx)} className="w-5 h-5 rounded flex items-center justify-center hover:bg-red-500/10">
+                          <X className="w-3 h-3 text-red-400" />
+                        </button>
                       </div>
-                      {isGrouped && (
-                        <div className="w-20">
-                          <label className="text-[10px] text-muted-foreground block mb-0.5">Grupo</label>
-                          <input
-                            type="text"
-                            value={ex.groupId || ''}
-                            onChange={(e) => updateExField(idx, 'groupId', e.target.value.toUpperCase().slice(0, 2))}
-                            placeholder="A"
-                            className="input-field text-xs py-1 px-2 text-center font-bold"
-                            maxLength={2}
-                          />
-                        </div>
-                      )}
                     </div>
 
                     <div className="grid grid-cols-4 gap-1.5">
@@ -723,12 +742,23 @@ function PlanEditForm({ plan, isPending, onSave, onCancel, onPlansChange }: {
                       <input type="text" value={ex.notes ?? ''} onChange={(e) => updateExField(idx, 'notes', e.target.value)} placeholder="Técnica, variação..." className="input-field text-xs py-1 px-2" />
                     </div>
                   </div>
-                  {showConnector && (
-                    <div className={cn('flex items-center gap-2 py-0.5 px-3', cfg.color)}>
-                      <div className="flex-1 h-px bg-current opacity-30" />
-                      <span className="text-[10px] font-semibold opacity-70">{cfg.label} · {ex.groupId}</span>
-                      <div className="flex-1 h-px bg-current opacity-30" />
-                    </div>
+
+                  {/* Link connector between exercises */}
+                  {idx < exercises.length - 1 && (
+                    <button
+                      onClick={() => toggleLink(idx)}
+                      className={cn(
+                        'w-full flex items-center justify-center gap-1.5 py-1.5 text-[10px] font-semibold transition-all rounded-lg my-0.5',
+                        isLinkedToNext
+                          ? cn('border', groupColor.connectorBg, groupColor.connector)
+                          : 'text-muted-foreground/40 hover:text-primary hover:bg-primary/5',
+                      )}
+                    >
+                      <Link2 className="w-3 h-3" />
+                      {isLinkedToNext
+                        ? `${groupLabel} — clique para desconectar`
+                        : 'Vincular ao próximo (bi-set / super set)'}
+                    </button>
                   )}
                 </div>
               );
@@ -779,22 +809,7 @@ function PlanEditForm({ plan, isPending, onSave, onCancel, onPlansChange }: {
   );
 }
 
-type Technique = 'NORMAL' | 'DROP_SET' | 'BI_SET' | 'SUPER_SET' | 'TRI_SET' | 'GIANT_SET' | 'CIRCUIT';
-
-const TECHNIQUE_CONFIG: Record<Technique, { label: string; color: string; bg: string; border: string }> = {
-  NORMAL:    { label: 'Normal',     color: 'text-muted-foreground', bg: '',                  border: '' },
-  DROP_SET:  { label: 'Drop Set',   color: 'text-red-400',          bg: 'bg-red-500/10',     border: 'border-l-4 border-red-500/60' },
-  BI_SET:    { label: 'Bi-set',     color: 'text-orange-400',       bg: 'bg-orange-500/10',  border: 'border-l-4 border-orange-500/60' },
-  SUPER_SET: { label: 'Super Set',  color: 'text-blue-400',         bg: 'bg-blue-500/10',    border: 'border-l-4 border-blue-500/60' },
-  TRI_SET:   { label: 'Tri-set',    color: 'text-purple-400',       bg: 'bg-purple-500/10',  border: 'border-l-4 border-purple-500/60' },
-  GIANT_SET: { label: 'Giant Set',  color: 'text-pink-400',         bg: 'bg-pink-500/10',    border: 'border-l-4 border-pink-500/60' },
-  CIRCUIT:   { label: 'Circuito',   color: 'text-emerald-400',      bg: 'bg-emerald-500/10', border: 'border-l-4 border-emerald-500/60' },
-};
-
 function toExRow(ex: any) {
-  let technique: Technique = 'NORMAL';
-  if (ex.isDropSet) technique = 'DROP_SET';
-  else if (ex.isSuperSet) technique = 'SUPER_SET';
   return {
     _key: ex.id,
     exerciseId: ex.exerciseId,
@@ -805,8 +820,8 @@ function toExRow(ex: any) {
     restSeconds: ex.restSeconds ?? '',
     tempo: ex.tempo ?? '',
     notes: ex.notes ?? '',
-    technique,
-    groupId: ex.superSetGroupId ?? null as string | null,
+    isDropSet: ex.isDropSet ?? false,
+    groupId: (ex.superSetGroupId ?? null) as string | null,
   };
 }
 
