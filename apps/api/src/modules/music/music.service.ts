@@ -1,4 +1,4 @@
-import { Injectable, ServiceUnavailableException, BadGatewayException } from '@nestjs/common';
+import { Injectable, BadGatewayException, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
 export interface MusicResult {
@@ -15,6 +15,10 @@ interface SpotifyTokenCache {
   expiresAt: number;
 }
 
+// InnerTube client key used by YouTube's own web player — no personal API key required
+const INNERTUBE_KEY = 'AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8';
+const INNERTUBE_CLIENT_VERSION = '2.20231121.08.00';
+
 @Injectable()
 export class MusicService {
   private spotifyCache: SpotifyTokenCache | null = null;
@@ -23,12 +27,13 @@ export class MusicService {
 
   async searchYouTube(q: string): Promise<MusicResult[]> {
     const apiKey = this.config.get<string>('YOUTUBE_API_KEY');
-    if (!apiKey) {
-      throw new ServiceUnavailableException(
-        'YouTube API não configurada. Adicione YOUTUBE_API_KEY ao .env para habilitar busca personalizada.',
-      );
+    if (apiKey) {
+      return this.searchYouTubeDataApi(q, apiKey);
     }
+    return this.searchYouTubeInnerTube(q);
+  }
 
+  private async searchYouTubeDataApi(q: string, apiKey: string): Promise<MusicResult[]> {
     const url = new URL('https://www.googleapis.com/youtube/v3/search');
     url.searchParams.set('part', 'snippet');
     url.searchParams.set('q', q);
@@ -46,14 +51,69 @@ export class MusicService {
       return (data.items || []).map((item: any) => ({
         id: item.id.videoId,
         title: item.snippet.title,
-        thumbnail:
-          item.snippet.thumbnails?.medium?.url ??
-          item.snippet.thumbnails?.default?.url ??
-          '',
+        thumbnail: item.snippet.thumbnails?.medium?.url ?? item.snippet.thumbnails?.default?.url ?? '',
         author: item.snippet.channelTitle,
         type: 'track' as const,
-        embedUrl: `https://www.youtube.com/embed/${item.id.videoId}?autoplay=1`,
+        embedUrl: `https://www.youtube.com/embed/${item.id.videoId}?autoplay=1&rel=1`,
       }));
+    } catch (err: any) {
+      throw new BadGatewayException('Erro ao buscar no YouTube: ' + err.message);
+    }
+  }
+
+  private async searchYouTubeInnerTube(q: string): Promise<MusicResult[]> {
+    try {
+      const res = await fetch(
+        `https://www.youtube.com/youtubei/v1/search?key=${INNERTUBE_KEY}&prettyPrint=false`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-YouTube-Client-Name': '1',
+            'X-YouTube-Client-Version': INNERTUBE_CLIENT_VERSION,
+            'Origin': 'https://www.youtube.com',
+            'Referer': 'https://www.youtube.com/',
+          },
+          body: JSON.stringify({
+            context: {
+              client: {
+                clientName: 'WEB',
+                clientVersion: INNERTUBE_CLIENT_VERSION,
+                hl: 'pt',
+                gl: 'BR',
+              },
+            },
+            query: q,
+          }),
+        },
+      );
+
+      if (!res.ok) throw new Error(`InnerTube HTTP ${res.status}`);
+      const data: any = await res.json();
+
+      const items: any[] =
+        data?.contents?.twoColumnSearchResultsRenderer?.primaryContents
+          ?.sectionListRenderer?.contents?.[0]
+          ?.itemSectionRenderer?.contents ?? [];
+
+      const results: MusicResult[] = [];
+      for (const item of items) {
+        const vr = item.videoRenderer;
+        if (!vr?.videoId) continue;
+        const thumbs: any[] = vr.thumbnail?.thumbnails ?? [];
+        const thumb = thumbs.find((t) => t.width >= 320) ?? thumbs[thumbs.length - 1] ?? {};
+        results.push({
+          id: vr.videoId,
+          title: vr.title?.runs?.[0]?.text ?? '',
+          thumbnail: thumb.url ?? '',
+          author: vr.ownerText?.runs?.[0]?.text ?? vr.shortBylineText?.runs?.[0]?.text ?? '',
+          type: 'track' as const,
+          embedUrl: `https://www.youtube.com/embed/${vr.videoId}?autoplay=1&rel=1`,
+        });
+        if (results.length >= 10) break;
+      }
+
+      return results;
     } catch (err: any) {
       throw new BadGatewayException('Erro ao buscar no YouTube: ' + err.message);
     }

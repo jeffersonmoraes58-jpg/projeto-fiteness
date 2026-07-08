@@ -773,8 +773,6 @@ export default function StudentWorkout() {
 
 // ─── Workout Music Player ────────────────────────────────────────────────────
 
-type MusicService = 'youtube' | 'spotify' | 'deezer';
-
 interface MusicSearchResult {
   id: string;
   title: string;
@@ -784,103 +782,44 @@ interface MusicSearchResult {
   embedUrl: string;
 }
 
-// Preset playlists — loaded instantly via iframe without API call
-const YOUTUBE_PRESETS = [
-  { label: '🔥 Treino',  query: 'workout gym music', embedUrl: 'https://www.youtube.com/embed/videoseries?list=PLRBp0Fe2GpgmsW46rSmyiWte46RCfH5JC&autoplay=1' },
-  { label: '⚡ HIIT',   query: 'hiit workout music', embedUrl: 'https://www.youtube.com/embed/videoseries?list=PLFgquLnL59alCl_2TQvOiD5Vgm1hCaGSK&autoplay=1' },
-  { label: '🎧 EDM',    query: 'edm workout music',  embedUrl: 'https://www.youtube.com/embed/videoseries?list=PLRBp0Fe2GpgnSW81e-Fwl2t_3QMOJ1UL&autoplay=1' },
-  { label: '🎸 Rock',   query: 'rock workout music', embedUrl: 'https://www.youtube.com/embed/videoseries?list=PLRBp0Fe2GpglSD5qFEMEiJRxnzJA3JUls&autoplay=1' },
-  { label: '🎵 Hip-Hop', query: 'hip hop workout',   embedUrl: 'https://www.youtube.com/embed/videoseries?list=PLRBp0Fe2GpglPuFKkY1rKL2R2N49FzUas&autoplay=1' },
-];
-
-const SPOTIFY_PRESETS = [
-  { label: '🔥 Treino',  query: 'workout',  embedUrl: 'https://open.spotify.com/embed/playlist/37i9dQZF1DXdoiVBe0Ni9X?utm_source=generator&theme=0' },
-  { label: '⚡ HIIT',   query: 'hiit',     embedUrl: 'https://open.spotify.com/embed/playlist/37i9dQZF1DWUVpAXiEPK8P?utm_source=generator&theme=0' },
-  { label: '🎧 EDM',    query: 'edm',      embedUrl: 'https://open.spotify.com/embed/playlist/37i9dQZF1DX8a1tdzq5tbM?utm_source=generator&theme=0' },
-  { label: '🎵 Hip-Hop', query: 'hip hop', embedUrl: 'https://open.spotify.com/embed/playlist/37i9dQZF1DX2RxBh64BHjQ?utm_source=generator&theme=0' },
-  { label: '🎸 Rock',   query: 'rock',     embedUrl: 'https://open.spotify.com/embed/playlist/37i9dQZF1DX70RN3TfWWJh?utm_source=generator&theme=0' },
-];
-
-const DEEZER_PRESETS = [
-  { label: '🔥 Treino',  query: 'workout',  embedUrl: 'https://widget.deezer.com/widget/auto/playlist/1282694775' },
-  { label: '⚡ HIIT',   query: 'hiit',     embedUrl: 'https://widget.deezer.com/widget/auto/playlist/4531411342' },
-  { label: '🎧 EDM',    query: 'edm',      embedUrl: 'https://widget.deezer.com/widget/auto/playlist/1111143121' },
-  { label: '🎵 Hip-Hop', query: 'hip hop', embedUrl: 'https://widget.deezer.com/widget/auto/playlist/1109890782' },
-  { label: '🎸 Rock',   query: 'rock',     embedUrl: 'https://widget.deezer.com/widget/auto/playlist/1109890342' },
+const GENRES = [
+  { label: '🔥 Treino',   query: 'best workout gym music mix motivação' },
+  { label: '⚡ HIIT',    query: 'hiit cardio workout music intense 2024' },
+  { label: '🎧 EDM',     query: 'edm electronic workout gym music 2024' },
+  { label: '🎸 Rock',    query: 'rock metal workout gym motivation music' },
+  { label: '🎵 Hip-Hop', query: 'hip hop rap workout motivation music' },
 ];
 
 function WorkoutMusicPlayer() {
   const [open, setOpen] = useState(true);
-  const [service, setService] = useState<MusicService>('spotify');
-  const [activeLabel, setActiveLabel] = useState(SPOTIFY_PRESETS[0].label);
-  const [embedSrc, setEmbedSrc] = useState(SPOTIFY_PRESETS[0].embedUrl);
+  const [activeLabel, setActiveLabel] = useState('');
+  const [embedSrc, setEmbedSrc] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [searching, setSearching] = useState(false);
   const [searchResults, setSearchResults] = useState<MusicSearchResult[]>([]);
   const [searchError, setSearchError] = useState('');
   const [activeResultId, setActiveResultId] = useState('');
 
-  useEffect(() => {
-    const saved = localStorage.getItem('fitlynutri-music-service') as MusicService | null;
-    if (saved === 'youtube') {
-      setService('youtube');
-      setActiveLabel('');
-      setEmbedSrc('');
-    } else if (saved === 'deezer') {
-      setService('deezer');
-      setActiveLabel(DEEZER_PRESETS[0].label);
-      setEmbedSrc(DEEZER_PRESETS[0].embedUrl);
-    }
-    // spotify is already the default state
-  }, []);
-
-  function switchService(svc: MusicService) {
-    localStorage.setItem('fitlynutri-music-service', svc);
-    setService(svc);
-    setSearchQuery('');
-    setSearchResults([]);
-    setSearchError('');
-    setActiveResultId('');
-    if (svc === 'youtube') {
-      setActiveLabel('');
-      setEmbedSrc('');
-    } else {
-      const presets = svc === 'spotify' ? SPOTIFY_PRESETS : DEEZER_PRESETS;
-      setActiveLabel(presets[0].label);
-      setEmbedSrc(presets[0].embedUrl);
-    }
-  }
-
-  function loadPreset(preset: { label: string; query: string; embedUrl: string }) {
-    setActiveLabel(preset.label);
-    setEmbedSrc(preset.embedUrl);
-    setSearchResults([]);
-    setSearchQuery('');
-    setSearchError('');
-    setActiveResultId('');
-  }
-
-  async function doSearch(q: string, currentService?: MusicService) {
-    const svc = currentService ?? service;
+  async function doSearch(q: string, label?: string) {
     if (!q.trim()) return;
     setSearching(true);
     setSearchError('');
     setSearchResults([]);
     setActiveResultId('');
+    if (label) setActiveLabel(label);
     try {
-      const res = await api.get(`/music/search?q=${encodeURIComponent(q.trim())}&service=${svc}`);
+      const res = await api.get(`/music/search?q=${encodeURIComponent(q.trim())}&service=youtube`);
       const results: MusicSearchResult[] = res.data?.data ?? res.data ?? [];
-      setSearchResults(results);
       if (results.length === 0) {
         setSearchError('Nenhum resultado. Tente outro termo.');
       } else {
+        setSearchResults(results);
         setActiveResultId(results[0].id);
         setEmbedSrc(results[0].embedUrl);
-        setActiveLabel(results[0].title.slice(0, 30));
+        if (!label) setActiveLabel(results[0].title.slice(0, 28));
       }
-    } catch (err: any) {
-      const msg = err?.response?.data?.message ?? 'Erro ao buscar. Tente novamente.';
-      setSearchError(msg);
+    } catch {
+      setSearchError('Erro ao buscar. Tente novamente.');
     } finally {
       setSearching(false);
     }
@@ -889,28 +828,19 @@ function WorkoutMusicPlayer() {
   function playResult(result: MusicSearchResult) {
     setActiveResultId(result.id);
     setEmbedSrc(result.embedUrl);
-    setActiveLabel(result.title.slice(0, 30));
+    setActiveLabel(result.title.slice(0, 28));
   }
-
-  const presets = service === 'youtube' ? YOUTUBE_PRESETS : service === 'spotify' ? SPOTIFY_PRESETS : DEEZER_PRESETS;
-  const iframeHeight = service === 'spotify' ? 380 : service === 'deezer' ? 200 : 220;
-
-  const iframeAllow = service === 'youtube'
-    ? 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share'
-    : service === 'spotify'
-    ? 'autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture; allow-forms allow-scripts allow-same-origin'
-    : 'autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture';
 
   return (
     <div className="glass-card overflow-hidden">
       {/* Header */}
       <button onClick={() => setOpen((o) => !o)} className="w-full flex items-center justify-between">
         <div className="flex items-center gap-2 min-w-0">
-          <div className="w-7 h-7 rounded-lg bg-violet-500/20 flex items-center justify-center flex-shrink-0">
-            <Music className="w-3.5 h-3.5 text-violet-400" />
+          <div className="w-7 h-7 rounded-lg bg-red-500/20 flex items-center justify-center flex-shrink-0">
+            <Music className="w-3.5 h-3.5 text-red-400" />
           </div>
           <span className="text-sm font-semibold truncate">
-            {activeLabel ? `Música — ${activeLabel}` : 'Música de Treino'}
+            {activeLabel ? `▶ ${activeLabel}` : 'YouTube Music'}
           </span>
         </div>
         {open
@@ -919,43 +849,24 @@ function WorkoutMusicPlayer() {
       </button>
 
       <div className={cn('mt-3 space-y-3', !open && 'hidden')}>
-        {/* Service selector */}
-        <div className="flex gap-1 p-1 rounded-xl bg-black/20">
-          {(['spotify', 'deezer', 'youtube'] as MusicService[]).map((svc) => (
-            <button
-              key={svc}
-              onClick={() => switchService(svc)}
-              className={cn(
-                'flex-1 py-1.5 rounded-lg text-xs font-semibold transition-all',
-                service === svc ? 'bg-violet-600 text-white shadow' : 'text-muted-foreground hover:text-foreground',
-              )}
-            >
-              {svc === 'youtube' ? 'YouTube' : svc === 'spotify' ? 'Spotify' : 'Deezer'}
-            </button>
-          ))}
-        </div>
-
         {/* Genre preset buttons */}
         <div className="flex flex-wrap gap-1.5">
-          {presets.map((p) => (
+          {GENRES.map((g) => (
             <button
-              key={p.label}
-              onClick={() => {
-                if (service === 'youtube') {
-                  setActiveLabel(p.label);
-                  doSearch(p.query, 'youtube');
-                } else {
-                  loadPreset(p);
-                }
-              }}
+              key={g.label}
+              onClick={() => { setSearchQuery(g.query); doSearch(g.query, g.label); }}
+              disabled={searching}
               className={cn(
-                'text-xs px-3 py-1.5 rounded-full glass hover:bg-accent transition-all',
-                activeLabel === p.label && searchResults.length === 0
-                  ? 'bg-violet-500/20 text-violet-300 border border-violet-500/30'
+                'text-xs px-3 py-1.5 rounded-full glass hover:bg-accent transition-all disabled:opacity-50 flex items-center gap-1',
+                activeLabel === g.label
+                  ? 'bg-red-500/20 text-red-300 border border-red-500/30'
                   : '',
               )}
             >
-              {p.label}
+              {searching && activeLabel === g.label
+                ? <Loader2 className="w-3 h-3 animate-spin" />
+                : null}
+              {g.label}
             </button>
           ))}
         </div>
@@ -966,7 +877,7 @@ function WorkoutMusicPlayer() {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
             <input
               type="text"
-              placeholder={`Pesquisar no ${service === 'youtube' ? 'YouTube' : service === 'spotify' ? 'Spotify' : 'Deezer'}...`}
+              placeholder="Pesquisar no YouTube..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter') doSearch(searchQuery); }}
@@ -978,7 +889,7 @@ function WorkoutMusicPlayer() {
             disabled={searching || !searchQuery.trim()}
             className="btn-primary text-xs px-3 flex-shrink-0 disabled:opacity-40 flex items-center gap-1.5"
           >
-            {searching && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+            {searching && !activeLabel ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Search className="w-3.5 h-3.5" />}
             Buscar
           </button>
         </div>
@@ -1001,15 +912,15 @@ function WorkoutMusicPlayer() {
                 className={cn(
                   'flex-shrink-0 w-28 rounded-xl overflow-hidden text-left transition-all border',
                   activeResultId === r.id
-                    ? 'border-violet-500/60 ring-1 ring-violet-500/40'
+                    ? 'border-red-500/60 ring-1 ring-red-500/40'
                     : 'border-transparent opacity-60 hover:opacity-100',
                 )}
               >
                 {r.thumbnail ? (
                   <img src={r.thumbnail} alt={r.title} className="w-full aspect-video object-cover" loading="lazy" />
                 ) : (
-                  <div className="w-full aspect-video bg-violet-500/10 flex items-center justify-center">
-                    <Music className="w-6 h-6 text-violet-400" />
+                  <div className="w-full aspect-video bg-red-500/10 flex items-center justify-center">
+                    <Music className="w-6 h-6 text-red-400" />
                   </div>
                 )}
                 <div className="px-1.5 py-1 bg-white/5">
@@ -1022,38 +933,30 @@ function WorkoutMusicPlayer() {
         )}
 
         {/* Embedded player */}
-        <div className="rounded-xl overflow-hidden bg-black/10" style={{ minHeight: embedSrc ? iframeHeight : 100 }}>
+        <div className="rounded-xl overflow-hidden bg-black" style={{ minHeight: embedSrc ? 220 : 90 }}>
           {embedSrc ? (
             <iframe
               key={embedSrc}
               src={embedSrc}
               width="100%"
-              height={iframeHeight}
-              allow={iframeAllow}
+              height={220}
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
               allowFullScreen
               className="w-full block"
               style={{ border: 'none' }}
-              title="Music Player"
+              title="YouTube Music Player"
             />
           ) : (
-            <div className="flex flex-col items-center justify-center gap-2 py-8">
-              <Music className="w-8 h-8 text-violet-400/40" />
+            <div className="flex flex-col items-center justify-center gap-2 py-6">
+              <Music className="w-7 h-7 text-red-400/40" />
               <p className="text-xs text-muted-foreground/60 text-center px-4">
-                {service === 'youtube'
-                  ? 'Clique em um gênero ou pesquise para tocar músicas do YouTube'
-                  : 'Selecione um gênero acima para começar'}
+                Clique em um gênero ou pesquise uma música
               </p>
             </div>
           )}
         </div>
 
-        <p className="text-[10px] text-center text-muted-foreground/50">
-          {service === 'spotify'
-            ? 'Spotify: 30s sem login • login no player para música completa'
-            : service === 'deezer'
-            ? 'Deezer: login no player para acesso completo'
-            : 'YouTube: pesquise ou clique em um gênero'}
-        </p>
+        <p className="text-[10px] text-center text-muted-foreground/40">YouTube · clique em um gênero para começar</p>
       </div>
     </div>
   );
