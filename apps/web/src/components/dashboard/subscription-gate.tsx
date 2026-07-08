@@ -35,72 +35,21 @@ export function SubscriptionGate({ children }: { children: React.ReactNode }) {
     return <>{children}</>;
   }
 
-  // Se está em TRIAL (pagamento pendente), mostra banner mas não bloqueia
   const isTrial = status === 'TRIAL';
 
   if (exempt || isLoading || (!isBlocked && !isTrial)) {
     return <>{children}</>;
   }
 
-  // TRIAL: mostra banner no topo + conteúdo normalmente
-  if (isTrial) {
-    return (
-      <>
-        <TrialBanner />
-        {children}
-      </>
-    );
-  }
-
-  // EXPIRED/CANCELED/PAST_DUE: bloqueia completamente
+  // TRIAL/EXPIRED/CANCELED/PAST_DUE: bloqueia completamente
   return <ExpiredOverlay statusKey={status ?? 'EXPIRED'} currentPlan={plan} />;
-}
-
-function TrialBanner() {
-  const [loading, setLoading] = useState(false);
-
-  const handlePayNow = async () => {
-    setLoading(true);
-    try {
-      const returnUrl = `${window.location.origin}/dashboard`;
-      const res = await api.post('/subscriptions/checkout', {
-        plan: 'PRO',
-        cycle: 'MONTHLY',
-        returnUrl,
-      });
-      const checkoutUrl = res.data?.data?.checkoutUrl ?? res.data?.checkoutUrl;
-      if (!checkoutUrl) throw new Error('Sem URL de checkout');
-      window.location.href = checkoutUrl;
-    } catch (err: any) {
-      toast.error(err?.response?.data?.message || 'Erro ao iniciar pagamento');
-      setLoading(false);
-    }
-  };
-
-  return (
-    <div className="bg-amber-500/10 border-b border-amber-500/20 px-4 py-3">
-      <div className="max-w-7xl mx-auto flex items-center justify-between gap-4 flex-wrap">
-        <div className="flex items-center gap-2 text-sm text-amber-400">
-          <AlertTriangle className="w-4 h-4 flex-shrink-0" />
-          <span>Pagamento pendente. Seu plano será ativado após a confirmação do pagamento.</span>
-        </div>
-        <button
-          onClick={handlePayNow}
-          disabled={loading}
-          className="text-sm font-semibold bg-amber-500 hover:bg-amber-600 text-white px-4 py-1.5 rounded-lg transition-colors disabled:opacity-50 flex items-center gap-2"
-        >
-          {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-          Pagar agora
-        </button>
-      </div>
-    </div>
-  );
 }
 
 function ExpiredOverlay({ statusKey, currentPlan }: { statusKey: string; currentPlan: string }) {
   const [cycle, setCycle] = useState<Cycle>('MONTHLY');
   const [loadingPlan, setLoadingPlan] = useState<string | null>(null);
   const { logout } = useAuthStore();
+  const isTrial = statusKey === 'TRIAL';
 
   const handleCheckout = async (planValue: string) => {
     setLoadingPlan(planValue);
@@ -124,19 +73,23 @@ function ExpiredOverlay({ statusKey, currentPlan }: { statusKey: string; current
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <div className="max-w-3xl w-full">
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-red-500/10 mb-4">
-            <Lock className="w-8 h-8 text-red-400" />
+          <div className={`inline-flex items-center justify-center w-16 h-16 rounded-full mb-4 ${isTrial ? 'bg-amber-500/10' : 'bg-red-500/10'}`}>
+            <Lock className={`w-8 h-8 ${isTrial ? 'text-amber-400' : 'text-red-400'}`} />
           </div>
           <h1 className="text-3xl font-bold mb-2">{STATUS_LABEL[statusKey] ?? 'Acesso bloqueado'}</h1>
           <p className="text-muted-foreground">
-            Seu plano atual ({currentPlan}) não está mais ativo. Renove para continuar usando o Fitlynutri.
+            {isTrial
+              ? 'Complete seu pagamento para liberar o acesso ao Fitlynutri.'
+              : `Seu plano atual (${currentPlan}) não está mais ativo. Renove para continuar usando o Fitlynutri.`}
           </p>
         </div>
 
         <div className="glass-card mb-6">
           <div className="flex items-center gap-2 mb-4 p-3 rounded-xl bg-yellow-500/10 text-yellow-400 text-sm">
             <AlertTriangle className="w-4 h-4 flex-shrink-0" />
-            Seus dados continuam salvos. Após renovar, você volta de onde parou.
+            {isTrial
+              ? 'Seus dados estão seguros. O acesso será liberado imediatamente após a confirmação do pagamento.'
+              : 'Seus dados continuam salvos. Após renovar, você volta de onde parou.'}
           </div>
 
           <div className="flex justify-center mb-6">
@@ -194,7 +147,7 @@ function ExpiredOverlay({ statusKey, currentPlan }: { statusKey: string; current
                       p.badge ? 'btn-primary' : 'btn-secondary border border-border hover:border-primary'
                     } disabled:opacity-50`}
                   >
-                    {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Renovar'}
+                    {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : isTrial ? 'Assinar' : 'Renovar'}
                   </button>
                 </div>
               );
