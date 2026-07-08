@@ -4,11 +4,12 @@ import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Users, ChevronLeft, Flame, Dumbbell, Star, Calendar,
-  MessageCircle, UserCheck, Trash2,
+  MessageCircle, Trash2,
   Clock, Zap, ChevronRight, ClipboardList, TrendingUp,
   Heart, Activity, Moon, Brain, Target, Info,
   Plus, X, Search, Pencil, Scale, Save,
 } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -47,16 +48,6 @@ export default function StudentDetailPage() {
   const { id } = useParams();
   const qc = useQueryClient();
   const [tab, setTab] = useState('treinos');
-  const [selectedWorkout, setSelectedWorkout] = useState('');
-  const [startDate, setStartDate] = useState(() => new Date().toISOString().split('T')[0]);
-  const [endDate, setEndDate] = useState('');
-  const [notes, setNotes] = useState('');
-  const [assignError, setAssignError] = useState('');
-  const [selectedDays, setSelectedDays] = useState<number[]>([]);
-  const DAYS_SHORT = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
-  const toggleDay = (day: number) => {
-    setSelectedDays(prev => prev.includes(day) ? prev.filter(d => d !== day) : [...prev, day]);
-  };
   const [editingPlan, setEditingPlan] = useState<any | null>(null);
   const [showAssessForm, setShowAssessForm] = useState(false);
   const EMPTY_ASSESS = { weight: '', height: '', bodyFatPercent: '', muscleMassKg: '', waistCm: '', hipCm: '', chestCm: '', rightArmCm: '', rightThighCm: '' };
@@ -65,11 +56,6 @@ export default function StudentDetailPage() {
   const { data: students, isLoading } = useQuery({
     queryKey: ['trainer-students'],
     queryFn: () => api.get('/trainers/me/students').then((r) => r.data.data),
-  });
-
-  const { data: workouts } = useQuery({
-    queryKey: ['workouts-list'],
-    queryFn: () => api.get('/workouts').then((r) => r.data.data || []),
   });
 
   const student = students?.find((s: any) => s.id === id);
@@ -127,29 +113,6 @@ export default function StudentDetailPage() {
     });
   }
 
-  const assignMutation = useMutation({
-    mutationFn: (data: any) =>
-      api.post(`/workouts/${data.workoutId}/assign`, {
-        studentId: student?.id,
-        startDate: data.startDate,
-        endDate: data.endDate || undefined,
-        notes: data.notes || undefined,
-        dayOfWeek: data.dayOfWeek || undefined,
-      }),
-    onSuccess: () => {
-      setSelectedWorkout(''); setStartDate(new Date().toISOString().split('T')[0]);
-      setEndDate(''); setNotes(''); setAssignError('');
-      qc.invalidateQueries({ queryKey: ['student-plans', id] });
-      toast.success('Treino atribuído com sucesso!');
-    },
-    onError: (e: any) => {
-      const msg = e.message || e.response?.data?.message;
-      const text = Array.isArray(msg) ? msg.join(', ') : (msg || 'Erro ao atribuir treino');
-      setAssignError(text);
-      toast.error(text);
-    },
-  });
-
   const removePlanMutation = useMutation({
     mutationFn: (planId: string) => api.delete(`/workouts/plans/${planId}`),
     onSuccess: () => {
@@ -169,20 +132,6 @@ export default function StudentDetailPage() {
     },
     onError: () => toast.error('Erro ao atualizar plano'),
   });
-
-  const handleAssign = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedWorkout) { setAssignError('Selecione um treino'); return; }
-    if (!startDate) { setAssignError('Informe a data de início'); return; }
-    setAssignError('');
-    assignMutation.mutate({
-      workoutId: selectedWorkout,
-      startDate,
-      endDate,
-      notes,
-      dayOfWeek: selectedDays.length > 0 ? selectedDays : undefined,
-    });
-  };
 
   if (isLoading) {
     return (
@@ -312,7 +261,7 @@ export default function StudentDetailPage() {
                 <div className="text-center py-8 text-muted-foreground">
                   <Dumbbell className="w-10 h-10 mx-auto mb-2 opacity-40" />
                   <p className="text-sm">Nenhum treino atribuído ainda.</p>
-                  <p className="text-xs mt-1">Use o formulário abaixo para atribuir treinos.</p>
+                  <p className="text-xs mt-1">Atribua treinos na página do treino.</p>
                 </div>
               ) : (
                 <div className="space-y-2">
@@ -356,61 +305,6 @@ export default function StudentDetailPage() {
               )}
             </div>
 
-            {/* Assign form */}
-            <form onSubmit={handleAssign} className="glass-card space-y-5">
-              <h2 className="font-semibold flex items-center gap-2">
-                <UserCheck className="w-4 h-4 text-purple-400" />
-                Adicionar treino à grade
-              </h2>
-              <div>
-                <label className="text-sm font-medium mb-1.5 block">Treino *</label>
-                <select value={selectedWorkout} onChange={(e) => setSelectedWorkout(e.target.value)} className="input-field">
-                  <option value="">Selecione um treino...</option>
-                  {(workouts || []).map((w: any) => (
-                    <option key={w.id} value={w.id}>{w.name}{w.duration ? ` — ${w.duration} min` : ''}{w.exercises?.length ? ` (${w.exercises.length} ex)` : ''}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-sm font-medium mb-1.5 block">Data de início *</label>
-                  <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="input-field" required />
-                </div>
-                <div>
-                  <label className="text-sm font-medium mb-1.5 block">Data de término</label>
-                  <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="input-field" min={startDate} />
-                </div>
-              </div>
-              <div>
-                <label className="text-sm font-medium mb-1.5 block">Dias da semana</label>
-                <div className="flex gap-1.5 flex-wrap">
-                  {DAYS_SHORT.map((dayLabel, dayIndex) => (
-                    <button
-                      key={dayIndex}
-                      type="button"
-                      onClick={() => toggleDay(dayIndex)}
-                      className={`w-10 h-10 rounded-xl text-xs font-medium transition-all border ${
-                        selectedDays.includes(dayIndex)
-                          ? 'bg-primary text-primary-foreground border-primary'
-                          : 'glass border-transparent hover:bg-accent text-muted-foreground'
-                      }`}
-                    >
-                      {dayLabel}
-                    </button>
-                  ))}
-                </div>
-                <p className="text-xs text-muted-foreground mt-1">Selecione os dias em que este treino será realizado</p>
-              </div>
-              <div>
-                <label className="text-sm font-medium mb-1.5 block">Observações</label>
-                <input type="text" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Ex: Foco em progressão de carga" className="input-field" />
-              </div>
-              {assignError && <div className="glass rounded-xl p-3 border border-red-500/20 text-red-400 text-sm">{assignError}</div>}
-              <button type="submit" disabled={assignMutation.isPending} className="btn-primary w-full flex items-center justify-center gap-2 disabled:opacity-50">
-                <UserCheck className="w-4 h-4" />
-                {assignMutation.isPending ? 'Atribuindo...' : 'Adicionar à grade'}
-              </button>
-            </form>
           </motion.div>
         )}
 
@@ -662,7 +556,7 @@ function PlanEditForm({ plan, isPending, onSave, onCancel, onPlansChange }: {
   function addExercise(ex: any) {
     setExercises((prev) => [
       ...prev,
-      { _key: ex.id + Date.now(), exerciseId: ex.id, name: ex.name, sets: 3, reps: '10', weight: '', restSeconds: 60, notes: '' },
+      { _key: ex.id + Date.now(), exerciseId: ex.id, name: ex.name, sets: 3, reps: '10', weight: '', restSeconds: 60, notes: '', technique: 'NORMAL', groupId: null },
     ]);
     setExSearch('');
     setSearchResults([]);
@@ -688,8 +582,9 @@ function PlanEditForm({ plan, isPending, onSave, onCancel, onPlansChange }: {
           restSeconds: ex.restSeconds !== '' && ex.restSeconds != null ? Number(ex.restSeconds) : null,
           tempo: ex.tempo || null,
           notes: ex.notes || null,
-          isDropSet: false,
-          isSuperSet: false,
+          isDropSet: ex.technique === 'DROP_SET',
+          isSuperSet: ['BI_SET', 'SUPER_SET', 'TRI_SET', 'GIANT_SET', 'CIRCUIT'].includes(ex.technique),
+          superSetGroupId: ex.technique !== 'NORMAL' ? (ex.groupId || null) : null,
         })),
       });
       toast.success('Exercícios salvos!');
@@ -752,71 +647,92 @@ function PlanEditForm({ plan, isPending, onSave, onCancel, onPlansChange }: {
             {exercises.length === 0 && (
               <p className="text-xs text-muted-foreground text-center py-3">Nenhum exercício. Adicione abaixo.</p>
             )}
-            {exercises.map((ex, idx) => (
-              <div key={ex._key ?? idx} className="glass rounded-xl p-2.5 space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-medium truncate flex-1 mr-2">{idx + 1}. {ex.name}</span>
-                  <button onClick={() => removeExercise(idx)} className="w-5 h-5 rounded flex items-center justify-center hover:bg-red-500/10 flex-shrink-0">
-                    <X className="w-3 h-3 text-red-400" />
-                  </button>
+            {exercises.map((ex, idx) => {
+              const cfg = TECHNIQUE_CONFIG[(ex.technique as Technique) ?? 'NORMAL'] ?? TECHNIQUE_CONFIG.NORMAL;
+              const isGrouped = ex.technique && ex.technique !== 'NORMAL';
+              const nextEx = exercises[idx + 1];
+              const showConnector = isGrouped && ex.groupId && nextEx?.groupId === ex.groupId && nextEx?.technique === ex.technique;
+              return (
+                <div key={ex._key ?? idx}>
+                  <div className={cn('glass rounded-xl p-2.5 space-y-2', isGrouped && cfg.border)}>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1.5 flex-1 mr-2 min-w-0">
+                        <span className="text-xs font-medium truncate">{idx + 1}. {ex.name}</span>
+                        {isGrouped && (
+                          <span className={cn('text-[10px] font-semibold px-1.5 py-0.5 rounded-full flex-shrink-0', cfg.bg, cfg.color)}>
+                            {cfg.label}{ex.groupId ? ` · ${ex.groupId}` : ''}
+                          </span>
+                        )}
+                      </div>
+                      <button onClick={() => removeExercise(idx)} className="w-5 h-5 rounded flex items-center justify-center hover:bg-red-500/10 flex-shrink-0">
+                        <X className="w-3 h-3 text-red-400" />
+                      </button>
+                    </div>
+
+                    <div className="flex gap-1.5">
+                      <div className="flex-1">
+                        <label className="text-[10px] text-muted-foreground block mb-0.5">Tipo de série</label>
+                        <select
+                          value={ex.technique || 'NORMAL'}
+                          onChange={(e) => {
+                            updateExField(idx, 'technique', e.target.value);
+                            if (e.target.value === 'NORMAL') updateExField(idx, 'groupId', null);
+                          }}
+                          className="input-field text-xs py-1 px-2"
+                        >
+                          {(Object.keys(TECHNIQUE_CONFIG) as Technique[]).map((k) => (
+                            <option key={k} value={k}>{TECHNIQUE_CONFIG[k].label}</option>
+                          ))}
+                        </select>
+                      </div>
+                      {isGrouped && (
+                        <div className="w-20">
+                          <label className="text-[10px] text-muted-foreground block mb-0.5">Grupo</label>
+                          <input
+                            type="text"
+                            value={ex.groupId || ''}
+                            onChange={(e) => updateExField(idx, 'groupId', e.target.value.toUpperCase().slice(0, 2))}
+                            placeholder="A"
+                            className="input-field text-xs py-1 px-2 text-center font-bold"
+                            maxLength={2}
+                          />
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="grid grid-cols-4 gap-1.5">
+                      <div>
+                        <label className="text-[10px] text-muted-foreground block mb-0.5">Séries</label>
+                        <input type="number" value={ex.sets} onChange={(e) => updateExField(idx, 'sets', e.target.value)} className="input-field text-xs py-1 px-2 text-center" min={1} />
+                      </div>
+                      <div>
+                        <label className="text-[10px] text-muted-foreground block mb-0.5">Reps</label>
+                        <input type="text" value={ex.reps ?? ''} onChange={(e) => updateExField(idx, 'reps', e.target.value)} placeholder="8-12" className="input-field text-xs py-1 px-2" />
+                      </div>
+                      <div>
+                        <label className="text-[10px] text-muted-foreground block mb-0.5">Carga (kg)</label>
+                        <input type="number" value={ex.weight ?? ''} onChange={(e) => updateExField(idx, 'weight', e.target.value)} placeholder="0" className="input-field text-xs py-1 px-2 text-center" min={0} step={0.5} />
+                      </div>
+                      <div>
+                        <label className="text-[10px] text-muted-foreground block mb-0.5">Desc. (s)</label>
+                        <input type="number" value={ex.restSeconds ?? ''} onChange={(e) => updateExField(idx, 'restSeconds', e.target.value)} placeholder="60" className="input-field text-xs py-1 px-2 text-center" min={0} />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-muted-foreground block mb-0.5">Obs</label>
+                      <input type="text" value={ex.notes ?? ''} onChange={(e) => updateExField(idx, 'notes', e.target.value)} placeholder="Técnica, variação..." className="input-field text-xs py-1 px-2" />
+                    </div>
+                  </div>
+                  {showConnector && (
+                    <div className={cn('flex items-center gap-2 py-0.5 px-3', cfg.color)}>
+                      <div className="flex-1 h-px bg-current opacity-30" />
+                      <span className="text-[10px] font-semibold opacity-70">{cfg.label} · {ex.groupId}</span>
+                      <div className="flex-1 h-px bg-current opacity-30" />
+                    </div>
+                  )}
                 </div>
-                <div className="grid grid-cols-4 gap-1.5">
-                  <div>
-                    <label className="text-[10px] text-muted-foreground block mb-0.5">Séries</label>
-                    <input
-                      type="number"
-                      value={ex.sets}
-                      onChange={(e) => updateExField(idx, 'sets', e.target.value)}
-                      className="input-field text-xs py-1 px-2 text-center"
-                      min={1}
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[10px] text-muted-foreground block mb-0.5">Reps</label>
-                    <input
-                      type="text"
-                      value={ex.reps ?? ''}
-                      onChange={(e) => updateExField(idx, 'reps', e.target.value)}
-                      placeholder="8-12"
-                      className="input-field text-xs py-1 px-2"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[10px] text-muted-foreground block mb-0.5">Carga (kg)</label>
-                    <input
-                      type="number"
-                      value={ex.weight ?? ''}
-                      onChange={(e) => updateExField(idx, 'weight', e.target.value)}
-                      placeholder="0"
-                      className="input-field text-xs py-1 px-2 text-center"
-                      min={0}
-                      step={0.5}
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[10px] text-muted-foreground block mb-0.5">Desc. (s)</label>
-                    <input
-                      type="number"
-                      value={ex.restSeconds ?? ''}
-                      onChange={(e) => updateExField(idx, 'restSeconds', e.target.value)}
-                      placeholder="60"
-                      className="input-field text-xs py-1 px-2 text-center"
-                      min={0}
-                    />
-                  </div>
-                </div>
-                <div>
-                  <label className="text-[10px] text-muted-foreground block mb-0.5">Obs</label>
-                  <input
-                    type="text"
-                    value={ex.notes ?? ''}
-                    onChange={(e) => updateExField(idx, 'notes', e.target.value)}
-                    placeholder="Técnica, variação..."
-                    className="input-field text-xs py-1 px-2"
-                  />
-                </div>
-              </div>
-            ))}
+              );
+            })}
 
             {/* Add exercise */}
             <div className="space-y-1.5">
@@ -863,7 +779,22 @@ function PlanEditForm({ plan, isPending, onSave, onCancel, onPlansChange }: {
   );
 }
 
+type Technique = 'NORMAL' | 'DROP_SET' | 'BI_SET' | 'SUPER_SET' | 'TRI_SET' | 'GIANT_SET' | 'CIRCUIT';
+
+const TECHNIQUE_CONFIG: Record<Technique, { label: string; color: string; bg: string; border: string }> = {
+  NORMAL:    { label: 'Normal',     color: 'text-muted-foreground', bg: '',                  border: '' },
+  DROP_SET:  { label: 'Drop Set',   color: 'text-red-400',          bg: 'bg-red-500/10',     border: 'border-l-4 border-red-500/60' },
+  BI_SET:    { label: 'Bi-set',     color: 'text-orange-400',       bg: 'bg-orange-500/10',  border: 'border-l-4 border-orange-500/60' },
+  SUPER_SET: { label: 'Super Set',  color: 'text-blue-400',         bg: 'bg-blue-500/10',    border: 'border-l-4 border-blue-500/60' },
+  TRI_SET:   { label: 'Tri-set',    color: 'text-purple-400',       bg: 'bg-purple-500/10',  border: 'border-l-4 border-purple-500/60' },
+  GIANT_SET: { label: 'Giant Set',  color: 'text-pink-400',         bg: 'bg-pink-500/10',    border: 'border-l-4 border-pink-500/60' },
+  CIRCUIT:   { label: 'Circuito',   color: 'text-emerald-400',      bg: 'bg-emerald-500/10', border: 'border-l-4 border-emerald-500/60' },
+};
+
 function toExRow(ex: any) {
+  let technique: Technique = 'NORMAL';
+  if (ex.isDropSet) technique = 'DROP_SET';
+  else if (ex.isSuperSet) technique = 'SUPER_SET';
   return {
     _key: ex.id,
     exerciseId: ex.exerciseId,
@@ -874,6 +805,8 @@ function toExRow(ex: any) {
     restSeconds: ex.restSeconds ?? '',
     tempo: ex.tempo ?? '',
     notes: ex.notes ?? '',
+    technique,
+    groupId: ex.superSetGroupId ?? null as string | null,
   };
 }
 

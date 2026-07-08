@@ -6,7 +6,7 @@ import {
   Dumbbell, Play, CheckCircle2, Clock, ChevronLeft,
   Flame, RotateCcw, Timer, ChevronRight,
   X, PlayCircle, Trophy, Share2, Download, Camera, SwitchCamera,
-  Music, ChevronUp, ChevronDown, ExternalLink,
+  Music, ChevronUp, ChevronDown, ExternalLink, Loader2, Search,
 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
@@ -775,139 +775,118 @@ export default function StudentWorkout() {
 
 type MusicService = 'youtube' | 'spotify' | 'deezer';
 
-interface MusicPreset {
-  label: string;
-  embedId: string;
-  embedType: 'video' | 'playlist' | 'album' | 'track';
+interface MusicSearchResult {
+  id: string;
+  title: string;
+  thumbnail: string;
+  author: string;
+  type: 'track' | 'playlist';
+  embedUrl: string;
 }
 
-const YOUTUBE_PRESETS: MusicPreset[] = [
-  { label: '🔥 Treino',  embedId: 'PLRBp0Fe2GpgmsW46rSmyiWte46RCfH5JC', embedType: 'playlist' },
-  { label: '⚡ HIIT',   embedId: 'PLFgquLnL59alCl_2TQvOiD5Vgm1hCaGSK', embedType: 'playlist' },
-  { label: '🎧 EDM',    embedId: 'PLx0sYbCqOb8QFavkVW4Ly3WEHrmXVJJM-', embedType: 'playlist' },
-  { label: '🎸 Rock',   embedId: 'PLx0sYbCqOb8TBPRdmBHs5Iftvv9TPboYg', embedType: 'playlist' },
-  { label: '🎵 Hip-Hop', embedId: 'PLx0sYbCqOb8Q3FbXN6-l8Hni9YLiN2WYd', embedType: 'playlist' },
+// Preset playlists — loaded instantly via iframe without API call
+const YOUTUBE_PRESETS = [
+  { label: '🔥 Treino',  query: 'workout gym music', embedUrl: 'https://www.youtube.com/embed/videoseries?list=PLRBp0Fe2GpgmsW46rSmyiWte46RCfH5JC&autoplay=1' },
+  { label: '⚡ HIIT',   query: 'hiit workout music', embedUrl: 'https://www.youtube.com/embed/videoseries?list=PLFgquLnL59alCl_2TQvOiD5Vgm1hCaGSK&autoplay=1' },
+  { label: '🎧 EDM',    query: 'edm workout music',  embedUrl: 'https://www.youtube.com/embed/videoseries?list=PLRBp0Fe2GpgnSW81e-Fwl2t_3QMOJ1UL&autoplay=1' },
+  { label: '🎸 Rock',   query: 'rock workout music', embedUrl: 'https://www.youtube.com/embed/videoseries?list=PLRBp0Fe2GpglSD5qFEMEiJRxnzJA3JUls&autoplay=1' },
+  { label: '🎵 Hip-Hop', query: 'hip hop workout',   embedUrl: 'https://www.youtube.com/embed/videoseries?list=PLRBp0Fe2GpglPuFKkY1rKL2R2N49FzUas&autoplay=1' },
 ];
 
-const SPOTIFY_PRESETS: MusicPreset[] = [
-  { label: '🔥 Treino',  embedId: '37i9dQZF1DXdoiVBe0Ni9X', embedType: 'playlist' },
-  { label: '⚡ HIIT',   embedId: '37i9dQZF1DWUVpAXiEPK8P', embedType: 'playlist' },
-  { label: '🎧 EDM',    embedId: '37i9dQZF1DX8a1tdzq5tbM', embedType: 'playlist' },
-  { label: '🎵 Hip-Hop', embedId: '37i9dQZF1DX2RxBh64BHjQ', embedType: 'playlist' },
-  { label: '🎸 Rock',   embedId: '37i9dQZF1DX70RN3TfWWJh', embedType: 'playlist' },
+const SPOTIFY_PRESETS = [
+  { label: '🔥 Treino',  query: 'workout',  embedUrl: 'https://open.spotify.com/embed/playlist/37i9dQZF1DXdoiVBe0Ni9X?utm_source=generator&theme=0' },
+  { label: '⚡ HIIT',   query: 'hiit',     embedUrl: 'https://open.spotify.com/embed/playlist/37i9dQZF1DWUVpAXiEPK8P?utm_source=generator&theme=0' },
+  { label: '🎧 EDM',    query: 'edm',      embedUrl: 'https://open.spotify.com/embed/playlist/37i9dQZF1DX8a1tdzq5tbM?utm_source=generator&theme=0' },
+  { label: '🎵 Hip-Hop', query: 'hip hop', embedUrl: 'https://open.spotify.com/embed/playlist/37i9dQZF1DX2RxBh64BHjQ?utm_source=generator&theme=0' },
+  { label: '🎸 Rock',   query: 'rock',     embedUrl: 'https://open.spotify.com/embed/playlist/37i9dQZF1DX70RN3TfWWJh?utm_source=generator&theme=0' },
 ];
 
-const DEEZER_PRESETS: MusicPreset[] = [
-  { label: '🔥 Workout', embedId: '1282694775', embedType: 'playlist' },
-  { label: '🎧 EDM',     embedId: '4531411342', embedType: 'playlist' },
-  { label: '🎵 Hip-Hop', embedId: '1111143121', embedType: 'playlist' },
+const DEEZER_PRESETS = [
+  { label: '🔥 Treino',  query: 'workout',  embedUrl: 'https://widget.deezer.com/widget/auto/playlist/1282694775' },
+  { label: '⚡ HIIT',   query: 'hiit',     embedUrl: 'https://widget.deezer.com/widget/auto/playlist/4531411342' },
+  { label: '🎧 EDM',    query: 'edm',      embedUrl: 'https://widget.deezer.com/widget/auto/playlist/1111143121' },
+  { label: '🎵 Hip-Hop', query: 'hip hop', embedUrl: 'https://widget.deezer.com/widget/auto/playlist/1109890782' },
+  { label: '🎸 Rock',   query: 'rock',     embedUrl: 'https://widget.deezer.com/widget/auto/playlist/1109890342' },
 ];
-
-function buildYouTubeEmbed(id: string, type: string): string {
-  if (type === 'playlist') {
-    return `https://www.youtube.com/embed/videoseries?list=${id}&autoplay=1`;
-  }
-  return `https://www.youtube.com/embed/${id}?autoplay=1&loop=1&playlist=${id}`;
-}
-
-function buildSpotifyEmbed(id: string, type: string): string {
-  return `https://open.spotify.com/embed/${type}/${id}?utm_source=generator&theme=0`;
-}
-
-function buildDeezerEmbed(id: string, type: string): string {
-  return `https://widget.deezer.com/widget/auto/${type}/${id}`;
-}
-
-function parseYouTubeUrl(input: string): { id: string; type: 'video' | 'playlist' } | null {
-  const listMatch = input.match(/[?&]list=([a-zA-Z0-9_-]+)/);
-  if (listMatch) return { id: listMatch[1], type: 'playlist' };
-  const videoMatch = input.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([a-zA-Z0-9_-]{11})/);
-  if (videoMatch) return { id: videoMatch[1], type: 'video' };
-  if (/^[a-zA-Z0-9_-]{11}$/.test(input)) return { id: input, type: 'video' };
-  if (/^PL[a-zA-Z0-9_-]{16,}$/.test(input)) return { id: input, type: 'playlist' };
-  return null;
-}
-
-function parseSpotifyUrl(input: string): { id: string; type: string } | null {
-  const match = input.match(/spotify\.com\/(playlist|track|album)\/([A-Za-z0-9]+)/);
-  if (match) return { id: match[2], type: match[1] };
-  const uri = input.match(/spotify:(playlist|track|album):([A-Za-z0-9]+)/);
-  if (uri) return { id: uri[2], type: uri[1] };
-  return null;
-}
-
-function parseDeezerUrl(input: string): { id: string; type: string } | null {
-  const match = input.match(/deezer\.com\/(?:[a-z]+\/)?(playlist|album|track)\/(\d+)/);
-  if (match) return { id: match[2], type: match[1] };
-  return null;
-}
 
 function WorkoutMusicPlayer() {
   const [open, setOpen] = useState(true);
   const [service, setService] = useState<MusicService>('youtube');
   const [activeLabel, setActiveLabel] = useState(YOUTUBE_PRESETS[0].label);
-  const [embedSrc, setEmbedSrc] = useState(() =>
-    buildYouTubeEmbed(YOUTUBE_PRESETS[0].embedId, YOUTUBE_PRESETS[0].embedType),
-  );
-  const [customUrl, setCustomUrl] = useState('');
-  const [urlError, setUrlError] = useState('');
+  const [embedSrc, setEmbedSrc] = useState(YOUTUBE_PRESETS[0].embedUrl);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searching, setSearching] = useState(false);
+  const [searchResults, setSearchResults] = useState<MusicSearchResult[]>([]);
+  const [searchError, setSearchError] = useState('');
+  const [activeResultId, setActiveResultId] = useState('');
 
   useEffect(() => {
     const saved = localStorage.getItem('fitlynutri-music-service') as MusicService | null;
     if (saved === 'spotify') {
       setService('spotify');
       setActiveLabel(SPOTIFY_PRESETS[0].label);
-      setEmbedSrc(buildSpotifyEmbed(SPOTIFY_PRESETS[0].embedId, SPOTIFY_PRESETS[0].embedType));
+      setEmbedSrc(SPOTIFY_PRESETS[0].embedUrl);
     } else if (saved === 'deezer') {
       setService('deezer');
       setActiveLabel(DEEZER_PRESETS[0].label);
-      setEmbedSrc(buildDeezerEmbed(DEEZER_PRESETS[0].embedId, DEEZER_PRESETS[0].embedType));
+      setEmbedSrc(DEEZER_PRESETS[0].embedUrl);
     }
   }, []);
 
   function switchService(svc: MusicService) {
     localStorage.setItem('fitlynutri-music-service', svc);
     setService(svc);
-    setCustomUrl('');
-    setUrlError('');
-    const first = svc === 'youtube' ? YOUTUBE_PRESETS[0] : svc === 'spotify' ? SPOTIFY_PRESETS[0] : DEEZER_PRESETS[0];
-    setActiveLabel(first.label);
-    if (svc === 'youtube') setEmbedSrc(buildYouTubeEmbed(first.embedId, first.embedType));
-    else if (svc === 'spotify') setEmbedSrc(buildSpotifyEmbed(first.embedId, first.embedType));
-    else setEmbedSrc(buildDeezerEmbed(first.embedId, first.embedType));
+    setSearchQuery('');
+    setSearchResults([]);
+    setSearchError('');
+    setActiveResultId('');
+    const presets = svc === 'youtube' ? YOUTUBE_PRESETS : svc === 'spotify' ? SPOTIFY_PRESETS : DEEZER_PRESETS;
+    setActiveLabel(presets[0].label);
+    setEmbedSrc(presets[0].embedUrl);
   }
 
-  function selectPreset(preset: MusicPreset) {
+  function loadPreset(preset: { label: string; query: string; embedUrl: string }) {
     setActiveLabel(preset.label);
-    setCustomUrl('');
-    setUrlError('');
-    if (service === 'youtube') setEmbedSrc(buildYouTubeEmbed(preset.embedId, preset.embedType));
-    else if (service === 'spotify') setEmbedSrc(buildSpotifyEmbed(preset.embedId, preset.embedType));
-    else setEmbedSrc(buildDeezerEmbed(preset.embedId, preset.embedType));
+    setEmbedSrc(preset.embedUrl);
+    setSearchResults([]);
+    setSearchQuery('');
+    setSearchError('');
+    setActiveResultId('');
   }
 
-  function applyCustomUrl() {
-    const url = customUrl.trim();
-    if (!url) return;
-    if (service === 'youtube') {
-      const parsed = parseYouTubeUrl(url);
-      if (!parsed) { setUrlError('Link inválido. Ex: youtube.com/watch?v=... ou youtube.com/playlist?list=...'); return; }
-      setEmbedSrc(buildYouTubeEmbed(parsed.id, parsed.type));
-    } else if (service === 'spotify') {
-      const parsed = parseSpotifyUrl(url);
-      if (!parsed) { setUrlError('Link inválido. Ex: open.spotify.com/playlist/...'); return; }
-      setEmbedSrc(buildSpotifyEmbed(parsed.id, parsed.type));
-    } else {
-      const parsed = parseDeezerUrl(url);
-      if (!parsed) { setUrlError('Link inválido. Ex: deezer.com/playlist/...'); return; }
-      setEmbedSrc(buildDeezerEmbed(parsed.id, parsed.type));
+  async function doSearch(q: string) {
+    if (!q.trim()) return;
+    setSearching(true);
+    setSearchError('');
+    setSearchResults([]);
+    setActiveResultId('');
+    try {
+      const res = await api.get(`/music/search?q=${encodeURIComponent(q.trim())}&service=${service}`);
+      const results: MusicSearchResult[] = res.data?.data ?? res.data ?? [];
+      setSearchResults(results);
+      if (results.length === 0) {
+        setSearchError('Nenhum resultado. Tente outro termo.');
+      } else {
+        setActiveResultId(results[0].id);
+        setEmbedSrc(results[0].embedUrl);
+        setActiveLabel(results[0].title.slice(0, 30));
+      }
+    } catch (err: any) {
+      const msg = err?.response?.data?.message ?? 'Erro ao buscar. Tente novamente.';
+      setSearchError(msg);
+    } finally {
+      setSearching(false);
     }
-    setUrlError('');
-    setActiveLabel('Personalizado');
-    setCustomUrl('');
+  }
+
+  function playResult(result: MusicSearchResult) {
+    setActiveResultId(result.id);
+    setEmbedSrc(result.embedUrl);
+    setActiveLabel(result.title.slice(0, 30));
   }
 
   const presets = service === 'youtube' ? YOUTUBE_PRESETS : service === 'spotify' ? SPOTIFY_PRESETS : DEEZER_PRESETS;
+  const iframeHeight = service === 'youtube' ? 200 : service === 'spotify' ? 280 : 160;
 
   return (
     <div className="glass-card overflow-hidden">
@@ -917,7 +896,7 @@ function WorkoutMusicPlayer() {
           <div className="w-7 h-7 rounded-lg bg-violet-500/20 flex items-center justify-center flex-shrink-0">
             <Music className="w-3.5 h-3.5 text-violet-400" />
           </div>
-          <span className="text-sm font-semibold">
+          <span className="text-sm font-semibold truncate">
             {activeLabel ? `Música — ${activeLabel}` : 'Música de Treino'}
           </span>
         </div>
@@ -943,24 +922,26 @@ function WorkoutMusicPlayer() {
           ))}
         </div>
 
-        {/* Login hint for Spotify / Deezer */}
+        {/* Login hint */}
         {service !== 'youtube' && (
           <p className="text-[10px] text-muted-foreground text-center">
             {service === 'spotify'
-              ? 'Faça login no Spotify pelo player abaixo para reprodução completa'
-              : 'Faça login no Deezer pelo player abaixo para reprodução completa'}
+              ? 'Faça login no Spotify pelo player para reprodução completa'
+              : 'Faça login no Deezer pelo player para reprodução completa'}
           </p>
         )}
 
-        {/* Genre presets */}
+        {/* Genre preset buttons */}
         <div className="flex flex-wrap gap-1.5">
           {presets.map((p) => (
             <button
               key={p.label}
-              onClick={() => selectPreset(p)}
+              onClick={() => loadPreset(p)}
               className={cn(
                 'text-xs px-3 py-1.5 rounded-full glass hover:bg-accent transition-all',
-                activeLabel === p.label && 'bg-violet-500/20 text-violet-300 border border-violet-500/30',
+                activeLabel === p.label && searchResults.length === 0
+                  ? 'bg-violet-500/20 text-violet-300 border border-violet-500/30'
+                  : '',
               )}
             >
               {p.label}
@@ -968,13 +949,74 @@ function WorkoutMusicPlayer() {
           ))}
         </div>
 
+        {/* Search bar */}
+        <div className="flex gap-2">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+            <input
+              type="text"
+              placeholder={`Pesquisar no ${service === 'youtube' ? 'YouTube' : service === 'spotify' ? 'Spotify' : 'Deezer'}...`}
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') doSearch(searchQuery); }}
+              className="input-field w-full pl-9 text-xs"
+            />
+          </div>
+          <button
+            onClick={() => doSearch(searchQuery)}
+            disabled={searching || !searchQuery.trim()}
+            className="btn-primary text-xs px-3 flex-shrink-0 disabled:opacity-40 flex items-center gap-1.5"
+          >
+            {searching && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+            Buscar
+          </button>
+        </div>
+
+        {/* Search error */}
+        {searchError && (
+          <p className="text-[10px] text-center text-muted-foreground">{searchError}</p>
+        )}
+
+        {/* Search results */}
+        {searchResults.length > 0 && (
+          <div
+            className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1"
+            style={{ scrollbarWidth: 'none' } as React.CSSProperties}
+          >
+            {searchResults.map((r) => (
+              <button
+                key={r.id}
+                onClick={() => playResult(r)}
+                className={cn(
+                  'flex-shrink-0 w-28 rounded-xl overflow-hidden text-left transition-all border',
+                  activeResultId === r.id
+                    ? 'border-violet-500/60 ring-1 ring-violet-500/40'
+                    : 'border-transparent opacity-60 hover:opacity-100',
+                )}
+              >
+                {r.thumbnail ? (
+                  <img src={r.thumbnail} alt={r.title} className="w-full aspect-video object-cover" loading="lazy" />
+                ) : (
+                  <div className="w-full aspect-video bg-violet-500/10 flex items-center justify-center">
+                    <Music className="w-6 h-6 text-violet-400" />
+                  </div>
+                )}
+                <div className="px-1.5 py-1 bg-white/5">
+                  <p className="text-[10px] font-medium line-clamp-2 leading-tight">{r.title}</p>
+                  <p className="text-[9px] text-muted-foreground mt-0.5 truncate">{r.author}</p>
+                </div>
+              </button>
+            ))}
+          </div>
+        )}
+
         {/* Embedded player */}
         <div className="rounded-xl overflow-hidden bg-black/10">
           <iframe
             key={embedSrc}
             src={embedSrc}
             width="100%"
-            height={service === 'youtube' ? 200 : 152}
+            height={iframeHeight}
             allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
             allowFullScreen
             className="w-full block"
@@ -983,35 +1025,9 @@ function WorkoutMusicPlayer() {
           />
         </div>
 
-        {/* Custom URL */}
-        <div className="space-y-1">
-          <div className="flex gap-2">
-            <input
-              type="url"
-              placeholder={
-                service === 'youtube' ? 'Cole um link do YouTube...' :
-                service === 'spotify' ? 'Cole um link do Spotify...' :
-                'Cole um link do Deezer...'
-              }
-              value={customUrl}
-              onChange={(e) => { setCustomUrl(e.target.value); setUrlError(''); }}
-              onKeyDown={(e) => { if (e.key === 'Enter') applyCustomUrl(); }}
-              className="input-field flex-1 text-xs"
-            />
-            <button
-              onClick={applyCustomUrl}
-              disabled={!customUrl.trim()}
-              className="btn-primary text-xs px-3 flex-shrink-0 disabled:opacity-40"
-            >
-              Tocar
-            </button>
-          </div>
-          {urlError && <p className="text-[10px] text-destructive">{urlError}</p>}
-        </div>
-
         {service === 'youtube' && (
-          <p className="text-[10px] text-center text-muted-foreground">
-            YouTube funciona sem login • Cole qualquer link do YouTube para personalizar
+          <p className="text-[10px] text-center text-muted-foreground/60">
+            YouTube funciona sem login • Deezer disponível sem configuração
           </p>
         )}
       </div>

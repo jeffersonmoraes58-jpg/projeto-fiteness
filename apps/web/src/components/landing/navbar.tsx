@@ -36,12 +36,12 @@ export function LandingNavbar() {
           <span className="gradient-text">Fitlynutri</span>
         </Link>
 
-        <div className="hidden md:flex items-center gap-8">
+        <div className="hidden md:flex items-center gap-1">
           {navLinks.map((link) => (
             <Link
               key={link.label}
               href={link.href}
-              className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+              className="text-sm font-medium text-foreground/70 hover:text-foreground px-3.5 py-2 rounded-lg hover:bg-white/[0.06] transition-all"
             >
               {link.label}
             </Link>
