@@ -11,8 +11,8 @@ import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 
 const statCards = [
-  { key: 'students', label: 'Alunos Ativos', icon: Users, color: 'from-purple-600 to-indigo-600', prefix: '' },
-  { key: 'workouts', label: 'Treinos Criados', icon: Dumbbell, color: 'from-cyan-600 to-blue-600', prefix: '' },
+  { key: 'totalStudents', label: 'Alunos Ativos', icon: Users, color: 'from-purple-600 to-indigo-600', prefix: '' },
+  { key: 'totalWorkouts', label: 'Treinos Criados', icon: Dumbbell, color: 'from-cyan-600 to-blue-600', prefix: '' },
   { key: 'checkins', label: 'Check-ins Hoje', icon: Activity, color: 'from-emerald-600 to-teal-600', prefix: '' },
   { key: 'revenue', label: 'Receita Mensal', icon: DollarSign, color: 'from-orange-600 to-amber-600', prefix: 'R$ ', format: (v: number) => v.toLocaleString('pt-BR') },
 ];
