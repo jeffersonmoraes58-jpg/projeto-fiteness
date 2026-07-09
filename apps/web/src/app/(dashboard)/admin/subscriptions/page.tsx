@@ -12,13 +12,13 @@ import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
 
 const PLANS = ['Todos', 'FREE', 'BASIC', 'PRO', 'ENTERPRISE'];
-const STATUSES = ['Todos', 'TRIAL', 'ACTIVE', 'PAST_DUE', 'CANCELED'];
+const STATUSES = ['Todos', 'TRIAL', 'ACTIVE', 'PAST_DUE', 'CANCELED', 'EXPIRED'];
 
 const PLAN_CONFIG: Record<string, { label: string; color: string; price: number }> = {
   FREE: { label: 'Free', color: 'from-gray-500 to-gray-600', price: 0 },
-  BASIC: { label: 'Basic', color: 'from-cyan-500 to-blue-500', price: 99 },
-  PRO: { label: 'Pro', color: 'from-purple-500 to-indigo-500', price: 249 },
-  ENTERPRISE: { label: 'Enterprise', color: 'from-yellow-500 to-amber-500', price: 599 },
+  BASIC: { label: 'Starter', color: 'from-cyan-500 to-blue-500', price: 35 },
+  PRO: { label: 'Pro', color: 'from-purple-500 to-indigo-500', price: 55 },
+  ENTERPRISE: { label: 'Elite', color: 'from-yellow-500 to-amber-500', price: 95 },
 };
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; icon: any }> = {

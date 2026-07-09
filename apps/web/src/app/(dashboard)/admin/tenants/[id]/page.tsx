@@ -16,9 +16,9 @@ import toast from 'react-hot-toast';
 
 const PLAN_CONFIG: Record<string, { label: string; gradient: string; price: number }> = {
   FREE: { label: 'Free', gradient: 'from-gray-500 to-gray-600', price: 0 },
-  BASIC: { label: 'Basic', gradient: 'from-cyan-500 to-blue-500', price: 99 },
-  PRO: { label: 'Pro', gradient: 'from-purple-500 to-indigo-500', price: 249 },
-  ENTERPRISE: { label: 'Enterprise', gradient: 'from-yellow-500 to-amber-500', price: 599 },
+  BASIC: { label: 'Starter', gradient: 'from-cyan-500 to-blue-500', price: 35 },
+  PRO: { label: 'Pro', gradient: 'from-purple-500 to-indigo-500', price: 55 },
+  ENTERPRISE: { label: 'Elite', gradient: 'from-yellow-500 to-amber-500', price: 95 },
 };
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; icon: any }> = {
@@ -26,6 +26,7 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; icon: any }>
   ACTIVE: { label: 'Ativo', color: 'bg-emerald-500/10 text-emerald-400', icon: CheckCircle2 },
   PAST_DUE: { label: 'Em atraso', color: 'bg-orange-500/10 text-orange-400', icon: AlertCircle },
   CANCELED: { label: 'Cancelado', color: 'bg-red-500/10 text-red-400', icon: XCircle },
+  EXPIRED: { label: 'Expirado', color: 'bg-muted text-muted-foreground', icon: XCircle },
 };
 
 export default function AdminTenantDetail() {
