@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, Fragment } from 'react';
+import { useState, useCallback, Fragment, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import {
   Dumbbell, ChevronLeft, Clock, Layers, Zap, Users, UserCheck,
@@ -564,6 +564,8 @@ function getPreviewUrl(exercise: any): string | null {
 
 function ExerciseSearchItem({ exercise, onAdd }: { exercise: any; onAdd: () => void }) {
   const [showPreview, setShowPreview] = useState(false);
+  const [tooltipPos, setTooltipPos] = useState({ top: 0, left: 0 });
+  const rowRef = useRef<HTMLDivElement>(null);
   const previewUrl = getPreviewUrl(exercise);
   const isGif = exercise.gifUrl != null;
   const isVideo = !exercise.gifUrl && exercise.videoUrl != null;
@@ -572,10 +574,29 @@ function ExerciseSearchItem({ exercise, onAdd }: { exercise: any; onAdd: () => v
   const categoryLabel = (exercise.category && CATEGORY_LABELS[exercise.category]) || null;
   const equipmentLabel = (exercise.equipment?.[0] && EQUIPMENT_LABELS[exercise.equipment[0]]) || null;
 
+  const handleMouseEnter = () => {
+    if (!rowRef.current) { setShowPreview(true); return; }
+    const rect = rowRef.current.getBoundingClientRect();
+    // Tooltip dimensions: roughly 224px wide, 196px tall (160 video + 36 label)
+    const tooltipW = 224;
+    const tooltipH = 196;
+    const margin = 8;
+    let left = rect.left;
+    let top = rect.top - tooltipH - margin;
+    // If it would go above viewport, show below instead
+    if (top < 0) top = rect.bottom + margin;
+    // Clamp left so tooltip doesn't go off-screen
+    if (left + tooltipW > window.innerWidth - 16) left = window.innerWidth - tooltipW - 16;
+    if (left < 16) left = 16;
+    setTooltipPos({ top, left });
+    setShowPreview(true);
+  };
+
   return (
     <div
-      className="relative w-full flex items-center gap-3 px-4 py-2.5 hover:bg-accent/60 transition-all text-left group"
-      onMouseEnter={() => setShowPreview(true)}
+      ref={rowRef}
+      className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-accent/60 transition-all text-left group cursor-pointer"
+      onMouseEnter={handleMouseEnter}
       onMouseLeave={() => setShowPreview(false)}
     >
       {/* Thumbnail */}
@@ -627,10 +648,13 @@ function ExerciseSearchItem({ exercise, onAdd }: { exercise: any; onAdd: () => v
         <Plus className="w-4 h-4 text-primary" />
       </button>
 
-      {/* Hover preview tooltip */}
+      {/* Hover preview tooltip — fixed positioning to avoid overflow clipping */}
       {showPreview && previewUrl && (
-        <div className="absolute left-0 bottom-full mb-2 z-50 pointer-events-none">
-          <div className="rounded-xl overflow-hidden bg-black shadow-2xl border border-white/10">
+        <div
+          className="fixed z-[9999] pointer-events-none"
+          style={{ top: tooltipPos.top, left: tooltipPos.left }}
+        >
+          <div className="rounded-xl overflow-hidden bg-black shadow-2xl border border-white/10 w-56">
             {isVideo ? (
               <video
                 src={previewUrl}
@@ -638,10 +662,10 @@ function ExerciseSearchItem({ exercise, onAdd }: { exercise: any; onAdd: () => v
                 muted
                 loop
                 playsInline
-                className="w-56 h-40 object-cover"
+                className="w-full h-40 object-cover"
               />
             ) : (
-              <img src={previewUrl} alt={exercise.name} className="w-56 h-40 object-cover" />
+              <img src={previewUrl} alt={exercise.name} className="w-full h-40 object-cover" />
             )}
             <div className="px-2.5 py-1.5 bg-white/5">
               <p className="text-xs font-medium truncate">{exercise.name}</p>
