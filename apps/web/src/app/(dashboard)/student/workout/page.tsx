@@ -932,31 +932,46 @@ function WorkoutMusicPlayer() {
           </div>
         )}
 
-        {/* Embedded player */}
-        <div className="rounded-xl overflow-hidden bg-black" style={{ minHeight: embedSrc ? 220 : 90 }}>
-          {embedSrc ? (
-            <iframe
-              key={embedSrc}
-              src={embedSrc}
-              width="100%"
-              height={220}
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-              allowFullScreen
-              className="w-full block"
-              style={{ border: 'none' }}
-              title="YouTube Music Player"
-            />
-          ) : (
-            <div className="flex flex-col items-center justify-center gap-2 py-6">
-              <Music className="w-7 h-7 text-red-400/40" />
-              <p className="text-xs text-muted-foreground/60 text-center px-4">
-                Clique em um gênero ou pesquise uma música
-              </p>
+        {/* Audio-only player — iframe hidden, mini control bar above */}
+        {embedSrc ? (
+          <>
+            {/* Hidden iframe — audio only */}
+            <div className="h-0 overflow-hidden">
+              <iframe
+                key={embedSrc}
+                src={embedSrc}
+                width="320"
+                height="180"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                title="YouTube Audio"
+                style={{ border: 'none' }}
+              />
             </div>
-          )}
-        </div>
+            {/* Mini audio status bar */}
+            <div className="flex items-center gap-2 rounded-lg bg-red-500/10 border border-red-500/20 px-3 py-2">
+              <div className="w-5 h-5 rounded-full bg-red-500/30 flex items-center justify-center flex-shrink-0">
+                <span className="block w-1.5 h-1.5 rounded-full bg-red-400 animate-pulse" />
+              </div>
+              <span className="text-xs font-medium truncate flex-1">{activeLabel || 'Tocando'}</span>
+              <button
+                onClick={() => { setEmbedSrc(''); setActiveLabel(''); setActiveResultId(''); }}
+                className="w-5 h-5 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center flex-shrink-0 transition-all"
+                title="Parar música"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </div>
+          </>
+        ) : (
+          <div className="flex flex-col items-center justify-center gap-2 py-4">
+            <Music className="w-6 h-6 text-red-400/40" />
+            <p className="text-xs text-muted-foreground/60 text-center px-4">
+              Clique em um gênero ou pesquise uma música
+            </p>
+          </div>
+        )}
 
-        <p className="text-[10px] text-center text-muted-foreground/40">YouTube · clique em um gênero para começar</p>
+        <p className="text-[10px] text-center text-muted-foreground/40">Áudio via YouTube · escolha uma playlist para começar</p>
       </div>
     </div>
   );
