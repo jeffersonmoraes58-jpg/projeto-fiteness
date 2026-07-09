@@ -294,9 +294,38 @@ export default function TrainerExercises() {
         restSeconds: e.restSeconds ?? 60,
         videoUrl: e.exercise?.videoUrl || '',
       }));
-      const toAdd = added
-        .filter(ex => !current.find((c: any) => c.exerciseId === ex.id))
-        .map(ex => ({ exerciseId: ex.id, sets: 3, reps: '10', restSeconds: 60, videoUrl: ex.videoUrl || '' }));
+
+      // Separate GIFs from regular exercises
+      const gifsToCreate = added.filter((ex: any) => ex.isGif);
+      const regularExercises = added.filter((ex: any) => !ex.isGif);
+
+      // Create exercises from GIFs via POST /exercises
+      const createdFromGifs: { exerciseId: string; videoUrl: string }[] = [];
+      for (const gif of gifsToCreate) {
+        try {
+          const res = await api.post('/exercises', {
+            name: gif.name,
+            category: 'FULL_BODY',
+            difficulty: 1,
+            equipment: [],
+            gifUrl: gif.gifUrl,
+            isPublic: false,
+          });
+          const created = res.data?.data;
+          if (created?.id) {
+            createdFromGifs.push({ exerciseId: created.id, videoUrl: gif.gifUrl || '' });
+          }
+        } catch {
+          // skip if creation fails
+        }
+      }
+
+      const toAdd = [
+        ...regularExercises
+          .filter(ex => !current.find((c: any) => c.exerciseId === ex.id))
+          .map(ex => ({ exerciseId: ex.id, sets: 3, reps: '10', restSeconds: 60, videoUrl: ex.videoUrl || '' })),
+        ...createdFromGifs.map(ex => ({ exerciseId: ex.exerciseId, sets: 3, reps: '10', restSeconds: 60, videoUrl: ex.videoUrl })),
+      ];
       await api.patch(`/workouts/${workoutId}`, { exercises: [...current, ...toAdd] });
       return workoutId;
     },
@@ -476,7 +505,12 @@ export default function TrainerExercises() {
                 ) : (
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                     {gifFiles.map((file: any) => (
-                      <GifCard key={file.publicId} file={file} />
+                      <GifCard
+                        key={file.publicId}
+                        file={file}
+                        isAdded={isAdded(file.publicId)}
+                        onToggleAdd={() => toggleAdded({ id: file.publicId, name: file.name, isGif: true, gifUrl: file.url })}
+                      />
                     ))}
                   </div>
                 )}
@@ -720,15 +754,12 @@ export default function TrainerExercises() {
   );
 }
 
-function GifCard({ file }: { file: any }) {
-  const [expanded, setExpanded] = useState(false);
-
+function GifCard({ file, isAdded, onToggleAdd }: { file: any; isAdded: boolean; onToggleAdd: () => void }) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
-      className="glass rounded-2xl overflow-hidden cursor-pointer hover:ring-1 hover:ring-primary/30 transition-all"
-      onClick={() => setExpanded(!expanded)}
+      className={cn('glass rounded-2xl overflow-hidden transition-all', isAdded && 'ring-2 ring-emerald-500/60')}
     >
       <div className="aspect-square bg-black/40 overflow-hidden relative">
         <img
@@ -741,30 +772,26 @@ function GifCard({ file }: { file: any }) {
         <div className="absolute bottom-2 left-2 right-2">
           <p className="text-xs font-medium text-white line-clamp-2 leading-tight">{file.name}</p>
         </div>
-      </div>
-      <AnimatePresence>
-        {expanded && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            className="overflow-hidden"
-          >
-            <div className="p-3 space-y-2 border-t border-border">
-              <p className="text-xs text-muted-foreground">{file.name}</p>
-              <a
-                href={file.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-xs text-primary hover:underline flex items-center gap-1"
-              >
-                <ExternalLink className="w-3 h-3" />
-                Abrir GIF original
-              </a>
-            </div>
-          </motion.div>
+        {/* Selection checkmark */}
+        {isAdded && (
+          <div className="absolute top-2 right-2 w-6 h-6 rounded-full bg-emerald-500 flex items-center justify-center shadow-lg">
+            <CheckCircle className="w-4 h-4 text-white" />
+          </div>
         )}
-      </AnimatePresence>
+      </div>
+      <button
+        onClick={(e) => { e.stopPropagation(); onToggleAdd(); }}
+        className={cn(
+          'w-full py-2 text-[11px] font-medium transition-colors flex items-center justify-center gap-1',
+          isAdded ? 'bg-emerald-500/10 text-emerald-400' : 'hover:bg-accent text-primary hover:text-primary/80',
+        )}
+      >
+        {isAdded ? (
+          <><Zap className="w-3 h-3 fill-emerald-400" />Adicionado</>
+        ) : (
+          <><Plus className="w-3 h-3" />Adicionar ao treino</>
+        )}
+      </button>
     </motion.div>
   );
 }
