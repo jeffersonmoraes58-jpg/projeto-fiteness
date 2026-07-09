@@ -416,9 +416,9 @@ export default function TrainerExercises() {
           <input type="text" placeholder="Pesquisar por nome" value={search} onChange={e => setSearch(e.target.value)} className="input-field pl-9" />
         </div>
 
-        <div className="flex gap-2">
-          {[{ key: 'all', label: 'Todos' }, { key: 'app', label: 'Exercícios do app' }, { key: 'mine', label: 'Seus exercícios' }, { key: 'gifs', label: 'Exercícios GIFs' }].map(f => (
-            <button key={f.key} onClick={() => setSourceFilter(f.key as any)} className={cn('px-3 py-1.5 rounded-full text-xs font-medium transition-all border flex-shrink-0', sourceFilter === f.key ? 'bg-primary text-primary-foreground border-primary' : 'glass border-transparent hover:bg-accent text-muted-foreground')}>
+        <div className="flex flex-wrap gap-1.5">
+          {[{ key: 'all', label: 'Todos' }, { key: 'app', label: 'Exercícios do app' }, { key: 'mine', label: 'Meus exercícios' }, { key: 'gifs', label: 'GIFs' }].map(f => (
+            <button key={f.key} onClick={() => setSourceFilter(f.key as any)} className={cn('px-2.5 py-1.5 rounded-full text-xs font-medium transition-all border', sourceFilter === f.key ? 'bg-primary text-primary-foreground border-primary' : 'glass border-transparent hover:bg-accent text-muted-foreground')}>
               {f.label}
             </button>
           ))}
