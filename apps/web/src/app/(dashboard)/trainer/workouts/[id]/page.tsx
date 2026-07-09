@@ -12,8 +12,32 @@ import { useParams } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
+import { resolveImageUrl, resolveVideoUrl } from '@/lib/video-url';
 
 const LEVEL_LABELS = ['', 'Iniciante', 'Básico', 'Intermediário', 'Avançado', 'Elite'];
+
+const MUSCLE_GROUP_LABELS: Record<string, string> = {
+  PECTORALIS_MAJOR: 'Peitoral Maior', PECTORALIS_MINOR: 'Peitoral Menor',
+  LATISSIMUS_DORSI: 'Dorsal', TRAPEZIUS: 'Trapézio', RHOMBOIDS: 'Romboides',
+  DELTOID: 'Deltóide', BICEPS_BRACHII: 'Bíceps', TRICEPS_BRACHII: 'Tríceps',
+  FOREARMS: 'Antebraços', QUADRICEPS: 'Quadríceps', HAMSTRINGS: 'Posteriores',
+  GLUTES: 'Glúteos', CALVES: 'Panturrilhas', ABS: 'Abdomên', OBLIQUES: 'Oblíquos',
+  LOWER_BACK: 'Lombar', HIP_FLEXORS: 'Flexores',
+};
+
+const CATEGORY_LABELS: Record<string, string> = {
+  CHEST: 'Peito', BACK: 'Costas', SHOULDERS: 'Ombros', BICEPS: 'Bíceps',
+  TRICEPS: 'Tríceps', LEGS: 'Pernas', GLUTES: 'Glúteos', CORE: 'Core',
+  CARDIO: 'Cardio', FULL_BODY: 'Corpo Inteiro', MOBILITY: 'Mobilidade',
+};
+
+const EQUIPMENT_LABELS: Record<string, string> = {
+  BARBELL: 'Barra', DUMBBELL: 'Halteres', MACHINE: 'Máquina',
+  CABLE: 'Cabo', BODYWEIGHT: 'Peso Corporal', KETTLEBELL: 'Kettlebell',
+  BAND: 'Elástico', BENCH: 'Banco', EZ_BAR: 'Barra EZ', SMITH: 'Smith',
+  PLATE: 'Anilha', FOAM_ROLLER: 'Rolo', PULL_UP_BAR: 'Barra Fixa',
+  MEDICINE_BALL: 'Bola', SWISS_BALL: 'Bola Suíça',
+};
 
 type Technique = 'NORMAL' | 'BI_SET' | 'SUPER_SET' | 'TRI_SET' | 'DROP_SET' | 'GIANT_SET' | 'CIRCUIT';
 
@@ -323,12 +347,9 @@ export default function WorkoutDetailPage() {
         </div>
 
         {exSearch && (
-          <div className="glass rounded-xl divide-y divide-border max-h-48 overflow-y-auto">
-            {(allExercises || []).filter((e: any) => !exerciseRows.find(r => r.exerciseId === e.id)).slice(0, 8).map((ex: any) => (
-              <button key={ex.id} type="button" onClick={() => { addExercise(ex); setExSearch(''); }} className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-accent transition-all text-left">
-                <span className="text-sm">{ex.name}</span>
-                <Plus className="w-4 h-4 text-primary flex-shrink-0" />
-              </button>
+          <div className="glass rounded-xl divide-y divide-border max-h-72 overflow-y-auto">
+            {(allExercises || []).filter((e: any) => !exerciseRows.find(r => r.exerciseId === e.id)).slice(0, 10).map((ex: any) => (
+              <ExerciseSearchItem key={ex.id} exercise={ex} onAdd={() => { addExercise(ex); setExSearch(''); }} />
             ))}
             {(allExercises || []).filter((e: any) => !exerciseRows.find(r => r.exerciseId === e.id)).length === 0 && (
               <p className="text-sm text-muted-foreground text-center py-3">Nenhum resultado</p>
@@ -525,6 +546,112 @@ export default function WorkoutDetailPage() {
           <UserCheck className="w-4 h-4" />{assignMutation.isPending ? 'Atribuindo...' : 'Atribuir treino'}
         </button>
       </motion.form>
+    </div>
+  );
+}
+
+// ─── Exercise Search Item (thumbnail + hover preview) ───────────────────────
+
+function getPreviewUrl(exercise: any): string | null {
+  // GIF has highest priority (animated, lightweight for hover preview)
+  if (exercise.gifUrl) return resolveImageUrl(exercise.gifUrl);
+  // Video URL as fallback for MP4 preview
+  if (exercise.videoUrl) return resolveVideoUrl(exercise.videoUrl);
+  // Static thumbnail
+  if (exercise.thumbnailUrl) return resolveImageUrl(exercise.thumbnailUrl);
+  return null;
+}
+
+function ExerciseSearchItem({ exercise, onAdd }: { exercise: any; onAdd: () => void }) {
+  const [showPreview, setShowPreview] = useState(false);
+  const previewUrl = getPreviewUrl(exercise);
+  const isGif = exercise.gifUrl != null;
+  const isVideo = !exercise.gifUrl && exercise.videoUrl != null;
+
+  const muscleLabel = (exercise.muscleGroups?.[0] && MUSCLE_GROUP_LABELS[exercise.muscleGroups[0]]) || null;
+  const categoryLabel = (exercise.category && CATEGORY_LABELS[exercise.category]) || null;
+  const equipmentLabel = (exercise.equipment?.[0] && EQUIPMENT_LABELS[exercise.equipment[0]]) || null;
+
+  return (
+    <div
+      className="relative w-full flex items-center gap-3 px-4 py-2.5 hover:bg-accent/60 transition-all text-left group"
+      onMouseEnter={() => setShowPreview(true)}
+      onMouseLeave={() => setShowPreview(false)}
+    >
+      {/* Thumbnail */}
+      <div className="w-16 h-12 rounded-lg bg-white/5 overflow-hidden flex-shrink-0 relative">
+        {previewUrl ? (
+          isVideo ? (
+            <video
+              src={previewUrl}
+              muted
+              loop
+              playsInline
+              className="w-full h-full object-cover"
+              onMouseEnter={(e) => (e.target as HTMLVideoElement).play().catch(() => {})}
+              onMouseLeave={(e) => { (e.target as HTMLVideoElement).pause(); (e.target as HTMLVideoElement).currentTime = 0; }}
+            />
+          ) : (
+            <img src={previewUrl} alt={exercise.name} className="w-full h-full object-cover" loading="lazy" />
+          )
+        ) : (
+          <div className="w-full h-full flex items-center justify-center">
+            <Dumbbell className="w-4 h-4 text-muted-foreground/40" />
+          </div>
+        )}
+        {/* Play overlay */}
+        {previewUrl && (
+          <div className="absolute inset-0 flex items-center justify-center bg-black/20 group-hover:bg-black/40 transition-all">
+            <Video className="w-4 h-4 text-white/70" />
+          </div>
+        )}
+      </div>
+
+      {/* Info */}
+      <div className="flex-1 min-w-0">
+        <div className="text-sm font-medium truncate">{exercise.name}</div>
+        <div className="flex items-center gap-2 mt-0.5 text-[10px] text-muted-foreground">
+          {categoryLabel && <span>{categoryLabel}</span>}
+          {muscleLabel && <span className="text-purple-400/60">{muscleLabel}</span>}
+          {equipmentLabel && <span>{equipmentLabel}</span>}
+        </div>
+      </div>
+
+      {/* Add button */}
+      <button
+        type="button"
+        onClick={onAdd}
+        className="w-8 h-8 rounded-lg bg-primary/10 hover:bg-primary/20 flex items-center justify-center flex-shrink-0 transition-all"
+        title="Adicionar exercício"
+      >
+        <Plus className="w-4 h-4 text-primary" />
+      </button>
+
+      {/* Hover preview tooltip */}
+      {showPreview && previewUrl && (
+        <div className="absolute left-0 bottom-full mb-2 z-50 pointer-events-none">
+          <div className="rounded-xl overflow-hidden bg-black shadow-2xl border border-white/10">
+            {isVideo ? (
+              <video
+                src={previewUrl}
+                autoPlay
+                muted
+                loop
+                playsInline
+                className="w-56 h-40 object-cover"
+              />
+            ) : (
+              <img src={previewUrl} alt={exercise.name} className="w-56 h-40 object-cover" />
+            )}
+            <div className="px-2.5 py-1.5 bg-white/5">
+              <p className="text-xs font-medium truncate">{exercise.name}</p>
+              <p className="text-[10px] text-muted-foreground">
+                {[categoryLabel, muscleLabel].filter(Boolean).join(' · ')}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
