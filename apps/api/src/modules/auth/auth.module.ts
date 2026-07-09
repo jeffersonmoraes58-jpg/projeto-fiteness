@@ -11,6 +11,7 @@ import { JwtRefreshStrategy } from './strategies/jwt-refresh.strategy';
 import { UsersModule } from '../users/users.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { SubscriptionsModule } from '../subscriptions/subscription.module';
+import { EmailModule } from '../email/email.module';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { SubscriptionsModule } from '../subscriptions/subscription.module';
     UsersModule,
     NotificationsModule,
     SubscriptionsModule,
+    EmailModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],

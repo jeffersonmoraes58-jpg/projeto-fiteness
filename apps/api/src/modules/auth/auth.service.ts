@@ -12,6 +12,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { UsersService } from '../users/users.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { SubscriptionService } from '../subscriptions/subscription.service';
+import { EmailService } from '../email/email.service';
 import * as bcrypt from 'bcryptjs';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
@@ -28,6 +29,7 @@ export class AuthService {
     private config: ConfigService,
     private notifications: NotificationsService,
     private subscriptionService: SubscriptionService,
+    private emailService: EmailService,
   ) {}
 
   async register(dto: RegisterDto) {
@@ -153,6 +155,14 @@ export class AuthService {
         );
       }
     }
+
+    // Envia email de boas-vindas (fire-and-forget — não bloqueia o cadastro)
+    this.emailService.sendRegistrationWelcome({
+      to: user.email,
+      firstName: dto.firstName,
+      role: user.role,
+      tenantName: dto.studioName ?? undefined,
+    }).catch((err) => this.logger.error('[Register] Erro ao enviar email de boas-vindas:', err));
 
     return { user: this.sanitizeUser(user), ...tokens, checkoutUrl };
   }
