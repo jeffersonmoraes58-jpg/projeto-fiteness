@@ -2,6 +2,7 @@ import { Injectable, Logger, ForbiddenException, BadRequestException } from '@ne
 import { ConfigService } from '@nestjs/config';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { PrismaService } from '../prisma/prisma.service';
+import { EmailService } from '../email/email.service';
 import { SubscriptionPlan, SubscriptionStatus, BillingInterval } from '@prisma/client';
 import {
   PLAN_LIMITS,
@@ -20,6 +21,7 @@ export class SubscriptionService {
   constructor(
     private prisma: PrismaService,
     private config: ConfigService,
+    private emailService: EmailService,
   ) {}
 
   /**
@@ -54,6 +56,84 @@ export class SubscriptionService {
       );
     }
     return { expiredPaid: expiredPaid.count, expiredTrial: expiredTrial.count };
+  }
+
+  /**
+   * Notifica tenants cuja assinatura (mensal ou anual) está próxima de expirar:
+   * - 7 dias antes (primeiro aviso)
+   * - 3 dias antes (segundo aviso)
+   * - 1 dia antes (último aviso)
+   * Só envia se ainda não tiver enviado para este ciclo (verifica lastExpiringNotificationAt).
+   */
+  @Cron('0 0 12 * * *', { timeZone: 'America/Sao_Paulo' })
+  async notifyExpiringSubscriptions() {
+    const now = new Date();
+    const daysAhead = [7, 3, 1];
+
+    for (const days of daysAhead) {
+      // Calcula o target: assinaturas que expiram exatamente daqui a `days` dias
+      const targetDate = new Date(now);
+      targetDate.setDate(targetDate.getDate() + days);
+      
+      // Janela de 24h para capturar a data
+      const start = new Date(targetDate);
+      start.setHours(0, 0, 0, 0);
+      const end = new Date(targetDate);
+      end.setHours(23, 59, 59, 999);
+
+      // Busca assinaturas ACTIVE que expiram nesta janela
+      const subs = await this.prisma.tenantSubscription.findMany({
+        where: {
+          status: SubscriptionStatus.ACTIVE,
+          plan: { not: SubscriptionPlan.FREE },
+          currentPeriodEnd: { gte: start, lte: end },
+          // Evita reenvio: ou nunca notificou, ou notificou há mais de 2 dias
+          OR: [
+            { lastExpiringNotificationAt: null },
+            { lastExpiringNotificationAt: { lt: new Date(now.getTime() - 2 * 86400000) } },
+          ],
+        },
+        include: {
+          tenant: {
+            include: {
+              users: {
+                where: { role: { in: ['ADMIN', 'STUDIO_OWNER'] } },
+                take: 1,
+                include: { profile: true },
+              },
+            },
+          },
+        },
+      });
+
+      for (const sub of subs) {
+        const admin = sub.tenant.users[0];
+        if (!admin?.email) continue;
+
+        const cycleLabel = sub.billingCycle === 'ANNUAL' ? 'Anual' : 'Mensal';
+        const adminName = `${admin.profile?.firstName ?? ''} ${admin.profile?.lastName ?? ''}`.trim() || admin.email;
+
+        await this.emailService.sendSubscriptionExpiring({
+          to: admin.email,
+          adminName,
+          planLabel: PLAN_DISPLAY_NAMES[sub.plan],
+          cycleLabel,
+          expiresAt: sub.currentPeriodEnd!,
+          daysLeft: days,
+          tenantId: sub.tenantId,
+        });
+
+        // Marca que notificou para evitar reenvio
+        await this.prisma.tenantSubscription.update({
+          where: { id: sub.id },
+          data: { lastExpiringNotificationAt: new Date() },
+        });
+      }
+
+      if (subs.length > 0) {
+        this.logger.log(`Notificações de expiração (${days}d): ${subs.length} emails enviados`);
+      }
+    }
   }
 
   private mpClient() {

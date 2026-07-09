@@ -282,4 +282,101 @@ export class EmailService {
       return { sent: false, error: err.message };
     }
   }
+
+  /**
+   * Envia email avisando que a assinatura está próxima de expirar.
+   */
+  async sendSubscriptionExpiring(data: {
+    to: string;
+    adminName: string;
+    planLabel: string;
+    cycleLabel: string;
+    expiresAt: Date;
+    daysLeft: number;
+    tenantId: string;
+  }): Promise<{ sent: boolean; error?: string }> {
+    const apiKey = this.config.get('RESEND_API_KEY');
+    if (!apiKey) {
+      console.log(`[EMAIL] RESEND_API_KEY not set — would send to ${data.to}`);
+      return { sent: false, error: 'RESEND_API_KEY não configurado' };
+    }
+
+    const frontendUrl = this.config.get('FRONTEND_URL', 'https://fitlynutri.com.br');
+    const billingUrl = `${frontendUrl}/admin/subscriptions`;
+    const fromEmail = this.config.get('RESEND_FROM', 'onboarding@resend.dev');
+    const from = fromEmail.includes('@') && !fromEmail.includes('<') ? `Fitlynutri <${fromEmail}>` : fromEmail;
+
+    const urgency =
+      data.daysLeft <= 1 ? '⚠️ Sua assinatura expira amanhã!'
+      : data.daysLeft <= 3 ? '🔔 Sua assinatura expira em breve!'
+      : '📅 Sua assinatura está próxima da renovação';
+
+    const html = `
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#0f0f1a;font-family:'Segoe UI',Arial,sans-serif">
+  <div style="max-width:560px;margin:32px auto;background:#1a1a2e;border-radius:16px;overflow:hidden;border:1px solid rgba(255,255,255,0.08)">
+    <div style="background:linear-gradient(135deg,#f59e0b,#ef4444);padding:32px 24px;text-align:center">
+      <div style="font-size:28px;font-weight:800;color:#fff;letter-spacing:-0.5px">Fitlynutri</div>
+      <div style="color:rgba(255,255,255,0.8);font-size:14px;margin-top:4px">Plataforma Fitness Completa</div>
+    </div>
+    <div style="padding:32px 24px">
+      <p style="color:#e2e8f0;font-size:16px;margin:0 0 8px">Olá, <strong>${data.adminName}</strong>!</p>
+      <p style="color:#94a3b8;font-size:14px;margin:0 0 24px">
+        ${urgency}
+      </p>
+      <div style="background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.3);border-radius:12px;padding:20px;margin-bottom:24px">
+        <div style="margin-bottom:8px">
+          <div style="color:#94a3b8;font-size:11px;text-transform:uppercase;letter-spacing:1px;margin-bottom:2px">Plano</div>
+          <div style="color:#f59e0b;font-size:14px;font-weight:600">${data.planLabel} (${data.cycleLabel})</div>
+        </div>
+        <div style="margin-bottom:8px">
+          <div style="color:#94a3b8;font-size:11px;text-transform:uppercase;letter-spacing:1px;margin-bottom:2px">Data de renovação</div>
+          <div style="color:#e2e8f0;font-size:14px;font-weight:600">${new Date(data.expiresAt).toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })}</div>
+        </div>
+        <div>
+          <div style="color:#94a3b8;font-size:11px;text-transform:uppercase;letter-spacing:1px;margin-bottom:2px">Dias restantes</div>
+          <div style="color:${data.daysLeft <= 1 ? '#ef4444' : data.daysLeft <= 3 ? '#f59e0b' : '#fbbf24'};font-size:20px;font-weight:700">${data.daysLeft} dia${data.daysLeft !== 1 ? 's' : ''}</div>
+        </div>
+      </div>
+      <p style="color:#94a3b8;font-size:13px;margin:0 0 24px">
+        💳 Renove agora para manter o acesso à plataforma e não perder nenhum recurso.
+      </p>
+      <div style="text-align:center;margin-bottom:24px">
+        <a href="${billingUrl}" style="display:inline-block;background:linear-gradient(135deg,#f59e0b,#ef4444);color:#fff;text-decoration:none;padding:14px 32px;border-radius:12px;font-weight:700;font-size:15px">
+          Gerenciar assinatura →
+        </a>
+      </div>
+    </div>
+    <div style="padding:16px 24px;border-top:1px solid rgba(255,255,255,0.06);text-align:center">
+      <p style="color:#475569;font-size:12px;margin:0">© 2026 Fitlynutri · Todos os direitos reservados</p>
+    </div>
+  </div>
+</body>
+</html>`;
+
+    try {
+      const res = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          from,
+          to: [data.to],
+          subject: `Sua assinatura expira em ${data.daysLeft} dia${data.daysLeft !== 1 ? 's' : ''} — Fitlynutri`,
+          html,
+        }),
+      });
+      const json = await res.json() as any;
+      if (!res.ok) {
+        console.error('[EMAIL] Resend error:', json);
+        return { sent: false, error: json?.message || 'Erro ao enviar' };
+      }
+      console.log(`[EMAIL] Expiring subscription notice sent to ${data.to} (${data.daysLeft}d left) — id: ${json.id}`);
+      return { sent: true };
+    } catch (err: any) {
+      console.error('[EMAIL] Resend exception:', err.message);
+      return { sent: false, error: err.message };
+    }
+  }
 }

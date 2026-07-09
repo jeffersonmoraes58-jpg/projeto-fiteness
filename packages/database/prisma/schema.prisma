@@ -247,6 +247,7 @@ model TenantSubscription {
   stripeCustomerId     String?
   stripeSubscriptionId String?
   cancelAtPeriodEnd   Boolean   @default(false)
+  lastExpiringNotificationAt DateTime?
   createdAt    DateTime           @default(now())
   updatedAt    DateTime           @updatedAt
 
