@@ -27,6 +27,7 @@ import { BillingModule } from './modules/billing/billing.module';
 import { EmailModule } from './modules/email/email.module';
 import { MusicModule } from './modules/music/music.module';
 import { SubscriptionsModule } from './modules/subscriptions/subscription.module';
+import { CloudinaryGifsModule } from './modules/cloudinary-gifs/cloudinary-gifs.module';
 
 @Module({
   imports: [
@@ -76,6 +77,7 @@ import { SubscriptionsModule } from './modules/subscriptions/subscription.module
     EmailModule,
     MusicModule,
     SubscriptionsModule,
+    CloudinaryGifsModule,
   ],
 })
 export class AppModule {}

@@ -216,7 +216,7 @@ function VideoInput({
 export default function TrainerExercises() {
   const router = useRouter();
   const [search, setSearch] = useState('');
-  const [sourceFilter, setSourceFilter] = useState<'all' | 'app' | 'mine'>('all');
+  const [sourceFilter, setSourceFilter] = useState<'all' | 'app' | 'mine' | 'gifs'>('all');
   const [muscleFilter, setMuscleFilter] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
   const [equipmentFilter, setEquipmentFilter] = useState('');
@@ -229,6 +229,7 @@ export default function TrainerExercises() {
   const [videoEditId, setVideoEditId] = useState<string | null>(null);
   const [videoEditUrl, setVideoEditUrl] = useState('');
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+  const [gifFolder, setGifFolder] = useState<string | null>(null);
   const [workoutModal, setWorkoutModal] = useState(false);
   const [addingToWorkout, setAddingToWorkout] = useState(false);
   const queryClient = useQueryClient();
@@ -236,6 +237,18 @@ export default function TrainerExercises() {
   const { data: exercises, isLoading } = useQuery({
     queryKey: ['trainer-exercises', categoryFilter, search],
     queryFn: () => api.get(`/exercises?category=${categoryFilter}&search=${search}`).then(r => r.data.data),
+  });
+
+  const { data: gifFolders } = useQuery({
+    queryKey: ['cloudinary-gifs'],
+    queryFn: () => api.get('/cloudinary-gifs').then(r => r.data.data || []),
+    enabled: sourceFilter === 'gifs',
+  });
+
+  const { data: gifFiles } = useQuery({
+    queryKey: ['cloudinary-gifs', gifFolder],
+    queryFn: () => api.get(`/cloudinary-gifs/${gifFolder}`).then(r => r.data.data || []),
+    enabled: sourceFilter === 'gifs' && !!gifFolder,
   });
 
   const { data: workouts } = useQuery({
@@ -404,7 +417,7 @@ export default function TrainerExercises() {
         </div>
 
         <div className="flex gap-2">
-          {[{ key: 'all', label: 'Todos' }, { key: 'app', label: 'Exercícios do app' }, { key: 'mine', label: 'Seus exercícios' }].map(f => (
+          {[{ key: 'all', label: 'Todos' }, { key: 'app', label: 'Exercícios do app' }, { key: 'mine', label: 'Seus exercícios' }, { key: 'gifs', label: 'Exercícios GIFs' }].map(f => (
             <button key={f.key} onClick={() => setSourceFilter(f.key as any)} className={cn('px-3 py-1.5 rounded-full text-xs font-medium transition-all border flex-shrink-0', sourceFilter === f.key ? 'bg-primary text-primary-foreground border-primary' : 'glass border-transparent hover:bg-accent text-muted-foreground')}>
               {f.label}
             </button>
@@ -435,7 +448,84 @@ export default function TrainerExercises() {
       </div>
 
       <div className="px-4 sm:px-6 lg:px-8 pb-32">
-        {isLoading ? (
+        {sourceFilter === 'gifs' ? (
+          // ── GIFs View ──────────────────────────────────────────────────
+          <div className="space-y-4">
+            {gifFolder ? (
+              // ── Files inside a folder ─────────────────────────────────
+              <>
+                <button
+                  onClick={() => setGifFolder(null)}
+                  className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors mb-2"
+                >
+                  <ChevronRight className="w-3 h-3 rotate-180" />
+                  Voltar para grupos musculares
+                </button>
+                <h2 className="text-lg font-bold capitalize">{gifFolder}</h2>
+                {!gifFiles ? (
+                  <div className="space-y-3">
+                    {[...Array(4)].map((_, i) => (
+                      <div key={i} className="glass rounded-2xl animate-pulse h-20" />
+                    ))}
+                  </div>
+                ) : gifFiles.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-16 text-center">
+                    <Dumbbell className="w-8 h-8 text-muted-foreground mb-3" />
+                    <p className="text-sm text-muted-foreground">Nenhum GIF encontrado nesta pasta</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                    {gifFiles.map((file: any) => (
+                      <GifCard key={file.publicId} file={file} />
+                    ))}
+                  </div>
+                )}
+              </>
+            ) : (
+              // ── Folder list (grupos musculares) ────────────────────────
+              <>
+                <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Grupos Musculares</h2>
+                {!gifFolders ? (
+                  <div className="space-y-3">
+                    {[...Array(6)].map((_, i) => (
+                      <div key={i} className="glass rounded-2xl animate-pulse h-16" />
+                    ))}
+                  </div>
+                ) : gifFolders.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-16 text-center">
+                    <Dumbbell className="w-8 h-8 text-muted-foreground mb-3" />
+                    <p className="text-sm text-muted-foreground">Nenhuma pasta encontrada no Cloudinary</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {gifFolders.map((folder: any) => (
+                      <button
+                        key={folder.name}
+                        onClick={() => setGifFolder(folder.name)}
+                        className="w-full glass rounded-2xl p-4 flex items-center gap-4 hover:bg-accent/50 transition-all text-left"
+                      >
+                        <div className="w-14 h-14 rounded-xl bg-purple-500/10 overflow-hidden flex-shrink-0">
+                          {folder.thumbnailUrl ? (
+                            <img src={folder.thumbnailUrl} alt={folder.name} className="w-full h-full object-cover" loading="lazy" />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center">
+                              <Dumbbell className="w-5 h-5 text-purple-400/40" />
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-semibold text-sm capitalize">{folder.name}</p>
+                          <p className="text-xs text-muted-foreground">{folder.count} exercício{folder.count !== 1 ? 's' : ''}</p>
+                        </div>
+                        <ChevronRight className="w-5 h-5 text-muted-foreground flex-shrink-0" />
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        ) : isLoading ? (
           <div className="space-y-2">
             {[...Array(6)].map((_, i) => <div key={i} className="flex items-center gap-3 p-3 rounded-2xl glass animate-pulse"><div className="w-16 h-16 rounded-xl bg-white/10 flex-shrink-0" /><div className="flex-1 space-y-2"><div className="h-3 bg-white/10 rounded w-1/3" /><div className="h-2 bg-white/5 rounded w-1/4" /></div></div>)}
           </div>
@@ -627,6 +717,55 @@ export default function TrainerExercises() {
       </AnimatePresence>
 
     </div>
+  );
+}
+
+function GifCard({ file }: { file: any }) {
+  const [expanded, setExpanded] = useState(false);
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 6 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="glass rounded-2xl overflow-hidden cursor-pointer hover:ring-1 hover:ring-primary/30 transition-all"
+      onClick={() => setExpanded(!expanded)}
+    >
+      <div className="aspect-square bg-black/40 overflow-hidden relative">
+        <img
+          src={file.url}
+          alt={file.name}
+          className="w-full h-full object-cover"
+          loading="lazy"
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+        <div className="absolute bottom-2 left-2 right-2">
+          <p className="text-xs font-medium text-white line-clamp-2 leading-tight">{file.name}</p>
+        </div>
+      </div>
+      <AnimatePresence>
+        {expanded && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            className="overflow-hidden"
+          >
+            <div className="p-3 space-y-2 border-t border-border">
+              <p className="text-xs text-muted-foreground">{file.name}</p>
+              <a
+                href={file.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs text-primary hover:underline flex items-center gap-1"
+              >
+                <ExternalLink className="w-3 h-3" />
+                Abrir GIF original
+              </a>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </motion.div>
   );
 }
 
