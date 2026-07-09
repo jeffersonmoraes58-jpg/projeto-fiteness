@@ -209,6 +209,8 @@ export default function WorkoutDetailPage() {
     });
   };
 
+  const [addingGifId, setAddingGifId] = useState<string | null>(null);
+
   const addExercise = useCallback(
     (ex: any) => {
       if (exerciseRows.find(r => r.exerciseId === ex.id)) return;
@@ -216,6 +218,30 @@ export default function WorkoutDetailPage() {
     },
     [exerciseRows],
   );
+
+  const addGifToWorkout = useCallback(async (file: any) => {
+    if (exerciseRows.find(r => r.name === file.name && r.videoUrl === file.url)) return;
+    setAddingGifId(file.publicId);
+    try {
+      const res = await api.post('/exercises', {
+        name: file.name,
+        category: 'FULL_BODY',
+        difficulty: 1,
+        equipment: [],
+        gifUrl: file.url,
+        videoUrl: file.url,
+        isPublic: false,
+      });
+      const created = res.data?.data;
+      if (created?.id) {
+        addExercise({ id: created.id, name: file.name, videoUrl: file.url });
+      }
+    } catch (err) {
+      // silently fail — exercise may already exist
+    } finally {
+      setAddingGifId(null);
+    }
+  }, [exerciseRows, addExercise]);
 
   const removeExercise = (idx: number) => {
     const row = exerciseRows[idx];
@@ -390,7 +416,13 @@ export default function WorkoutDetailPage() {
                 ) : (
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                     {gifFiles.map((file: any) => (
-                      <GifCard key={file.publicId} file={file} />
+                      <GifCard
+                        key={file.publicId}
+                        file={file}
+                        onAdd={() => addGifToWorkout(file)}
+                        isAdding={addingGifId === file.publicId}
+                        isAlreadyAdded={exerciseRows.some(r => r.name === file.name && r.videoUrl === file.url)}
+                      />
                     ))}
                   </div>
                 )}
@@ -773,7 +805,7 @@ function ExerciseSearchItem({ exercise, onAdd }: { exercise: any; onAdd: () => v
 
 // ─── GifCard (compact version for workout detail) ──────────────────────────
 
-function GifCard({ file }: { file: any }) {
+function GifCard({ file, onAdd, isAdding, isAlreadyAdded }: { file: any; onAdd: () => void; isAdding: boolean; isAlreadyAdded: boolean }) {
   return (
     <div className="glass rounded-xl overflow-hidden">
       <div className="aspect-square bg-black/40 relative">
@@ -783,6 +815,24 @@ function GifCard({ file }: { file: any }) {
           <p className="text-[10px] font-medium text-white line-clamp-2 leading-tight">{file.name}</p>
         </div>
       </div>
+      <button
+        type="button"
+        disabled={isAdding || isAlreadyAdded}
+        onClick={(e) => { e.stopPropagation(); onAdd(); }}
+        className={cn(
+          'w-full py-1.5 text-[10px] font-medium transition-colors flex items-center justify-center gap-1',
+          isAlreadyAdded ? 'bg-emerald-500/10 text-emerald-400 cursor-default' : 'hover:bg-accent text-primary hover:text-primary/80',
+          isAdding && 'opacity-50',
+        )}
+      >
+        {isAlreadyAdded ? (
+          <><CheckCircle className="w-3 h-3" />Adicionado</>
+        ) : isAdding ? (
+          <><div className="w-3 h-3 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />Adicionando...</>
+        ) : (
+          <><Plus className="w-3 h-3" />Adicionar</>
+        )}
+      </button>
     </div>
   );
 }
