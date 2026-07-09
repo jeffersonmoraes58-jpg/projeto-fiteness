@@ -186,19 +186,34 @@ function StudentRow({ student, index }: { student: any; index: number }) {
         <div className="text-xs text-muted-foreground truncate">{student.goalType || 'Sem objetivo definido'}</div>
       </div>
       <div className="flex items-center gap-1.5 flex-shrink-0">
-        <span className="hidden xs:inline text-xs px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400">Ativo</span>
+        <span className={`hidden xs:inline text-xs px-2 py-0.5 rounded-full ${student.isActive ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'}`}>
+          {student.isActive ? 'Ativo' : 'Inativo'}
+        </span>
         <span className="text-xs text-muted-foreground">{student.streak || 0}🔥</span>
       </div>
     </Link>
   );
 }
 
+/**
+ * Retorna string YYYY-MM-DD no fuso America/Sao_Paulo, compatível com backend toBRDate().
+ */
+function toBRDate(date: Date): string {
+  const br = new Date(date.toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }));
+  const y = br.getFullYear();
+  const m = String(br.getMonth() + 1).padStart(2, '0');
+  const d = String(br.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
 function WeeklyChart({ values }: { values?: number[] }) {
   const days = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
-  // Build labels for the last 7 days in order
+  // Build labels for the last 7 days in BR timezone (aligned with backend)
   const dayLabels = Array.from({ length: 7 }, (_, i) => {
     const d = new Date(Date.now() - (6 - i) * 86400000);
-    return days[d.getDay()];
+    // Use BR date so day-of-week matches backend key aggregation
+    const br = new Date(d.toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }));
+    return days[br.getDay()];
   });
   const data = values && values.length === 7 ? values : Array(7).fill(0);
   const max = Math.max(...data, 1);

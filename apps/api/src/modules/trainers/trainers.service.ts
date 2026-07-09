@@ -9,6 +9,19 @@ export class TrainersService {
     private subscriptionService: SubscriptionService,
   ) {}
 
+  /**
+   * Converte uma data para string YYYY-MM-DD no fuso America/Sao_Paulo (GMT-3).
+   * Evita desalinhamento de 1 dia entre backend (UTC) e frontend (horário local).
+   */
+  private toBRDate(date: Date | string): string {
+    const d = new Date(date);
+    const br = new Date(d.toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }));
+    const y = br.getFullYear();
+    const m = String(br.getMonth() + 1).padStart(2, '0');
+    const day = String(br.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  }
+
   private async getTrainer(userId: string) {
     const trainer = await this.prisma.trainer.findUnique({
       where: { userId },
@@ -57,13 +70,13 @@ export class TrainersService {
 
     const dailyMap: Record<string, number> = {};
     weekLogs.forEach((l) => {
-      const key = new Date(l.completedAt).toISOString().split('T')[0];
+      const key = this.toBRDate(l.completedAt);
       dailyMap[key] = (dailyMap[key] || 0) + 1;
     });
     const weeklyCheckins: number[] = [];
     for (let i = 6; i >= 0; i--) {
       const d = new Date(Date.now() - i * 86400000);
-      weeklyCheckins.push(dailyMap[d.toISOString().split('T')[0]] || 0);
+      weeklyCheckins.push(dailyMap[this.toBRDate(d)] || 0);
     }
 
     return {
@@ -228,13 +241,13 @@ export class TrainersService {
 
     const dailyMap: Record<string, number> = {};
     logs.forEach((log) => {
-      const key = new Date(log.completedAt).toISOString().split('T')[0];
+      const key = this.toBRDate(log.completedAt);
       dailyMap[key] = (dailyMap[key] || 0) + 1;
     });
     const dailyCheckins: number[] = [];
     for (let i = days - 1; i >= 0; i--) {
       const d = new Date(Date.now() - i * 86400000);
-      const key = d.toISOString().split('T')[0];
+      const key = this.toBRDate(d);
       dailyCheckins.push(dailyMap[key] || 0);
     }
 
