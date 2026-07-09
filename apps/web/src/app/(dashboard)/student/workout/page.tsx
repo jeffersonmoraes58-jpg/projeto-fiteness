@@ -1747,6 +1747,63 @@ function drawSelfieOverlay(ctx: CanvasRenderingContext2D, w: number, h: number, 
     ctx.fillText(DAY_SHORT[i], dx + daySize / 2, dayCenterY);
   }
 
+  // ── MOLDURA: Decorative gradient border (polaroid style) ─────────────────
+  const borderW = scale * 8;
+  const borderGrad = ctx.createLinearGradient(0, 0, w, h);
+  borderGrad.addColorStop(0, '#7c3aed');
+  borderGrad.addColorStop(0.3, '#a78bfa');
+  borderGrad.addColorStop(0.5, '#c084fc');
+  borderGrad.addColorStop(0.7, '#a78bfa');
+  borderGrad.addColorStop(1, '#7c3aed');
+  ctx.strokeStyle = borderGrad;
+  ctx.lineWidth = borderW;
+  roundRect(ctx, borderW / 2, borderW / 2, w - borderW, h - borderW, scale * 18);
+  ctx.stroke();
+
+  // Inner subtle shadow line
+  ctx.strokeStyle = 'rgba(255,255,255,0.12)';
+  ctx.lineWidth = scale * 1.5;
+  roundRect(ctx, borderW * 2, borderW * 2, w - borderW * 4, h - borderW * 4, scale * 14);
+  ctx.stroke();
+
+  // ── SELO: "Treino Concluído" badge (top right, below day checklist) ──────
+  const seloCX = w - pad - scale * 55;
+  const seloCY = topBarH + scale * 40;
+  const seloR = scale * 48;
+
+  // Outer glow
+  const seloGlow = ctx.createRadialGradient(seloCX, seloCY, seloR * 0.7, seloCX, seloCY, seloR * 1.5);
+  seloGlow.addColorStop(0, 'rgba(5,150,105,0.35)');
+  seloGlow.addColorStop(1, 'rgba(5,150,105,0)');
+  ctx.fillStyle = seloGlow;
+  ctx.beginPath(); ctx.arc(seloCX, seloCY, seloR * 1.5, 0, Math.PI * 2); ctx.fill();
+
+  // Badge circle
+  ctx.beginPath(); ctx.arc(seloCX, seloCY, seloR, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(5,150,105,0.88)';
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(255,255,255,0.35)';
+  ctx.lineWidth = scale * 2.5;
+  ctx.stroke();
+
+  // Checkmark
+  ctx.strokeStyle = '#ffffff';
+  ctx.lineWidth = scale * 4.5;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.beginPath();
+  ctx.moveTo(seloCX - scale * 15, seloCY);
+  ctx.lineTo(seloCX - scale * 4, seloCY + scale * 13);
+  ctx.lineTo(seloCX + scale * 18, seloCY - scale * 14);
+  ctx.stroke();
+
+  // "Concluído" text below badge
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'top';
+  ctx.fillStyle = '#ffffff';
+  ctx.font = `bold ${Math.round(scale * 14)}px system-ui,sans-serif`;
+  ctx.fillText('Concluído', seloCX, seloCY + seloR + scale * 8);
+
   // ── BOTTOM: Info bar with dark background for readability ─────────────────
   const bottomBarH = scale * 200;
   const bottomY = h - bottomBarH;
@@ -1803,11 +1860,11 @@ function drawSelfieOverlay(ctx: CanvasRenderingContext2D, w: number, h: number, 
     ctx.fillText(info.intensity, w - pad, y2);
   }
 
-  // Row 3: "FitlyNutri" watermark
+  // Row 3: Brand hashtags
   ctx.textAlign = 'center';
-  ctx.fillStyle = 'rgba(255,255,255,0.20)';
+  ctx.fillStyle = 'rgba(167,139,250,0.45)';
   ctx.font = `${Math.round(scale * 22)}px system-ui,sans-serif`;
-  ctx.fillText('fitlynutri.com.br', w / 2, y3);
+  ctx.fillText('#FitlyNutri  #SeuPersonalOnline', w / 2, y3);
 }
 
 const DAY_NAMES = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
