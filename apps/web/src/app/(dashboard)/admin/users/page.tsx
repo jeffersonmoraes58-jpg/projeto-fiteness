@@ -6,6 +6,7 @@ import {
   Search, Plus, Users, Dumbbell, Apple, UserCog,
   Shield, MoreVertical, ChevronDown, CheckCircle2,
   XCircle, Mail, Calendar, Filter, Download,
+  X, Loader2, Eye, EyeOff,
 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
@@ -34,6 +35,7 @@ export default function AdminUsers() {
   const [roleFilter, setRoleFilter] = useState('Todos');
   const [statusFilter, setStatusFilter] = useState('Todos');
   const [page, setPage] = useState(1);
+  const [showCreateModal, setShowCreateModal] = useState(false);
   const PER_PAGE = 20;
   const queryClient = useQueryClient();
 
@@ -65,6 +67,27 @@ export default function AdminUsers() {
     onError: () => toast.error('Erro ao atualizar perfil'),
   });
 
+  const exportCsv = () => {
+    const headers = ['Nome', 'E-mail', 'Perfil', 'Tenant', 'Ativo', 'Último Acesso'];
+    const rows = users.map((u: any) => [
+      `${u.profile?.firstName || ''} ${u.profile?.lastName || ''}`.trim(),
+      u.email,
+      ROLE_LABELS[u.role] || u.role,
+      u.tenant?.name || '—',
+      u.isActive ? 'Sim' : 'Não',
+      u.lastLoginAt ? new Date(u.lastLoginAt).toLocaleDateString('pt-BR') : 'Nunca',
+    ]);
+    const csv = [headers, ...rows].map((r) => r.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `usuarios-fitlynutri-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success('Exportado com sucesso');
+  };
+
   const filtered = users.filter((u: any) => {
     const name = `${u.profile?.firstName || ''} ${u.profile?.lastName || ''} ${u.email || ''}`.toLowerCase();
     const matchSearch = name.includes(search.toLowerCase());
@@ -86,11 +109,11 @@ export default function AdminUsers() {
           <p className="text-muted-foreground text-sm mt-1">{total.toLocaleString('pt-BR')} usuários na plataforma</p>
         </div>
         <div className="flex gap-2">
-          <button className="btn-secondary flex items-center gap-2 text-sm py-2">
+          <button onClick={exportCsv} className="btn-secondary flex items-center gap-2 text-sm py-2">
             <Download className="w-4 h-4" />
             Exportar
           </button>
-          <button className="btn-primary flex items-center gap-2 text-sm py-2">
+          <button onClick={() => setShowCreateModal(true)} className="btn-primary flex items-center gap-2 text-sm py-2">
             <Plus className="w-4 h-4" />
             Novo usuário
           </button>
@@ -220,6 +243,140 @@ export default function AdminUsers() {
           </div>
         )}
       </div>
+
+      {/* Create user modal */}
+      {showCreateModal && (
+        <CreateUserModal
+          onClose={() => setShowCreateModal(false)}
+          onCreated={() => {
+            setShowCreateModal(false);
+            queryClient.invalidateQueries({ queryKey: ['admin-users'] });
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function CreateUserModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
+  const [form, setForm] = useState({ firstName: '', lastName: '', email: '', password: '', role: 'TRAINER' });
+  const [showPwd, setShowPwd] = useState(false);
+
+  const createMutation = useMutation({
+    mutationFn: (data: typeof form) => api.post('/admin/users', data),
+    onSuccess: () => {
+      toast.success('Usuário criado com sucesso');
+      onCreated();
+    },
+    onError: (err: any) => {
+      const msg = err?.response?.data?.message || 'Erro ao criar usuário';
+      toast.error(msg);
+    },
+  });
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!form.email || !form.password || !form.firstName) {
+      toast.error('Preencha todos os campos obrigatórios');
+      return;
+    }
+    createMutation.mutate(form);
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={onClose}>
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        onClick={(e) => e.stopPropagation()}
+        className="glass-card w-full max-w-md mx-4 p-6"
+      >
+        <div className="flex items-center justify-between mb-5">
+          <h2 className="text-lg font-bold">Novo usuário</h2>
+          <button onClick={onClose} className="w-8 h-8 rounded-lg hover:bg-accent flex items-center justify-center">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs text-muted-foreground mb-1 block">Nome *</label>
+              <input
+                className="input-field"
+                placeholder="Nome"
+                value={form.firstName}
+                onChange={(e) => setForm((f) => ({ ...f, firstName: e.target.value }))}
+              />
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground mb-1 block">Sobrenome</label>
+              <input
+                className="input-field"
+                placeholder="Sobrenome"
+                value={form.lastName}
+                onChange={(e) => setForm((f) => ({ ...f, lastName: e.target.value }))}
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="text-xs text-muted-foreground mb-1 block">E-mail *</label>
+            <input
+              className="input-field"
+              type="email"
+              placeholder="email@exemplo.com"
+              value={form.email}
+              onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
+            />
+          </div>
+
+          <div>
+            <label className="text-xs text-muted-foreground mb-1 block">Senha *</label>
+            <div className="relative">
+              <input
+                className="input-field pr-10"
+                type={showPwd ? 'text' : 'password'}
+                placeholder="Mínimo 6 caracteres"
+                value={form.password}
+                onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPwd(!showPwd)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              >
+                {showPwd ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
+          </div>
+
+          <div>
+            <label className="text-xs text-muted-foreground mb-1 block">Perfil</label>
+            <select
+              className="input-field"
+              value={form.role}
+              onChange={(e) => setForm((f) => ({ ...f, role: e.target.value }))}
+            >
+              {Object.entries(ROLE_LABELS).map(([key, label]) => (
+                <option key={key} value={key}>{label}</option>
+              ))}
+            </select>
+          </div>
+
+          <button
+            type="submit"
+            disabled={createMutation.isPending}
+            className="btn-primary w-full py-2.5 flex items-center justify-center gap-2 disabled:opacity-60"
+          >
+            {createMutation.isPending ? (
+              <><Loader2 className="w-4 h-4 animate-spin" /> Criando...</>
+            ) : (
+              <>Criar usuário</>
+            )}
+          </button>
+        </form>
+      </motion.div>
     </div>
   );
 }

@@ -71,6 +71,12 @@ export class AdminController {
     return this.service.getUsers(search, role, page ? +page : 1, limit ? +limit : 20);
   }
 
+  @Post('users')
+  @ApiOperation({ summary: 'Criar usuário (admin)' })
+  createUser(@Body() body: { email: string; password: string; firstName: string; lastName: string; role: string }) {
+    return this.service.createUser(body);
+  }
+
   @Patch('users/:id')
   @ApiOperation({ summary: 'Ativar/desativar usuário ou alterar role' })
   updateUser(@Param('id') id: string, @Body() body: { isActive?: boolean; role?: string }) {

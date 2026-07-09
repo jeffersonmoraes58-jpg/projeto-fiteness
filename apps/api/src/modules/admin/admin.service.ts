@@ -1,7 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { Prisma, SubscriptionPlan, SubscriptionStatus, NotificationType } from '@prisma/client';
+import { Prisma, SubscriptionPlan, SubscriptionStatus, NotificationType, UserRole } from '@prisma/client';
 import { randomUUID } from 'crypto';
+import * as bcrypt from 'bcryptjs';
 import Redis from 'ioredis';
 import { PrismaService } from '../prisma/prisma.service';
 import { PLAN_PRICES } from '../../common/plan-limits';
@@ -348,6 +349,43 @@ export class AdminService {
       this.prisma.user.count({ where }),
     ]);
     return { users, total, page, limit };
+  }
+
+  async createUser(
+    input: { email: string; password: string; firstName: string; lastName: string; role: string },
+    tenantId?: string,
+  ) {
+    // Se tenantId não informado, usa o tenant do próprio admin (primeiro tenant)
+    const tid = tenantId || (await this.prisma.tenant.findFirst({ orderBy: { createdAt: 'asc' } }))?.id;
+    if (!tid) throw new NotFoundException('Nenhum tenant disponível para criar usuário');
+
+    const existing = await this.prisma.user.findFirst({
+      where: { email: input.email, tenantId: tid },
+    });
+    if (existing) throw new ConflictException('E-mail já cadastrado');
+
+    const role = (input.role as UserRole) || UserRole.STUDENT;
+    const hashedPassword = await bcrypt.hash(input.password, 12);
+
+    const user = await this.prisma.user.create({
+      data: {
+        email: input.email,
+        password: hashedPassword,
+        role,
+        tenantId: tid,
+        isActive: true,
+        emailVerified: true,
+        profile: {
+          create: {
+            firstName: input.firstName,
+            lastName: input.lastName,
+          },
+        },
+      },
+      include: { profile: true },
+    });
+
+    return user;
   }
 
   async updateUser(id: string, data: { isActive?: boolean; role?: string }) {
