@@ -5,7 +5,7 @@ import { motion } from 'framer-motion';
 import {
   Dumbbell, ChevronLeft, Clock, Layers, Zap, Users, UserCheck,
   Plus, Trash2, Search, Save, CheckCircle, Video,
-  Link2, Unlink,
+  Link2, Unlink, ExternalLink, ChevronRight,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
@@ -92,6 +92,8 @@ export default function WorkoutDetailPage() {
   const [exerciseRows, setExerciseRows] = useState<WorkoutExerciseRow[]>([]);
   const [exercisesLoaded, setExercisesLoaded] = useState(false);
   const [exSearch, setExSearch] = useState('');
+  const [exSourceFilter, setExSourceFilter] = useState<'app' | 'mine' | 'gifs'>('app');
+  const [gifFolder, setGifFolder] = useState<string | null>(null);
   const [saveExSuccess, setSaveExSuccess] = useState(false);
   const [saveExError, setSaveExError] = useState('');
 
@@ -131,6 +133,19 @@ export default function WorkoutDetailPage() {
   const { data: allExercises } = useQuery({
     queryKey: ['exercises', exSearch],
     queryFn: () => api.get('/exercises', { params: { search: exSearch || undefined } }).then(r => r.data.data || []),
+    enabled: exSourceFilter !== 'gifs',
+  });
+
+  const { data: gifFolders } = useQuery({
+    queryKey: ['workout-gifs'],
+    queryFn: () => api.get('/cloudinary-gifs').then(r => r.data.data || []),
+    enabled: exSourceFilter === 'gifs',
+  });
+
+  const { data: gifFiles } = useQuery({
+    queryKey: ['workout-gifs', gifFolder],
+    queryFn: () => api.get(`/cloudinary-gifs/${gifFolder}`).then(r => r.data.data || []),
+    enabled: exSourceFilter === 'gifs' && !!gifFolder,
   });
 
   const saveExercisesMutation = useMutation({
@@ -340,21 +355,97 @@ export default function WorkoutDetailPage() {
           </button>
         </div>
 
-        {/* Search to add exercises */}
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <input type="text" value={exSearch} onChange={e => setExSearch(e.target.value)} placeholder="Buscar exercício para adicionar..." className="input-field pl-9" />
+        {/* Source filter buttons */}
+        <div className="flex flex-wrap gap-1.5">
+          {[{ key: 'app', label: 'Exercícios do app' }, { key: 'mine', label: 'Meus exercícios' }, { key: 'gifs', label: 'GIFs' }].map(f => (
+            <button
+              key={f.key}
+              type="button"
+              onClick={() => { setExSourceFilter(f.key as any); setExSearch(''); setGifFolder(null); }}
+              className={cn('px-2.5 py-1.5 rounded-full text-xs font-medium transition-all border', exSourceFilter === f.key ? 'bg-primary text-primary-foreground border-primary' : 'glass border-transparent hover:bg-accent text-muted-foreground')}
+            >
+              {f.label}
+            </button>
+          ))}
         </div>
 
-        {exSearch && (
-          <div className="glass rounded-xl divide-y divide-border max-h-72 overflow-y-auto">
-            {(allExercises || []).filter((e: any) => !exerciseRows.find(r => r.exerciseId === e.id)).slice(0, 10).map((ex: any) => (
-              <ExerciseSearchItem key={ex.id} exercise={ex} onAdd={() => { addExercise(ex); setExSearch(''); }} />
-            ))}
-            {(allExercises || []).filter((e: any) => !exerciseRows.find(r => r.exerciseId === e.id)).length === 0 && (
-              <p className="text-sm text-muted-foreground text-center py-3">Nenhum resultado</p>
+        {exSourceFilter === 'gifs' ? (
+          // ── GIFs view ──────────────────────────────────────────────────
+          <div className="space-y-3">
+            {gifFolder ? (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setGifFolder(null)}
+                  className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  <ChevronRight className="w-3 h-3 rotate-180" />
+                  Voltar
+                </button>
+                <h3 className="text-sm font-bold capitalize">{gifFolder}</h3>
+                {!gifFiles ? (
+                  <div className="space-y-2">
+                    {[...Array(3)].map((_, i) => <div key={i} className="glass rounded-xl animate-pulse h-16" />)}
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                    {gifFiles.map((file: any) => (
+                      <GifCard key={file.publicId} file={file} />
+                    ))}
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className="space-y-1.5 max-h-60 overflow-y-auto">
+                {!gifFolders ? (
+                  [...Array(4)].map((_, i) => <div key={i} className="glass rounded-xl animate-pulse h-12" />)
+                ) : gifFolders.length === 0 ? (
+                  <p className="text-xs text-muted-foreground text-center py-3">Nenhuma pasta encontrada</p>
+                ) : (
+                  gifFolders.map((folder: any) => (
+                    <button
+                      key={folder.name}
+                      type="button"
+                      onClick={() => setGifFolder(folder.name)}
+                      className="w-full glass rounded-xl px-3 py-2.5 flex items-center gap-3 hover:bg-accent/50 transition-all text-left"
+                    >
+                      <div className="w-10 h-10 rounded-lg bg-purple-500/10 overflow-hidden flex-shrink-0">
+                        {folder.thumbnailUrl ? (
+                          <img src={folder.thumbnailUrl} alt={folder.name} className="w-full h-full object-cover" loading="lazy" />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center"><Dumbbell className="w-4 h-4 text-purple-400/40" /></div>
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium capitalize">{folder.name}</p>
+                        <p className="text-[10px] text-muted-foreground">{folder.count} exercício{folder.count !== 1 ? 's' : ''}</p>
+                      </div>
+                      <ChevronRight className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                    </button>
+                  ))
+                )}
+              </div>
             )}
           </div>
+        ) : (
+          <>
+            {/* Search to add exercises */}
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <input type="text" value={exSearch} onChange={e => setExSearch(e.target.value)} placeholder="Buscar exercício para adicionar..." className="input-field pl-9" />
+            </div>
+
+            {exSearch && (
+              <div className="glass rounded-xl divide-y divide-border max-h-72 overflow-y-auto">
+                {(allExercises || []).filter((e: any) => !exerciseRows.find(r => r.exerciseId === e.id)).slice(0, 10).map((ex: any) => (
+                  <ExerciseSearchItem key={ex.id} exercise={ex} onAdd={() => { addExercise(ex); setExSearch(''); }} />
+                ))}
+                {(allExercises || []).filter((e: any) => !exerciseRows.find(r => r.exerciseId === e.id)).length === 0 && (
+                  <p className="text-sm text-muted-foreground text-center py-3">Nenhum resultado</p>
+                )}
+              </div>
+            )}
+          </>
         )}
 
         {/* Legend */}
@@ -676,6 +767,22 @@ function ExerciseSearchItem({ exercise, onAdd }: { exercise: any; onAdd: () => v
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// ─── GifCard (compact version for workout detail) ──────────────────────────
+
+function GifCard({ file }: { file: any }) {
+  return (
+    <div className="glass rounded-xl overflow-hidden">
+      <div className="aspect-square bg-black/40 relative">
+        <img src={file.url} alt={file.name} className="w-full h-full object-cover" loading="lazy" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+        <div className="absolute bottom-1.5 left-1.5 right-1.5">
+          <p className="text-[10px] font-medium text-white line-clamp-2 leading-tight">{file.name}</p>
+        </div>
+      </div>
     </div>
   );
 }
