@@ -1,12 +1,14 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { SubscriptionService } from '../subscriptions/subscription.service';
+import { EmailService } from '../email/email.service';
 
 @Injectable()
 export class TrainersService {
   constructor(
     private prisma: PrismaService,
     private subscriptionService: SubscriptionService,
+    private emailService: EmailService,
   ) {}
 
   /**
@@ -271,6 +273,35 @@ export class TrainersService {
       since: s.createdAt,
     }));
     return { mrr, activeCount: active.length, totalCount: allStudents.length, fees };
+  }
+
+  async sendAnamneseLink(userId: string, studentUserId: string) {
+    const trainer = await this.getTrainer(userId);
+
+    const student = await this.prisma.student.findUnique({
+      where: { userId: studentUserId },
+      include: { user: { include: { profile: true } }, anamnesis: true },
+    });
+
+    if (!student) throw new NotFoundException('Aluno não encontrado');
+
+    const studentName =
+      `${student.user.profile?.firstName ?? ''} ${student.user.profile?.lastName ?? ''}`.trim() ||
+      student.user.email;
+    const trainerName =
+      `${trainer.user.profile?.firstName ?? ''} ${trainer.user.profile?.lastName ?? ''}`.trim() ||
+      trainer.user.email;
+
+    if (!student.user.email) throw new NotFoundException('Aluno não possui email cadastrado');
+
+    const result = await this.emailService.sendAnamneseLink({
+      to: student.user.email,
+      studentName,
+      trainerName,
+      studentUserId: student.userId,
+    });
+
+    return result;
   }
 
   async update(userId: string, data: any) {

@@ -7,7 +7,7 @@ import {
   MessageCircle, Trash2, Link2,
   Clock, Zap, ChevronRight, ClipboardList, TrendingUp,
   Heart, Activity, Moon, Brain, Target, Info,
-  Plus, X, Search, Pencil, Scale, Save,
+  Plus, X, Search, Pencil, Scale, Save, Mail, Share2, Send,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
@@ -131,6 +131,20 @@ export default function StudentDetailPage() {
       toast.success('Plano atualizado!');
     },
     onError: () => toast.error('Erro ao atualizar plano'),
+  });
+
+  const sendAnamneseMutation = useMutation({
+    mutationFn: () =>
+      api.post(`/trainers/me/students/${student?.userId}/send-anamnese-link`),
+    onSuccess: (res: any) => {
+      const data = res.data?.data ?? res.data;
+      if (data?.sent) {
+        toast.success('Link da anamnese enviado por email!');
+      } else {
+        toast.error(data?.error || 'Erro ao enviar email');
+      }
+    },
+    onError: () => toast.error('Erro ao enviar link da anamnese'),
   });
 
   if (isLoading) {
@@ -316,10 +330,61 @@ export default function StudentDetailPage() {
               Anamnese do aluno
             </h2>
             {!anamnesis ? (
-              <div className="text-center py-12 text-muted-foreground">
+              <div className="text-center py-10 text-muted-foreground">
                 <ClipboardList className="w-12 h-12 mx-auto mb-3 opacity-30" />
-                <p className="text-sm font-medium">Anamnese não preenchida</p>
-                <p className="text-xs mt-1 max-w-xs mx-auto">O aluno ainda não respondeu a anamnese. Envie o link novamente pelo cadastro.</p>
+                <p className="text-sm font-medium mb-1">Anamnese não preenchida</p>
+                <p className="text-xs max-w-xs mx-auto mb-6">
+                  Envie o link da anamnese para o aluno preencher
+                </p>
+                <div className="flex flex-col items-center gap-3">
+                  {/* Botão Email */}
+                  <button
+                    onClick={() => sendAnamneseMutation.mutate()}
+                    disabled={sendAnamneseMutation.isPending}
+                    className="btn-primary text-sm py-2 px-6 flex items-center gap-2 disabled:opacity-50"
+                  >
+                    {sendAnamneseMutation.isPending ? (
+                      <>
+                        <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                        Enviando...
+                      </>
+                    ) : (
+                      <>
+                        <Mail className="w-4 h-4" />
+                        Enviar link por Email
+                      </>
+                    )}
+                  </button>
+                  {/* Botão WhatsApp (copia link) */}
+                  {(() => {
+                    const anamneseUrl = `https://fitlynutri.com.br/anamnese/${student?.userId}`;
+                    const msg = encodeURIComponent(
+                      `Olá! ${student?.user?.profile?.firstName || ''}, seu personal trainer solicitou que você preencha a anamnese. Acesse o link: ${anamneseUrl}`
+                    );
+                    const rawPhone = student?.user?.profile?.phone?.replace(/\D/g, '');
+                    const waPhone = rawPhone
+                      ? rawPhone.startsWith('55') ? rawPhone : `55${rawPhone}`
+                      : null;
+                    return (
+                      <button
+                        onClick={() => {
+                          if (waPhone) {
+                            window.open(`https://wa.me/${waPhone}?text=${msg}`, '_blank');
+                          } else {
+                            navigator.clipboard.writeText(anamneseUrl).then(
+                              () => toast.success('Link copiado! Compartilhe com o aluno.'),
+                              () => toast.error('Erro ao copiar link')
+                            );
+                          }
+                        }}
+                        className="btn-secondary text-sm py-2 px-6 flex items-center gap-2"
+                      >
+                        <Share2 className="w-4 h-4" />
+                        {waPhone ? 'Enviar por WhatsApp' : 'Copiar link'}
+                      </button>
+                    );
+                  })()}
+                </div>
               </div>
             ) : (
               <div className="space-y-0">

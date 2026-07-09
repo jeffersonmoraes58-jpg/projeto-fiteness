@@ -76,4 +76,10 @@ export class TrainersController {
   update(@CurrentUser() user: any, @Body() body: any) {
     return this.service.update(user.id, body);
   }
+
+  @Post('me/students/:studentUserId/send-anamnese-link')
+  @ApiOperation({ summary: 'Enviar link da anamnese por email para o aluno' })
+  sendAnamneseLink(@CurrentUser() user: any, @Param('studentUserId') studentUserId: string) {
+    return this.service.sendAnamneseLink(user.id, studentUserId);
+  }
 }
