@@ -9,6 +9,19 @@ export class StudentsService {
     private notifications: NotificationsService,
   ) {}
 
+  /**
+   * Converte uma data para string YYYY-MM-DD no fuso America/Sao_Paulo (GMT-3).
+   * Evita desalinhamento de 1 dia entre backend (UTC) e frontend (horário local).
+   */
+  private toBRDate(date: Date | string): string {
+    const d = new Date(date);
+    const br = new Date(d.toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }));
+    const y = br.getFullYear();
+    const m = String(br.getMonth() + 1).padStart(2, '0');
+    const day = String(br.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  }
+
   private async getStudent(userId: string) {
     const student = await this.prisma.student.findUnique({
       where: { userId },
@@ -66,11 +79,10 @@ export class StudentsService {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    const [workoutLogs, waterLogs, activePlan, activeDiet] = await Promise.all([
+    const [weekLogsRaw, waterLogs, activePlan, activeDiet] = await Promise.all([
       this.prisma.workoutLog.findMany({
-        where: { studentId: student.id },
-        orderBy: { completedAt: 'desc' },
-        take: 7,
+        where: { studentId: student.id, completedAt: { gte: new Date(Date.now() - 7 * 86400000) } },
+        select: { completedAt: true },
       }),
       this.prisma.waterLog.findMany({
         where: { studentId: student.id, loggedAt: { gte: today } },
@@ -86,9 +98,18 @@ export class StudentsService {
     ]);
 
     const totalWaterToday = waterLogs.reduce((s, l) => s + l.amount, 0);
-    const workoutsThisWeek = workoutLogs.filter(
-      (l) => l.completedAt >= new Date(Date.now() - 7 * 86400000),
-    ).length;
+    const workoutsThisWeek = weekLogsRaw.length;
+
+    // weekActivity: array de 7 posições (0=Dom..6=Sáb), 1 se houve treino no dia
+    const dayMap: Record<string, boolean> = {};
+    weekLogsRaw.forEach((l) => {
+      dayMap[this.toBRDate(l.completedAt)] = true;
+    });
+    const weekActivity: number[] = [];
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date(Date.now() - i * 86400000);
+      weekActivity.push(dayMap[this.toBRDate(d)] ? 1 : 0);
+    }
 
     return {
       student: { ...student, user: undefined, userId: undefined },
@@ -99,6 +120,7 @@ export class StudentsService {
         points: student.points,
         workoutsThisWeek,
         waterToday: totalWaterToday,
+        weekActivity,
       },
       todayWorkout: activePlan?.workout ?? null,
       activeDiet: activeDiet?.diet ?? null,

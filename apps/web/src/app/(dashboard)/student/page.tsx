@@ -159,7 +159,7 @@ export default function StudentDashboard() {
                         <span className="text-xs font-bold text-purple-400">{i + 1}</span>
                       </div>
                       <div className="flex-1">
-                        <div className="text-sm font-medium">{ex.exercise?.name}</div>
+                        <div className="text-sm font-medium">{ex.name}</div>
                         <div className="text-xs text-muted-foreground">{ex.sets}x{ex.reps} • {ex.weight ? `${ex.weight}kg` : 'Sem peso'}</div>
                       </div>
                       <CheckCircle2 className="w-4 h-4 text-muted-foreground/30" />
@@ -209,11 +209,11 @@ export default function StudentDashboard() {
               </Link>
             </div>
             <MacroRing
-              calories={todayDiet?.calories ?? 0}
-              goal={todayDiet?.caloriesGoal ?? 2200}
-              protein={todayDiet?.protein ?? 0}
-              carbs={todayDiet?.carbs ?? 0}
-              fat={todayDiet?.fat ?? 0}
+              calories={todayDiet?.diet?.calories ?? 0}
+              goal={todayDiet?.diet?.caloriesGoal ?? 2200}
+              protein={todayDiet?.diet?.protein ?? 0}
+              carbs={todayDiet?.diet?.carbs ?? 0}
+              fat={todayDiet?.diet?.fat ?? 0}
             />
           </motion.div>
 
@@ -504,7 +504,8 @@ function WhatsAppIcon({ className }: { className?: string }) {
 
 function WeekActivity({ stats }: { stats: any }) {
   const days = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
-  const activity = stats?.weekActivity || [0, 1, 1, 0, 1, 1, 0];
+  // Constrói array de 7 posições: 1 se houve treino no dia, 0 caso contrário
+  const activity = (stats?.weekActivity as number[]) ?? Array(7).fill(0);
 
   return (
     <div className="flex items-end gap-3 h-20">
