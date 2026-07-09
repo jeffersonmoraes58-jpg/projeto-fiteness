@@ -1,0 +1,130 @@
+# FitlyNutri — Regras para o Cline/DeepSeek
+
+> Leia o arquivo `BRIEFING_DEEPSEEK.md` na raiz do projeto para entender toda a arquitetura,
+> endpoints, modelos e histórico de bugs. Este arquivo contém apenas as regras críticas resumidas.
+
+---
+
+## REGRAS ABSOLUTAS
+
+1. **Nunca fazer commit ou push automaticamente.** Sempre perguntar ao usuário primeiro.
+2. **Não inventar endpoints.** Verificar o controller/service antes de usar qualquer rota.
+3. **Não mexer em `apps/mobile/`.** Está descontinuado.
+4. **Não adicionar features além do solicitado.** Sem abstrações desnecessárias.
+5. **Ao alterar Prisma schema → rodar `prisma migrate dev` antes de usar o novo campo.**
+
+---
+
+## CONVENÇÃO CRÍTICA: DOIS TIPOS DE ID
+
+O banco tem dois níveis de ID para usuários. **Confundir quebra tudo.**
+
+| Campo | Tipo | Quando usar |
+|-------|------|-------------|
+| `User.id` | UUID | JWT payload (`user.id`), autenticação |
+| `Student.id` | UUID | Relacionamentos (WorkoutPlan, etc.) |
+| `Trainer.id` | UUID | Relacionamentos (Workout, etc.) |
+
+- `Student.userId = User.id` (FK)
+- `WorkoutPlan.studentId = Student.id` — **NÃO** o `User.id`
+
+**Correto em service:**
+```typescript
+const student = await this.prisma.student.findUnique({ where: { userId } }); // userId = JWT
+const plans = await this.prisma.workoutPlan.findMany({ where: { studentId: student.id } });
+```
+
+---
+
+## CONVENÇÃO CRÍTICA: FORMATO DE RESPOSTA DA API
+
+**TODOS** os endpoints retornam via `TransformInterceptor`:
+```json
+{ "success": true, "data": <payload>, "timestamp": "2024-..." }
+```
+
+No frontend, **sempre** use `r.data.data` (não `r.data`):
+```typescript
+api.get('/students/me/workout-plan').then(r => r.data.data || [])
+```
+
+---
+
+## CONVENÇÃO CRÍTICA: FLAT vs NESTED de EXERCÍCIOS
+
+`GET /students/me/workout-plan` retorna exercícios **achatados**:
+```typescript
+// CORRETO:
+ex.name
+ex.videoUrl
+ex.gifUrl
+
+// ERRADO — não existe exercise aninhado aqui:
+ex.exercise?.name    // undefined!
+ex.exercise?.videoUrl // undefined!
+```
+
+`GET /workouts/:id` (trainer) retorna estrutura **aninhada**:
+```typescript
+ex.exercise.name
+ex.exercise.videoUrl
+```
+
+> Este erro já causou bug real: em 07/07/2026 o getWorkoutPlan() foi refatorado para flat,
+> mas ExerciseRow e downloadWorkoutPDF ainda liam ex.exercise?.name → exercícios sem nome/vídeo.
+
+---
+
+## SISTEMA DE ASSINATURA
+
+| Status | Comportamento |
+|--------|--------------|
+| `FREE` | Acesso total, nunca bloqueado |
+| `TRIAL` | **Bloqueia completamente** — overlay de pagamento (âmbar) |
+| `ACTIVE` | Acesso total |
+| `PAST_DUE` | Bloqueia completamente — overlay vermelho |
+| `CANCELED` | Bloqueia completamente — overlay vermelho |
+| `EXPIRED` | Bloqueia completamente — overlay vermelho |
+
+**STUDENT e ADMIN** nunca são bloqueados pelo SubscriptionGate.
+
+---
+
+## ATRIBUIÇÃO DE TREINO (Trainer → Aluno)
+
+```typescript
+// CORRETO: usar Student.id (não User.id)
+POST /workouts/:workoutId/assign
+Body: { "studentId": "<Student.id>", "startDate": "YYYY-MM-DD", "dayOfWeek": [1,3,5] }
+
+// /trainers/me/students retorna: { id: Student.id, userId: User.id, ... }
+// Sempre usar student.id (não student.userId) no assign
+```
+
+---
+
+## FILTRO DE DIA DA SEMANA
+
+`WorkoutPlan.dayOfWeek` é array de inteiros: `0=Dom, 1=Seg, ..., 6=Sáb`
+
+- Array vazio `[]` = aparece todos os dias
+- `[1,3,5]` = Seg, Qua, Sex
+
+---
+
+## INFRAESTRUTURA
+
+- **Produção:** Oracle Cloud — confirmar antes de comandos destrutivos
+- **Deploy:** push no `master` → GitHub Actions → Docker → Watchtower (~5 min automático)
+- **Arquivo completo:** `BRIEFING_DEEPSEEK.md` — leia antes de qualquer tarefa
+
+---
+
+## USUÁRIOS DEMO
+
+| Perfil | Email | Senha |
+|--------|-------|-------|
+| Trainer | trainer@demo.com | Trainer@123 |
+| Aluno | student@demo.com | Student@123 |
+| Nutri | nutri@demo.com | Nutri@123 |
+| Admin | admin@fitsaas.com | Admin@123 |
