@@ -379,4 +379,173 @@ export class EmailService {
       return { sent: false, error: err.message };
     }
   }
+
+  /**
+   * Envia lembrete de treino por email para o aluno.
+   */
+  async sendWorkoutReminder(data: {
+    to: string;
+    studentName: string;
+    workoutName: string;
+    trainerName: string;
+  }): Promise<{ sent: boolean; error?: string }> {
+    const apiKey = this.config.get('RESEND_API_KEY');
+    if (!apiKey) {
+      console.log(`[EMAIL] RESEND_API_KEY not set — would send workout reminder to ${data.to}`);
+      return { sent: false, error: 'RESEND_API_KEY não configurado' };
+    }
+
+    const frontendUrl = this.config.get('FRONTEND_URL', 'https://fitlynutri.com.br');
+    const workoutUrl = `${frontendUrl}/student/workout`;
+    const fromEmail = this.config.get('RESEND_FROM', 'onboarding@resend.dev');
+    const from = fromEmail.includes('@') && !fromEmail.includes('<') ? `Fitlynutri <${fromEmail}>` : fromEmail;
+
+    const html = `
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#0f0f1a;font-family:'Segoe UI',Arial,sans-serif">
+  <div style="max-width:560px;margin:32px auto;background:#1a1a2e;border-radius:16px;overflow:hidden;border:1px solid rgba(255,255,255,0.08)">
+    <div style="background:linear-gradient(135deg,#7c3aed,#2563eb);padding:32px 24px;text-align:center">
+      <div style="font-size:28px;font-weight:800;color:#fff;letter-spacing:-0.5px">💪 Hora de Treinar!</div>
+      <div style="color:rgba(255,255,255,0.8);font-size:14px;margin-top:4px">Seu corpo está pronto para mais um desafio</div>
+    </div>
+    <div style="padding:32px 24px">
+      <p style="color:#e2e8f0;font-size:16px;margin:0 0 8px">Olá, <strong>${data.studentName}</strong>!</p>
+      <p style="color:#94a3b8;font-size:14px;margin:0 0 24px">
+        Seu treino de hoje te espera na plataforma:
+      </p>
+      <div style="background:rgba(124,58,237,0.1);border:1px solid rgba(124,58,237,0.3);border-radius:12px;padding:20px;margin-bottom:24px;text-align:center">
+        <p style="color:#a78bfa;font-size:20px;font-weight:700;margin:0">${data.workoutName}</p>
+        <p style="color:#94a3b8;font-size:12px;margin:4px 0 0">com ${data.trainerName}</p>
+      </div>
+      <p style="color:#94a3b8;font-size:13px;margin:0 0 24px">
+        🎯 Cada treino te deixa mais próximo dos seus objetivos. Não deixe pra depois!
+      </p>
+      <div style="text-align:center;margin-bottom:24px">
+        <a href="${workoutUrl}" style="display:inline-block;background:linear-gradient(135deg,#7c3aed,#2563eb);color:#fff;text-decoration:none;padding:14px 32px;border-radius:12px;font-weight:700;font-size:15px">
+          Ver treino de hoje →
+        </a>
+      </div>
+    </div>
+    <div style="padding:16px 24px;border-top:1px solid rgba(255,255,255,0.06);text-align:center">
+      <p style="color:#475569;font-size:12px;margin:0">© 2026 Fitlynutri · Todos os direitos reservados</p>
+    </div>
+  </div>
+</body>
+</html>`;
+
+    try {
+      const res = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          from,
+          to: [data.to],
+          subject: `💪 Hora do treino: ${data.workoutName} — Fitlynutri`,
+          html,
+        }),
+      });
+      const json = await res.json() as any;
+      if (!res.ok) {
+        console.error('[EMAIL] Resend error:', json);
+        return { sent: false, error: json?.message || 'Erro ao enviar' };
+      }
+      console.log(`[EMAIL] Workout reminder sent to ${data.to} — id: ${json.id}`);
+      return { sent: true };
+    } catch (err: any) {
+      console.error('[EMAIL] Resend exception:', err.message);
+      return { sent: false, error: err.message };
+    }
+  }
+
+  /**
+   * Alerta o personal trainer por email quando um aluno está inativo há 7+ dias.
+   */
+  async sendInactivityAlert(data: {
+    to: string;
+    trainerName: string;
+    studentName: string;
+    lastTrainDate: string;
+    daysInactive: number;
+  }): Promise<{ sent: boolean; error?: string }> {
+    const apiKey = this.config.get('RESEND_API_KEY');
+    if (!apiKey) {
+      console.log(`[EMAIL] RESEND_API_KEY not set — would send inactivity alert to ${data.to}`);
+      return { sent: false, error: 'RESEND_API_KEY não configurado' };
+    }
+
+    const frontendUrl = this.config.get('FRONTEND_URL', 'https://fitlynutri.com.br');
+    const studentsUrl = `${frontendUrl}/trainer/students`;
+    const fromEmail = this.config.get('RESEND_FROM', 'onboarding@resend.dev');
+    const from = fromEmail.includes('@') && !fromEmail.includes('<') ? `Fitlynutri <${fromEmail}>` : fromEmail;
+
+    const html = `
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#0f0f1a;font-family:'Segoe UI',Arial,sans-serif">
+  <div style="max-width:560px;margin:32px auto;background:#1a1a2e;border-radius:16px;overflow:hidden;border:1px solid rgba(255,255,255,0.08)">
+    <div style="background:linear-gradient(135deg,#f59e0b,#ef4444);padding:32px 24px;text-align:center">
+      <div style="font-size:28px;font-weight:800;color:#fff;letter-spacing:-0.5px">⚠️ Aluno Inativo</div>
+      <div style="color:rgba(255,255,255,0.8);font-size:14px;margin-top:4px">Não deixe seu aluno desmotivar!</div>
+    </div>
+    <div style="padding:32px 24px">
+      <p style="color:#e2e8f0;font-size:16px;margin:0 0 8px">Olá, <strong>${data.trainerName}</strong>!</p>
+      <p style="color:#94a3b8;font-size:14px;margin:0 0 24px">
+        O aluno(a) <strong style="color:#f59e0b">${data.studentName}</strong> está sem treinar há <strong>${data.daysInactive} dias</strong>.
+      </p>
+      <div style="background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.3);border-radius:12px;padding:20px;margin-bottom:24px">
+        <div style="margin-bottom:8px">
+          <div style="color:#94a3b8;font-size:11px;text-transform:uppercase;letter-spacing:1px;margin-bottom:2px">Aluno</div>
+          <div style="color:#f59e0b;font-size:16px;font-weight:600">${data.studentName}</div>
+        </div>
+        <div style="margin-bottom:8px">
+          <div style="color:#94a3b8;font-size:11px;text-transform:uppercase;letter-spacing:1px;margin-bottom:2px">Último treino</div>
+          <div style="color:#e2e8f0;font-size:14px;font-weight:600">${data.lastTrainDate}</div>
+        </div>
+        <div>
+          <div style="color:#94a3b8;font-size:11px;text-transform:uppercase;letter-spacing:1px;margin-bottom:2px">Dias inativo</div>
+          <div style="color:#ef4444;font-size:20px;font-weight:700">${data.daysInactive} dias</div>
+        </div>
+      </div>
+      <p style="color:#94a3b8;font-size:13px;margin:0 0 24px">
+        📞 Que tal entrar em contato? Um simples "como você está?" pode fazer toda diferença na motivação do seu aluno!
+      </p>
+      <div style="text-align:center;margin-bottom:24px">
+        <a href="${studentsUrl}" style="display:inline-block;background:linear-gradient(135deg,#f59e0b,#ef4444);color:#fff;text-decoration:none;padding:14px 32px;border-radius:12px;font-weight:700;font-size:15px">
+          Ver meus alunos →
+        </a>
+      </div>
+    </div>
+    <div style="padding:16px 24px;border-top:1px solid rgba(255,255,255,0.06);text-align:center">
+      <p style="color:#475569;font-size:12px;margin:0">© 2026 Fitlynutri · Todos os direitos reservados</p>
+    </div>
+  </div>
+</body>
+</html>`;
+
+    try {
+      const res = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          from,
+          to: [data.to],
+          subject: `⚠️ ${data.studentName} está há ${data.daysInactive} dias sem treinar — Fitlynutri`,
+          html,
+        }),
+      });
+      const json = await res.json() as any;
+      if (!res.ok) {
+        console.error('[EMAIL] Resend error:', json);
+        return { sent: false, error: json?.message || 'Erro ao enviar' };
+      }
+      console.log(`[EMAIL] Inactivity alert sent to ${data.to} — id: ${json.id}`);
+      return { sent: true };
+    } catch (err: any) {
+      console.error('[EMAIL] Resend exception:', err.message);
+      return { sent: false, error: err.message };
+    }
+  }
 }

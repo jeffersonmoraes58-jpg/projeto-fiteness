@@ -2,12 +2,14 @@ import { Injectable } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from './notifications.service';
+import { EmailService } from '../email/email.service';
 
 @Injectable()
 export class NotificationsScheduler {
   constructor(
     private prisma: PrismaService,
     private notifications: NotificationsService,
+    private emailService: EmailService,
   ) {}
 
   // Lembrete de treino — 7h todo dia

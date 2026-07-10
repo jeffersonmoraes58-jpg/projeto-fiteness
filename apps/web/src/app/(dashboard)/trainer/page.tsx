@@ -4,7 +4,7 @@ import { motion } from 'framer-motion';
 import {
   Users, Dumbbell, TrendingUp, DollarSign,
   Activity, Calendar, MessageCircle, Star, Trophy,
-  ArrowUpRight, Plus, ChevronRight, Brain,
+  ArrowUpRight, Plus, ChevronRight, Brain, Zap,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
@@ -36,6 +36,12 @@ export default function TrainerDashboard() {
   const { data: students } = useQuery({
     queryKey: ['trainer-students'],
     queryFn: () => api.get('/trainers/me/students').then((r) => r.data.data),
+  });
+
+  const { data: analytics } = useQuery({
+    queryKey: ['trainer-analytics'],
+    queryFn: () => api.get('/trainers/me/analytics').then((r) => r.data.data),
+    refetchInterval: 5 * 60 * 1000, // refresh a cada 5 min
   });
 
   return (
@@ -147,6 +153,102 @@ export default function TrainerDashboard() {
           </Link>
         </div>
       </div>
+
+      {/* Analytics Section */}
+      {analytics && (
+        <div className="space-y-4">
+          <div className="flex items-center gap-2">
+            <TrendingUp className="w-5 h-5 text-purple-400" />
+            <h2 className="font-semibold text-lg">Analytics de Engajamento</h2>
+            <span className="text-xs text-muted-foreground ml-2">Últimos 30 dias</span>
+          </div>
+
+          {/* KPI Cards */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {[
+              { label: 'Alunos Ativos (semana)', value: `${analytics.activeStudentsThisWeek}/${analytics.activeStudents}`, icon: Users, color: 'text-emerald-400', sub: `${analytics.avgCheckinsPerStudentWeek} treinos/aluno` },
+              { label: 'Taxa de Conclusão', value: `${analytics.completionRate}%`, icon: Activity, color: 'text-blue-400', sub: `${analytics.totalCheckinsWeek} check-ins` },
+              { label: 'Sentimento Positivo', value: `${analytics.sentiments}%`, icon: Star, color: 'text-yellow-400', sub: 'últimos 7 dias' },
+              { label: 'Streak Médio', value: `${analytics.avgStreak}🔥`, icon: Zap, color: 'text-orange-400', sub: `${analytics.retentionRate}% retenção` },
+            ].map((kpi, i) => (
+              <motion.div
+                key={kpi.label}
+                initial={{ opacity: 0, y: 16 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.1 * i }}
+                className="glass-card"
+              >
+                <kpi.icon className={`w-5 h-5 ${kpi.color} mb-2`} />
+                <div className="text-xl font-bold">{kpi.value}</div>
+                <div className="text-xs text-muted-foreground">{kpi.label}</div>
+                <div className="text-[10px] text-muted-foreground mt-0.5">{kpi.sub}</div>
+              </motion.div>
+            ))}
+          </div>
+
+          {/* Risk Alert + Trend Row */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {/* Alunos em Risco */}
+            <div className={`glass-card border ${analytics.atRiskStudents > 0 ? 'border-red-500/30 bg-red-500/5' : 'border-emerald-500/30 bg-emerald-500/5'}`}>
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-semibold flex items-center gap-2">
+                  {analytics.atRiskStudents > 0 ? '⚠️' : '✅'} Alunos em Risco
+                </h3>
+                <span className={`text-xs px-2 py-0.5 rounded-full ${analytics.atRiskStudents > 0 ? 'bg-red-500/20 text-red-400' : 'bg-emerald-500/20 text-emerald-400'}`}>
+                  {analytics.atRiskStudents} sem treinar há 7+ dias
+                </span>
+              </div>
+              {analytics.atRiskStudents > 0 ? (
+                <p className="text-xs text-muted-foreground">
+                  {analytics.atRiskList?.slice(0, 3).map((s: any) => s.name).join(', ') || 'Alguns alunos'} precisam de atenção. Que tal enviar uma mensagem motivacional?
+                </p>
+              ) : (
+                <p className="text-xs text-muted-foreground">Todos os alunos ativos treinaram nos últimos 7 dias. Excelente trabalho! 🎉</p>
+              )}
+            </div>
+
+            {/* Crescimento Semanal */}
+            <div className="glass-card">
+              <h3 className="text-sm font-semibold mb-3">Comparativo Semanal</h3>
+              <div className="flex items-end gap-4">
+                <div>
+                  <div className="text-2xl font-bold">{analytics.totalCheckinsWeek}</div>
+                  <div className="text-xs text-muted-foreground">Check-ins esta semana</div>
+                </div>
+                <div className={`flex items-center gap-1 text-sm font-medium ${analytics.weekGrowth >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                  <TrendingUp className={`w-4 h-4 ${analytics.weekGrowth < 0 ? 'rotate-180' : ''}`} />
+                  {analytics.weekGrowth > 0 ? '+' : ''}{analytics.weekGrowth}%
+                </div>
+                <div className="text-xs text-muted-foreground">vs semana anterior</div>
+              </div>
+            </div>
+          </div>
+
+          {/* 30-Day Trend Mini Chart */}
+          <div className="glass-card">
+            <h3 className="text-sm font-semibold mb-4">Tendência de Check-ins (30 dias)</h3>
+            <div className="flex items-end gap-0.5 h-20">
+              {analytics.dailyTrend?.map((d: any, i: number) => {
+                const max = Math.max(...(analytics.dailyTrend?.map((t: any) => t.count) || [1]), 1);
+                return (
+                  <motion.div
+                    key={i}
+                    initial={{ height: 0 }}
+                    animate={{ height: `${Math.max((d.count / max) * 100, 2)}%` }}
+                    transition={{ duration: 0.3, delay: i * 0.01 }}
+                    className="flex-1 bg-gradient-to-t from-purple-600 to-indigo-600 rounded-t-sm opacity-70 hover:opacity-100 transition-opacity min-h-[2px]"
+                    title={`${d.date}: ${d.count} check-ins`}
+                  />
+                );
+              })}
+            </div>
+            <div className="flex justify-between mt-2 text-[10px] text-muted-foreground">
+              <span>30 dias atrás</span>
+              <span>Hoje</span>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Weekly overview */}
       <div className="glass-card">

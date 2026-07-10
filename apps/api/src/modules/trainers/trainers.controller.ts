@@ -82,4 +82,10 @@ export class TrainersController {
   sendAnamneseLink(@CurrentUser() user: any, @Param('studentUserId') studentUserId: string) {
     return this.service.sendAnamneseLink(user.id, studentUserId);
   }
+
+  @Get('me/analytics')
+  @ApiOperation({ summary: 'Analytics de engajamento do trainer' })
+  getAnalytics(@CurrentUser() user: any) {
+    return this.service.getAnalytics(user.id);
+  }
 }

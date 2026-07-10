@@ -304,6 +304,173 @@ export class TrainersService {
     return result;
   }
 
+  async getAnalytics(userId: string) {
+    const trainer = await this.getTrainer(userId);
+
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 86400000);
+    const sevenDaysAgo = new Date(Date.now() - 7 * 86400000);
+
+    // Buscar todos os dados em paralelo
+    const [
+      allStudents,
+      totalWorkouts,
+      recentLogs,
+      weeklyLogs,
+      monthlyLogs,
+    ] = await Promise.all([
+      // Todos os alunos (ativos e inativos)
+      this.prisma.trainerStudent.findMany({
+        where: { trainerId: trainer.id },
+        include: {
+          student: {
+            select: {
+              id: true,
+              streak: true,
+              points: true,
+              goalType: true,
+              user: { select: { createdAt: true } },
+            },
+          },
+        },
+      }),
+      this.prisma.workout.count({
+        where: { trainerId: trainer.id, NOT: { tags: { has: '__personalized' } } },
+      }),
+      // Logs dos últimos 7 dias (para calcular alunos ativos na semana)
+      this.prisma.workoutLog.findMany({
+        where: {
+          workoutPlan: { workout: { trainerId: trainer.id } },
+          completedAt: { gte: sevenDaysAgo },
+        },
+        select: { studentId: true, completedAt: true, status: true, feeling: true },
+      }),
+      // Weekly checkins
+      this.prisma.workoutLog.findMany({
+        where: {
+          workoutPlan: { workout: { trainerId: trainer.id } },
+          completedAt: { gte: sevenDaysAgo },
+        },
+        select: { completedAt: true },
+      }),
+      // Monthly logs para tendências
+      this.prisma.workoutLog.findMany({
+        where: {
+          workoutPlan: { workout: { trainerId: trainer.id } },
+          completedAt: { gte: thirtyDaysAgo },
+        },
+        select: { studentId: true, completedAt: true },
+      }),
+    ]);
+
+    // ─── Métricas calculadas ──────────────────────────────────────────
+
+    // Total de alunos
+    const totalStudents = allStudents.length;
+    const activeStudents = allStudents.filter((s) => s.isActive).length;
+
+    // Alunos ativos nos últimos 7 dias (treinaram pelo menos 1x)
+    const activeStudentsThisWeek = new Set(recentLogs.map((l) => l.studentId)).size;
+
+    // Alunos EM RISCO (não treinaram nos últimos 7 dias, mas estão ativos)
+    const activeStudentIds = new Set(allStudents.filter((s) => s.isActive).map((s) => s.student.id));
+    const trainedStudentIds = new Set(recentLogs.map((l) => l.studentId));
+    const atRiskStudents = [...activeStudentIds].filter((id) => !trainedStudentIds.has(id)).length;
+    const atRiskList = allStudents
+      .filter((s) => s.isActive && !trainedStudentIds.has(s.student.id))
+      .slice(0, 10)
+      .map((s) => ({
+        studentId: s.studentId,
+        name: `${s.student.user?.createdAt ? 'Aluno' : 'Aluno'}`,
+        streak: s.student.streak,
+        goalType: s.student.goalType,
+      }));
+
+    // Taxa de conclusão (logs completos vs incompletos)
+    const completedLogs = recentLogs.filter((l) => l.status === 'COMPLETED').length;
+    const completionRate = recentLogs.length > 0
+      ? Math.round((completedLogs / recentLogs.length) * 100)
+      : 0;
+
+    // Streak médio
+    const avgStreak = activeStudents > 0
+      ? Math.round(allStudents.filter((s) => s.isActive).reduce((sum, s) => sum + (s.student.streak || 0), 0) / activeStudents)
+      : 0;
+
+    // Sentimento dos treinos
+    const feelingCounts: Record<string, number> = { GREAT: 0, GOOD: 0, AVERAGE: 0, BAD: 0, TERRIBLE: 0 };
+    recentLogs.forEach((l) => { if (l.feeling) feelingCounts[l.feeling] = (feelingCounts[l.feeling] || 0) + 1; });
+    const positiveFeelings = (feelingCounts.GREAT || 0) + (feelingCounts.GOOD || 0);
+    const sentiments = recentLogs.length > 0
+      ? Math.round((positiveFeelings / recentLogs.length) * 100)
+      : 0;
+
+    // Total de checkins (mês e semana)
+    const totalCheckinsMonth = monthlyLogs.length;
+    const totalCheckinsWeek = weeklyLogs.length;
+    const avgCheckinsPerStudentWeek = activeStudents > 0
+      ? (totalCheckinsWeek / activeStudents).toFixed(1)
+      : '0';
+
+    // Tendência de checkins diários (30 dias)
+    const dailyMap: Record<string, number> = {};
+    monthlyLogs.forEach((l) => {
+      const key = this.toBRDate(l.completedAt);
+      dailyMap[key] = (dailyMap[key] || 0) + 1;
+    });
+    const dailyTrend: { date: string; count: number }[] = [];
+    for (let i = 29; i >= 0; i--) {
+      const d = new Date(Date.now() - i * 86400000);
+      const key = this.toBRDate(d);
+      dailyTrend.push({ date: key, count: dailyMap[key] || 0 });
+    }
+
+    // Tendência semanal (comparação com semana anterior)
+    const previousWeekLogs = await this.prisma.workoutLog.count({
+      where: {
+        workoutPlan: { workout: { trainerId: trainer.id } },
+        completedAt: { gte: new Date(Date.now() - 14 * 86400000), lt: sevenDaysAgo },
+      },
+    });
+    const weekGrowth = previousWeekLogs > 0
+      ? Math.round(((totalCheckinsWeek - previousWeekLogs) / previousWeekLogs) * 100)
+      : 0;
+
+    // Receita mensal
+    const fees = allStudents
+      .filter((s) => s.isActive)
+      .reduce((sum, s) => sum + (s.monthlyFee || 0), 0);
+
+    // Retenção (alunos que entraram há mais de 30 dias e ainda estão ativos)
+    const joinedLongAgo = allStudents.filter((s) =>
+      s.isActive && new Date(s.student.user.createdAt) < thirtyDaysAgo,
+    ).length;
+    const retentionRate = allStudents.length > 0
+      ? Math.round((joinedLongAgo / allStudents.length) * 100)
+      : 100;
+
+    return {
+      totalStudents,
+      activeStudents,
+      activeStudentsThisWeek,
+      atRiskStudents,
+      atRiskList,
+      completionRate,
+      avgStreak,
+      sentiments,
+      totalCheckinsMonth,
+      totalCheckinsWeek,
+      avgCheckinsPerStudentWeek,
+      weekGrowth,
+      revenue: fees,
+      totalWorkouts,
+      retentionRate,
+      dailyTrend,
+      feelingBreakdown: feelingCounts,
+    };
+  }
+
   async update(userId: string, data: any) {
     const trainer = await this.getTrainer(userId);
     const { profile, trainer: trainerData } = data;
