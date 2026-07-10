@@ -51,10 +51,12 @@ interface AnalysisResult {
 }
 
 const SUGGESTIONS = [
-  { icon: Dumbbell, label: 'Monte um treino de hipertrofia para iniciantes 3x por semana', color: 'text-purple-400' },
-  { icon: Target, label: 'Crie um programa periodizado de 12 semanas para ganho de força', color: 'text-cyan-400' },
-  { icon: TrendingUp, label: 'Monte um treino HIIT de 30 minutos para perda de gordura', color: 'text-emerald-400' },
-  { icon: Zap, label: 'Sugira exercícios de mobilidade e aquecimento para treino de pernas', color: 'text-orange-400' },
+  { icon: Dumbbell, label: 'Crie um treino de hipertrofia para superiores (intermediário, 4x/semana)', color: 'text-purple-400' },
+  { icon: Target, label: 'Monte um programa de periodização ondulatória de 8 semanas para força', color: 'text-cyan-400' },
+  { icon: TrendingUp, label: 'Crie um treino de pernas completo com foco em glúteo e posterior', color: 'text-emerald-400' },
+  { icon: Zap, label: 'Quais os melhores exercícios para corrigir desequilíbrio postural?', color: 'text-orange-400' },
+  { icon: Brain, label: 'Analise se o volume de treino atual está adequado para hipertrofia', color: 'text-violet-400' },
+  { icon: FlaskConical, label: 'Como periodizar a progressão de carga para um aluno estagnado?', color: 'text-rose-400' },
 ];
 
 // ─── Main page ────────────────────────────────────────────────────────────────
@@ -114,7 +116,7 @@ function ChatTab() {
     {
       id: '0',
       role: 'assistant',
-      content: 'Olá! Sou sua assistente de IA especializada em fitness e treinamento. Posso ajudar com:\n\n• Criação de programas de treino personalizados\n• Periodização e progressão de cargas\n• Exercícios alternativos e substituições\n• Estratégias para objetivos específicos\n\n📎 **Novidade!** Agora você pode anexar arquivos PDF com treinos prontos e a IA vai ler e criar os exercícios automaticamente no sistema!',
+      content: '👋 Olá! Sou a **Fitly IA**, sua Personal Trainer Expert de elite.\n\nCom conhecimento equivalente a um PhD em Ciências do Exercício e 20+ anos de experiência prática, estou aqui para ajudar você a criar os melhores treinos para seus alunos.\n\n**O que posso fazer:**\n🏋️ Criar treinos completos e periodizados (hipertrofia, força, emagrecimento, reabilitação)\n📊 Analisar volume, intensidade, simetria e progressão de carga\n🔄 Sugerir exercícios alternativos com justificativa biomecânica\n📅 Montar periodização (linear, ondulatória, blocos)\n🧠 Explicar a ciência por trás de cada recomendação\n👵 Adaptar treinos para populações especiais (idosos, gestantes, adolescentes)\n\n📎 **Arraste ou anexe PDFs** de treinos para eu importar automaticamente!\n\n💬 Me pergunte qualquer coisa sobre treinamento — quanto mais específico você for, mais precisa será minha resposta.',
       timestamp: new Date(),
     },
   ]);
