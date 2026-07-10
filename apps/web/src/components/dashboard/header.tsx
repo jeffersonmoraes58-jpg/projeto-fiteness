@@ -9,6 +9,7 @@ import { api } from '@/lib/api';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import toast, { Toaster } from 'react-hot-toast';
+import { PushNotificationManager } from '@/components/push-notification-manager';
 
 const TYPE_CONFIG: Record<string, { icon: any; color: string; bg: string }> = {
   INFO: { icon: Info, color: 'text-blue-400', bg: 'bg-blue-500/10' },
@@ -229,6 +230,9 @@ export function DashboardHeader() {
             )}
           </AnimatePresence>
         </div>
+
+        {/* Push Notification Toggle */}
+        <PushNotificationManager />
 
         {/* User avatar */}
         <div className="flex items-center gap-2 ml-1">

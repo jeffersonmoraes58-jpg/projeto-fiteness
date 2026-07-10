@@ -22,7 +22,7 @@ export function PushNotificationManager() {
   // Busca a VAPID public key da API
   useEffect(() => {
     api.get('/push/vapid-public-key')
-      .then((r) => setVapidKey(r.data?.publicKey ?? r.data))
+      .then((r) => setVapidKey(r.data?.data?.publicKey ?? r.data?.publicKey ?? r.data))
       .catch(() => {
         // Se a API não tiver o endpoint, usa uma chave padrão
         // Em produção, gere com: npx web-push generate-vapid-keys
