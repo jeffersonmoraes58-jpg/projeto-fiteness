@@ -89,6 +89,12 @@ export class AdminController {
     return this.service.updateUser(id, body);
   }
 
+  @Patch('users/:id/plan-override')
+  @ApiOperation({ summary: 'Definir ou remover override de plano para um usuário específico' })
+  updateUserPlanOverride(@Param('id') id: string, @Body() body: { planOverride?: string | null }) {
+    return this.service.updateUserPlanOverride(id, body.planOverride ?? null);
+  }
+
   // ── Notificações em massa ─────────────────────────────────
 
   @Get('notifications')

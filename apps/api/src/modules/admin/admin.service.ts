@@ -417,6 +417,19 @@ export class AdminService {
     return this.prisma.user.update({ where: { id }, data: data as any });
   }
 
+  async updateUserPlanOverride(id: string, planOverride: string | null) {
+    const user = await this.prisma.user.findUnique({ where: { id } });
+    if (!user) throw new NotFoundException('Usuário não encontrado');
+    const plan = planOverride ? (planOverride as SubscriptionPlan) : null;
+    if (planOverride && !Object.values(SubscriptionPlan).includes(plan!)) {
+      throw new NotFoundException(`Plano inválido: ${planOverride}`);
+    }
+    return this.prisma.user.update({
+      where: { id },
+      data: { planOverride: plan },
+    });
+  }
+
   // ── Notificações em massa (admin platform-wide) ─────────────
 
   async listBroadcasts() {
