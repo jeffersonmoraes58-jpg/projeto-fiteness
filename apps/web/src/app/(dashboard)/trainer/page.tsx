@@ -10,6 +10,16 @@ import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 
+const GOAL_LABELS: Record<string, string> = {
+  LOSE_WEIGHT: 'Perda de peso',
+  GAIN_MUSCLE: 'Ganho muscular',
+  MAINTAIN_WEIGHT: 'Manutenção',
+  IMPROVE_ENDURANCE: 'Resistência',
+  INCREASE_FLEXIBILITY: 'Flexibilidade',
+  ATHLETIC_PERFORMANCE: 'Performance',
+  REHABILITATION: 'Reabilitação',
+};
+
 const statCards = [
   { key: 'totalStudents', label: 'Alunos Ativos', icon: Users, color: 'from-purple-600 to-indigo-600', prefix: '' },
   { key: 'totalWorkouts', label: 'Treinos Criados', icon: Dumbbell, color: 'from-cyan-600 to-blue-600', prefix: '' },
@@ -183,7 +193,7 @@ function StudentRow({ student, index }: { student: any; index: number }) {
         <div className="text-sm font-medium truncate">
           {student.user.profile?.firstName} {student.user.profile?.lastName}
         </div>
-        <div className="text-xs text-muted-foreground truncate">{student.goalType || 'Sem objetivo definido'}</div>
+        <div className="text-xs text-muted-foreground truncate">{GOAL_LABELS[student.goalType] || student.goalType || 'Sem objetivo definido'}</div>
       </div>
       <div className="flex items-center gap-1.5 flex-shrink-0">
         <span className={`hidden xs:inline text-xs px-2 py-0.5 rounded-full ${student.isActive ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'}`}>
