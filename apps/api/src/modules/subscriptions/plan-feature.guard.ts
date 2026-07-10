@@ -2,7 +2,7 @@ import { Injectable, CanActivate, ExecutionContext, ForbiddenException } from '@
 import { Reflector } from '@nestjs/core';
 import { SubscriptionService } from './subscription.service';
 import { REQUIRE_FEATURE_KEY } from './require-feature.decorator';
-import { PlanFeature } from '../../common/plan-limits';
+import { PlanFeature, PLAN_LIMITS } from '../../common/plan-limits';
 
 @Injectable()
 export class PlanFeatureGuard implements CanActivate {
@@ -21,11 +21,25 @@ export class PlanFeatureGuard implements CanActivate {
 
     const request = context.switchToHttp().getRequest();
     const tenantId = request.user?.tenantId;
+    const userId = request.user?.id;
 
     if (!tenantId) throw new ForbiddenException('Tenant não identificado');
 
-    for (const feature of features) {
-      await this.subscriptionService.checkFeature(tenantId, feature);
+    // Se o usuário tem planOverride, usa o plano efetivo (ignora checkFeature do tenant)
+    if (userId) {
+      const effectivePlan = await this.subscriptionService.getEffectivePlan(tenantId, userId);
+      for (const feature of features) {
+        const limits = PLAN_LIMITS[effectivePlan];
+        if (!limits[feature as keyof typeof limits] || limits[feature as keyof typeof limits] === false) {
+          throw new ForbiddenException(
+            `A funcionalidade "${feature}" não está disponível no seu plano. Faça upgrade para continuar.`,
+          );
+        }
+      }
+    } else {
+      for (const feature of features) {
+        await this.subscriptionService.checkFeature(tenantId, feature);
+      }
     }
 
     return true;

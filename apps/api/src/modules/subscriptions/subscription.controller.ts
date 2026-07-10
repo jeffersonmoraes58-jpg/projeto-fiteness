@@ -15,8 +15,11 @@ export class SubscriptionController {
 
   @Get('my')
   @ApiOperation({ summary: 'Retorna o plano atual e limites de features do tenant' })
-  getMyPlan(@CurrentUser('tenantId') tenantId: string) {
-    return this.subscriptionService.getMyPlan(tenantId);
+  getMyPlan(
+    @CurrentUser('tenantId') tenantId: string,
+    @CurrentUser('id') userId: string,
+  ) {
+    return this.subscriptionService.getMyPlan(tenantId, userId);
   }
 
   @Post('checkout')

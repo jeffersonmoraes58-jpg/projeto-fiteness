@@ -160,13 +160,13 @@ export class SubscriptionService {
     return sub?.plan ?? SubscriptionPlan.FREE;
   }
 
-  async getMyPlan(tenantId: string) {
+  async getMyPlan(tenantId: string, userId?: string) {
+    const plan = await this.getEffectivePlan(tenantId, userId);
+    const limits = PLAN_LIMITS[plan];
+    const displayName = PLAN_DISPLAY_NAMES[plan];
     const sub = await this.prisma.tenantSubscription.findUnique({
       where: { tenantId },
     });
-    const plan = sub?.plan ?? SubscriptionPlan.FREE;
-    const limits = PLAN_LIMITS[plan];
-    const displayName = PLAN_DISPLAY_NAMES[plan];
     return { plan, displayName, limits, subscription: sub };
   }
 
