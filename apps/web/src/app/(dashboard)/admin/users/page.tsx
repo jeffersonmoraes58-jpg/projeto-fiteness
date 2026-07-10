@@ -194,7 +194,7 @@ export default function AdminUsers() {
       </div>
 
       {/* Table */}
-      <div className="glass-card !p-0 overflow-hidden">
+      <div className="glass-card !p-0 overflow-visible">
         {/* Header row */}
         <div className="grid grid-cols-[2fr_1.5fr_1fr_1fr_1fr_80px] gap-4 px-4 py-3 border-b border-border/50 text-xs text-muted-foreground font-medium">
           <span>Usuário</span>
