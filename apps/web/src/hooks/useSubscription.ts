@@ -46,7 +46,7 @@ export function useSubscription() {
     queryKey: ['subscription-my'],
     queryFn: () => api.get('/subscriptions/my').then((r) => r.data?.data ?? r.data),
     enabled: !!user && user.role !== 'ADMIN',
-    staleTime: 5 * 60 * 1000,
+    staleTime: 0,
   });
 
   const plan: SubscriptionPlan = data?.plan ?? 'FREE';
