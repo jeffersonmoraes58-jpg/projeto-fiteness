@@ -174,6 +174,22 @@ export class SubscriptionService {
    * Bloqueia ação se a assinatura do tenant estiver EXPIRED/CANCELED/PAST_DUE.
    * Plano FREE ACTIVE passa normalmente (nunca expira).
    */
+  /**
+   * Resolve o plano efetivo de um usuário.
+   * Se o user tem planOverride definido, usa ele.
+   * Caso contrário, usa o plano do tenant.
+   */
+  async getEffectivePlan(tenantId: string, userId?: string): Promise<SubscriptionPlan> {
+    if (userId) {
+      const user = await this.prisma.user.findUnique({
+        where: { id: userId },
+        select: { planOverride: true },
+      });
+      if (user?.planOverride) return user.planOverride;
+    }
+    return this.getTenantPlan(tenantId);
+  }
+
   async assertSubscriptionActive(tenantId: string): Promise<void> {
     const sub = await this.prisma.tenantSubscription.findUnique({
       where: { tenantId },

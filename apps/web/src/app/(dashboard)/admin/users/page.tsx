@@ -30,6 +30,13 @@ const ROLE_ICONS: Record<string, any> = {
   ADMIN: Shield, STUDIO_OWNER: UserCog,
 };
 
+const PLAN_OPTIONS: Record<string, string> = {
+  FREE: 'Free',
+  BASIC: 'Starter',
+  PRO: 'Pro',
+  ENTERPRISE: 'Elite',
+};
+
 export default function AdminUsers() {
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState('Todos');
@@ -65,6 +72,16 @@ export default function AdminUsers() {
       toast.success('Perfil atualizado');
     },
     onError: () => toast.error('Erro ao atualizar perfil'),
+  });
+
+  const planOverrideMutation = useMutation({
+    mutationFn: ({ id, planOverride }: { id: string; planOverride: string | null }) =>
+      api.patch(`/admin/users/${id}/plan-override`, { planOverride }),
+    onSuccess: (_, { planOverride }) => {
+      queryClient.invalidateQueries({ queryKey: ['admin-users'] });
+      toast.success(planOverride ? `Acesso definido como ${planOverride}` : 'Acesso padrão restaurado');
+    },
+    onError: () => toast.error('Erro ao alterar acesso'),
   });
 
   const exportCsv = () => {
@@ -208,6 +225,8 @@ export default function AdminUsers() {
                 index={i}
                 onToggleActive={() => toggleActiveMutation.mutate({ id: user.id, isActive: !user.isActive })}
                 onChangeRole={(role) => changeRoleMutation.mutate({ id: user.id, role })}
+                planOverride={user.planOverride}
+                onPlanOverride={(po: string | null) => planOverrideMutation.mutate({ id: user.id, planOverride: po })}
               />
             ))
           ) : (
@@ -381,8 +400,9 @@ function CreateUserModal({ onClose, onCreated }: { onClose: () => void; onCreate
   );
 }
 
-function UserRow({ user, index, onToggleActive, onChangeRole }: {
+function UserRow({ user, index, onToggleActive, onChangeRole, planOverride, onPlanOverride }: {
   user: any; index: number; onToggleActive: () => void; onChangeRole: (r: string) => void;
+  planOverride?: string; onPlanOverride?: (po: string | null) => void;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [roleMenuOpen, setRoleMenuOpen] = useState(false);
@@ -469,7 +489,7 @@ function UserRow({ user, index, onToggleActive, onChangeRole }: {
           <MoreVertical className="w-4 h-4 text-muted-foreground" />
         </button>
         {menuOpen && (
-          <div className="absolute right-0 top-9 bg-card border border-border rounded-xl shadow-xl z-20 py-1 w-40">
+          <div className="absolute right-0 top-9 bg-card border border-border rounded-xl shadow-xl z-20 py-1 w-44">
             <button
               onClick={() => { onToggleActive(); setMenuOpen(false); }}
               className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-accent transition-all"
@@ -479,6 +499,31 @@ function UserRow({ user, index, onToggleActive, onChangeRole }: {
                 : <><CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />Ativar</>
               }
             </button>
+            <div className="border-t border-border/50 my-0.5" />
+            <div className="px-3 py-1.5 text-[10px] text-muted-foreground font-medium uppercase tracking-wide">Acesso</div>
+            {Object.entries(PLAN_OPTIONS).map(([key, label]) => (
+              <button
+                key={key}
+                onClick={() => { onPlanOverride?.(key); setMenuOpen(false); }}
+                className={cn(
+                  'w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-accent transition-all',
+                  planOverride === key && 'text-primary',
+                )}
+              >
+                {planOverride === key && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />}
+                <span>{label}</span>
+              </button>
+            ))}
+            {planOverride && (
+              <button
+                onClick={() => { onPlanOverride?.(null); setMenuOpen(false); }}
+                className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-red-500/10 text-red-400 transition-all"
+              >
+                <XCircle className="w-3.5 h-3.5" />
+                Remover acesso especial
+              </button>
+            )}
+            <div className="border-t border-border/50 my-0.5" />
             <a
               href={`mailto:${user.email}`}
               onClick={() => setMenuOpen(false)}
