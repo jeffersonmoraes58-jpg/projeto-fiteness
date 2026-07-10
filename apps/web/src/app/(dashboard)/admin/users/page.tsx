@@ -479,13 +479,14 @@ function UserRow({ user, index, onToggleActive, onChangeRole }: {
                 : <><CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />Ativar</>
               }
             </button>
-            <button
+            <a
+              href={`mailto:${user.email}`}
               onClick={() => setMenuOpen(false)}
               className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-accent transition-all"
             >
               <Mail className="w-3.5 h-3.5" />
               Enviar e-mail
-            </button>
+            </a>
           </div>
         )}
       </div>
