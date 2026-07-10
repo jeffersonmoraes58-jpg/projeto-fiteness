@@ -187,7 +187,7 @@ export class AdminService {
       this.prisma.tenant.count({ where: { createdAt: { gte: thirtyDaysAgo } } }),
       this.prisma.tenant.count({ where: { createdAt: { gte: sixtyDaysAgo, lt: thirtyDaysAgo } } }),
       this.prisma.user.count({ where: { updatedAt: { gte: thirtyDaysAgo } } }),
-      this.prisma.tenantSubscription.findMany({ select: { plan: true, status: true } }),
+      this.prisma.tenantSubscription.findMany({ select: { plan: true, status: true, billingCycle: true } }),
       this.safeCount(() => this.prisma.workoutLog.count({ where: { completedAt: { gte: periodStart } } })),
       this.safeCount(() => (this.prisma as any).mealLog?.count({ where: { createdAt: { gte: periodStart } } })),
       this.safeCount(() => (this.prisma as any).message?.count({ where: { createdAt: { gte: periodStart } } })),
@@ -201,7 +201,7 @@ export class AdminService {
     }, {});
 
     const activeSubs = subscriptions.filter((s) => s.status === SubscriptionStatus.ACTIVE);
-    const mrr = activeSubs.reduce((sum, s) => sum + (PLAN_PRICES[s.plan] || 0), 0);
+    const mrr = activeSubs.reduce((sum, s) => sum + getMonthlyMrr(s.plan, s.billingCycle), 0);
     const activeTenants = subscriptions.filter((s) =>
       s.status === SubscriptionStatus.ACTIVE || s.status === SubscriptionStatus.TRIAL,
     ).length;
@@ -265,7 +265,7 @@ export class AdminService {
       this.prisma.user.findMany({ select: { createdAt: true } }),
       this.prisma.tenantSubscription.findMany({
         where: { status: SubscriptionStatus.ACTIVE },
-        select: { plan: true, createdAt: true },
+        select: { plan: true, billingCycle: true, createdAt: true },
       }),
     ]);
 
@@ -274,7 +274,7 @@ export class AdminService {
       users: users.filter((u) => u.createdAt < end).length,
       revenue: subs
         .filter((s) => s.createdAt < end)
-        .reduce((sum, s) => sum + (PLAN_PRICES[s.plan] || 0), 0),
+        .reduce((sum, s) => sum + getMonthlyMrr(s.plan, s.billingCycle), 0),
     }));
   }
 
