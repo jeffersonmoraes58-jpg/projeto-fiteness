@@ -28,6 +28,7 @@ import { EmailModule } from './modules/email/email.module';
 import { MusicModule } from './modules/music/music.module';
 import { SubscriptionsModule } from './modules/subscriptions/subscription.module';
 import { CloudinaryGifsModule } from './modules/cloudinary-gifs/cloudinary-gifs.module';
+import { PushModule } from './modules/push/push.module';
 
 @Module({
   imports: [
@@ -78,6 +79,7 @@ import { CloudinaryGifsModule } from './modules/cloudinary-gifs/cloudinary-gifs.
     MusicModule,
     SubscriptionsModule,
     CloudinaryGifsModule,
+    PushModule,
   ],
 })
 export class AppModule {}

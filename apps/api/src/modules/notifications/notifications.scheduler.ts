@@ -3,6 +3,7 @@ import { Cron } from '@nestjs/schedule';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from './notifications.service';
 import { EmailService } from '../email/email.service';
+import { PushService } from '../push/push.service';
 
 @Injectable()
 export class NotificationsScheduler {
@@ -10,6 +11,7 @@ export class NotificationsScheduler {
     private prisma: PrismaService,
     private notifications: NotificationsService,
     private emailService: EmailService,
+    private pushService: PushService,
   ) {}
 
   // Lembrete de treino — 7h todo dia
@@ -31,12 +33,18 @@ export class NotificationsScheduler {
     });
 
     for (const plan of plans) {
+      const title = '💪 Hora de treinar!';
+      const body = `Você tem treino hoje: ${plan.workout.name}. Bora lá!`;
+
       await this.notifications.create({
-        userId: plan.student.userId,
-        type: 'WORKOUT_REMINDER',
-        title: '💪 Hora de treinar!',
-        body: `Você tem treino hoje: ${plan.workout.name}. Bora lá!`,
+        userId: plan.student.userId, type: 'WORKOUT_REMINDER', title, body,
       });
+
+      // Enviar push notification nativa (aparece na barra do Android)
+      this.pushService.sendToUser(plan.student.userId, title, body, {
+        url: '/student/workout',
+        tag: 'workout-reminder',
+      }).catch(() => {});
     }
   }
 

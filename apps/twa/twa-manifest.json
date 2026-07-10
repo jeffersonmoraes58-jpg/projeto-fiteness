@@ -20,7 +20,7 @@
     "store": "android",
     "key": "android"
   },
-  "enableNotifications": false,
+  "enableNotifications": true,
   "features": {},
   "orientation": "portrait",
   "minSdkVersion": 21,
