@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { motion } from 'framer-motion';
+import toast from 'react-hot-toast';
 import {
   Building2, DollarSign, TrendingUp, TrendingDown,
   ArrowUpRight, MoreVertical, CheckCircle2, AlertCircle,
@@ -14,11 +15,15 @@ import { cn } from '@/lib/utils';
 const PLANS = ['Todos', 'FREE', 'BASIC', 'PRO', 'ENTERPRISE'];
 const STATUSES = ['Todos', 'TRIAL', 'ACTIVE', 'PAST_DUE', 'CANCELED', 'EXPIRED'];
 
-const PLAN_CONFIG: Record<string, { label: string; color: string; price: number }> = {
-  FREE: { label: 'Free', color: 'from-gray-500 to-gray-600', price: 0 },
-  BASIC: { label: 'Starter', color: 'from-cyan-500 to-blue-500', price: 35 },
-  PRO: { label: 'Pro', color: 'from-purple-500 to-indigo-500', price: 55 },
-  ENTERPRISE: { label: 'Elite', color: 'from-yellow-500 to-amber-500', price: 95 },
+/** Preços alinhados com apps/api/src/common/plan-limits.ts */
+const PRICE_MONTHLY: Record<string, number> = { FREE: 0, BASIC: 35, PRO: 55, ENTERPRISE: 95 };
+const PRICE_ANNUAL: Record<string, number> = { FREE: 0, BASIC: 350, PRO: 550, ENTERPRISE: 950 };
+
+const PLAN_CONFIG: Record<string, { label: string; color: string; gradient: string }> = {
+  FREE: { label: 'Free', color: 'text-gray-400', gradient: 'from-gray-500 to-gray-600' },
+  BASIC: { label: 'Starter', color: 'text-cyan-400', gradient: 'from-cyan-500 to-blue-500' },
+  PRO: { label: 'Pro', color: 'text-purple-400', gradient: 'from-purple-500 to-indigo-500' },
+  ENTERPRISE: { label: 'Elite', color: 'text-yellow-400', gradient: 'from-yellow-500 to-amber-500' },
 };
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; icon: any }> = {
@@ -35,33 +40,46 @@ export default function AdminSubscriptions() {
   const [search, setSearch] = useState('');
   const queryClient = useQueryClient();
 
-  const { data: tenantsData, isLoading } = useQuery({
+  const { data: subscriptions, isLoading } = useQuery({
     queryKey: ['admin-subscriptions'],
     queryFn: () => api.get('/admin/tenants?limit=100').then((r) => {
       const tenants = r.data.data?.tenants || r.data.data || [];
       return tenants.map((t: any) => ({
-        id: t.subscription?.id || t.id,
+        tenantId: t.id,
+        subscriptionId: t.subscription?.id,
         plan: t.subscription?.plan || 'FREE',
         status: t.subscription?.status || 'TRIAL',
-        tenant: { id: t.id, name: t.name },
+        billingCycle: t.subscription?.billingCycle || 'MONTHLY',
+        currentPeriodEnd: t.subscription?.currentPeriodEnd,
+        trialEndsAt: t.subscription?.trialEndsAt,
+        tenant: { id: t.id, name: t.name, slug: t.slug },
+        userCount: t._count?.users ?? 0,
         createdAt: t.createdAt,
       }));
     }),
   });
-  const subscriptions = tenantsData;
+
+  const subs = subscriptions || [];
 
   const changePlanMutation = useMutation({
-    mutationFn: ({ id, plan }: { id: string; plan: string }) =>
-      api.patch(`/admin/tenants/${id}`, { plan }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['admin-subscriptions'] }),
+    mutationFn: ({ tenantId, plan }: { tenantId: string; plan: string }) =>
+      api.patch(`/admin/tenants/${tenantId}/subscription`, { plan }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-subscriptions'] });
+      toast.success('Plano alterado com sucesso');
+    },
+    onError: () => toast.error('Erro ao alterar plano'),
   });
 
   const cancelMutation = useMutation({
-    mutationFn: (id: string) => api.patch(`/admin/tenants/${id}`, { subscriptionStatus: 'CANCELED' }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['admin-subscriptions'] }),
+    mutationFn: (tenantId: string) =>
+      api.patch(`/admin/tenants/${tenantId}/subscription`, { status: 'CANCELED' }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-subscriptions'] });
+      toast.success('Assinatura cancelada');
+    },
+    onError: () => toast.error('Erro ao cancelar assinatura'),
   });
-
-  const subs = subscriptions || [];
 
   const filtered = subs.filter((s: any) => {
     const name = (s.tenant?.name || '').toLowerCase();
@@ -73,11 +91,46 @@ export default function AdminSubscriptions() {
 
   const mrr = subs
     .filter((s: any) => s.status === 'ACTIVE')
-    .reduce((sum: number, s: any) => sum + (PLAN_CONFIG[s.plan]?.price || 0), 0);
+    .reduce((sum: number, s: any) => {
+      if (s.billingCycle === 'ANNUAL') return sum + Math.round((PRICE_ANNUAL[s.plan] || 0) / 12);
+      return sum + (PRICE_MONTHLY[s.plan] || 0);
+    }, 0);
 
   const trialCount = subs.filter((s: any) => s.status === 'TRIAL').length;
   const pastDueCount = subs.filter((s: any) => s.status === 'PAST_DUE').length;
   const activeCount = subs.filter((s: any) => s.status === 'ACTIVE').length;
+
+  const exportCsv = () => {
+    const headers = ['Tenant', 'Plano', 'Status', 'Ciclo', 'Próxima cobrança', 'Valor/mês'];
+    const rows = subs.map((s: any) => {
+      const planCfg = PLAN_CONFIG[s.plan] || PLAN_CONFIG.FREE;
+      const nextBill = s.currentPeriodEnd
+        ? new Date(s.currentPeriodEnd).toLocaleDateString('pt-BR')
+        : s.trialEndsAt
+        ? `Trial até ${new Date(s.trialEndsAt).toLocaleDateString('pt-BR')}`
+        : '—';
+      const price = s.billingCycle === 'ANNUAL'
+        ? Math.round((PRICE_ANNUAL[s.plan] || 0) / 12)
+        : (PRICE_MONTHLY[s.plan] || 0);
+      return [
+        s.tenant?.name || '',
+        planCfg.label,
+        STATUS_CONFIG[s.status]?.label || s.status,
+        s.billingCycle === 'ANNUAL' ? 'Anual' : 'Mensal',
+        nextBill,
+        price > 0 ? `R$ ${price}` : 'Grátis',
+      ];
+    });
+    const csv = [headers, ...rows].map((r) => r.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `assinaturas-fitlynutri-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success('Exportado com sucesso');
+  };
 
   return (
     <div className="space-y-6">
@@ -86,7 +139,7 @@ export default function AdminSubscriptions() {
           <h1 className="text-2xl font-bold">Assinaturas</h1>
           <p className="text-muted-foreground text-sm mt-1">{subs.length} tenants cadastrados</p>
         </div>
-        <button className="btn-secondary flex items-center gap-2 text-sm py-2">
+        <button onClick={exportCsv} className="btn-secondary flex items-center gap-2 text-sm py-2">
           <Download className="w-4 h-4" />
           Exportar
         </button>
@@ -95,8 +148,8 @@ export default function AdminSubscriptions() {
       {/* Revenue metrics */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[
-          { label: 'MRR', value: `R$ ${mrr.toLocaleString('pt-BR')}`, icon: DollarSign, color: 'from-emerald-600 to-teal-600', delta: '+8%', up: true },
-          { label: 'Assinaturas ativas', value: activeCount, icon: CheckCircle2, color: 'from-purple-600 to-indigo-600', delta: `+${Math.max(0, activeCount - 5)}`, up: true },
+          { label: 'MRR', value: `R$ ${mrr.toLocaleString('pt-BR')}`, icon: DollarSign, color: 'from-emerald-600 to-teal-600', delta: `${activeCount} ativas`, up: null },
+          { label: 'Assinaturas ativas', value: activeCount, icon: CheckCircle2, color: 'from-purple-600 to-indigo-600', delta: 'com pagamento em dia', up: null },
           { label: 'Em trial', value: trialCount, icon: Clock, color: 'from-blue-600 to-cyan-600', delta: `${trialCount} pendentes`, up: null },
           { label: 'Em atraso', value: pastDueCount, icon: AlertCircle, color: 'from-orange-600 to-red-600', delta: pastDueCount > 0 ? 'Atenção' : 'OK', up: pastDueCount === 0 },
         ].map((card, i) => (
@@ -133,16 +186,21 @@ export default function AdminSubscriptions() {
       >
         <h2 className="font-semibold mb-4">Receita por Plano</h2>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-          {Object.entries(PLAN_CONFIG).map(([key, plan]) => {
+          {Object.entries(PLAN_CONFIG).map(([key, planCfg]) => {
             const count = subs.filter((s: any) => s.plan === key && s.status === 'ACTIVE').length;
-            const revenue = count * plan.price;
+            const revenue = subs
+              .filter((s: any) => s.plan === key && s.status === 'ACTIVE')
+              .reduce((sum: number, s: any) => {
+                if (s.billingCycle === 'ANNUAL') return sum + Math.round((PRICE_ANNUAL[key] || 0) / 12);
+                return sum + (PRICE_MONTHLY[key] || 0);
+              }, 0);
             return (
               <div key={key} className="glass rounded-xl p-4">
-                <div className={`text-xs font-bold mb-2 px-2 py-0.5 rounded-full bg-gradient-to-r ${plan.color} bg-clip-text text-transparent inline-block`}>
-                  {plan.label}
+                <div className={`text-xs font-bold mb-1 ${planCfg.color}`}>
+                  {planCfg.label}
                 </div>
                 <div className="text-xl font-bold">
-                  {plan.price > 0 ? `R$ ${revenue.toLocaleString('pt-BR')}` : '—'}
+                  {revenue > 0 ? `R$ ${revenue.toLocaleString('pt-BR')}` : '—'}
                 </div>
                 <div className="text-xs text-muted-foreground mt-1">{count} tenants</div>
               </div>
@@ -209,11 +267,11 @@ export default function AdminSubscriptions() {
           ) : filtered.length > 0 ? (
             filtered.map((sub: any, i: number) => (
               <SubscriptionRow
-                key={sub.id}
+                key={sub.tenantId}
                 subscription={sub}
                 index={i}
-                onChangePlan={(plan) => changePlanMutation.mutate({ id: sub.id, plan })}
-                onCancel={() => cancelMutation.mutate(sub.id)}
+                onChangePlan={(plan) => changePlanMutation.mutate({ tenantId: sub.tenantId, plan })}
+                onCancel={() => cancelMutation.mutate(sub.tenantId)}
               />
             ))
           ) : (
@@ -229,9 +287,14 @@ function SubscriptionRow({ subscription: sub, index, onChangePlan, onCancel }: {
   subscription: any; index: number; onChangePlan: (p: string) => void; onCancel: () => void;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
-  const plan = PLAN_CONFIG[sub.plan] || PLAN_CONFIG.FREE;
+  const planCfg = PLAN_CONFIG[sub.plan] || PLAN_CONFIG.FREE;
   const status = STATUS_CONFIG[sub.status] || STATUS_CONFIG.ACTIVE;
   const StatusIcon = status.icon;
+
+  const cycleLabel = sub.billingCycle === 'ANNUAL' ? 'Anual' : 'Mensal';
+  const monthlyPrice = sub.billingCycle === 'ANNUAL'
+    ? Math.round((PRICE_ANNUAL[sub.plan] || 0) / 12)
+    : (PRICE_MONTHLY[sub.plan] || 0);
 
   const nextBilling = sub.currentPeriodEnd
     ? new Date(sub.currentPeriodEnd).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' })
@@ -248,7 +311,7 @@ function SubscriptionRow({ subscription: sub, index, onChangePlan, onCancel }: {
     >
       {/* Tenant */}
       <div className="flex items-center gap-3 min-w-0">
-        <div className={`w-9 h-9 rounded-xl bg-gradient-to-br ${plan.color} flex items-center justify-center flex-shrink-0`}>
+        <div className={`w-9 h-9 rounded-xl bg-gradient-to-br ${planCfg.gradient} flex items-center justify-center flex-shrink-0`}>
           <Building2 className="w-4 h-4 text-white" />
         </div>
         <div className="min-w-0">
@@ -259,9 +322,12 @@ function SubscriptionRow({ subscription: sub, index, onChangePlan, onCancel }: {
 
       {/* Plan */}
       <div>
-        <span className={cn('text-xs font-bold px-2 py-1 rounded-full bg-gradient-to-r', plan.color, 'text-white')}>
-          {plan.label}
+        <span className={cn('text-xs font-bold px-2 py-1 rounded-full bg-gradient-to-r', planCfg.gradient, 'text-white')}>
+          {planCfg.label}
         </span>
+        {sub.plan !== 'FREE' && (
+          <span className="text-[10px] text-muted-foreground ml-1.5">{cycleLabel}</span>
+        )}
       </div>
 
       {/* Status */}
@@ -277,8 +343,11 @@ function SubscriptionRow({ subscription: sub, index, onChangePlan, onCancel }: {
 
       {/* Amount */}
       <div className="font-medium">
-        {plan.price > 0 ? `R$ ${plan.price}` : <span className="text-muted-foreground">Grátis</span>}
-        {plan.price > 0 && <span className="text-xs text-muted-foreground">/mês</span>}
+        {monthlyPrice > 0 ? (
+          <>{`R$ ${monthlyPrice}`}<span className="text-xs text-muted-foreground">/mês</span></>
+        ) : (
+          <span className="text-muted-foreground">Grátis</span>
+        )}
       </div>
 
       {/* Actions */}
@@ -301,7 +370,7 @@ function SubscriptionRow({ subscription: sub, index, onChangePlan, onCancel }: {
             {sub.status !== 'CANCELED' && (
               <>
                 <div className="border-t border-border/50 my-1" />
-                <button onClick={() => { onCancel(); setMenuOpen(false); }}
+                <button onClick={() => { if (confirm('Cancelar esta assinatura?')) { onCancel(); } setMenuOpen(false); }}
                   className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-accent transition-all text-red-400">
                   <XCircle className="w-3.5 h-3.5" /> Cancelar
                 </button>

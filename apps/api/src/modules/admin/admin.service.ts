@@ -309,7 +309,7 @@ export class AdminService {
         take: limit,
         orderBy: { createdAt: 'desc' },
         include: {
-          subscription: { select: { plan: true, status: true, billingCycle: true } },
+          subscription: { select: { plan: true, status: true, billingCycle: true, currentPeriodEnd: true, trialEndsAt: true } },
           _count: { select: { users: true } },
         },
       }),
@@ -334,6 +334,20 @@ export class AdminService {
   async updateTenant(id: string, data: any) {
     await this.getTenant(id);
     return this.prisma.tenant.update({ where: { id }, data });
+  }
+
+  async updateTenantSubscription(id: string, data: { plan?: string; status?: string }) {
+    const tenant = await this.getTenant(id);
+    if (!tenant.subscription) {
+      throw new NotFoundException('Tenant não possui assinatura');
+    }
+    const update: any = {};
+    if (data.plan) update.plan = data.plan;
+    if (data.status) update.status = data.status;
+    return this.prisma.tenantSubscription.update({
+      where: { id: tenant.subscription.id },
+      data: update,
+    });
   }
 
   async getUsers(search?: string, role?: string, page = 1, limit = 20) {

@@ -60,6 +60,12 @@ export class AdminController {
     return this.service.updateTenant(id, body);
   }
 
+  @Patch('tenants/:id/subscription')
+  @ApiOperation({ summary: 'Atualizar assinatura do tenant (admin)' })
+  updateTenantSubscription(@Param('id') id: string, @Body() body: { plan?: string; status?: string }) {
+    return this.service.updateTenantSubscription(id, body);
+  }
+
   @Get('users')
   @ApiOperation({ summary: 'Listar usuários' })
   getUsers(
