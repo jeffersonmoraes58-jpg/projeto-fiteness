@@ -5,7 +5,16 @@ import { randomUUID } from 'crypto';
 import * as bcrypt from 'bcryptjs';
 import Redis from 'ioredis';
 import { PrismaService } from '../prisma/prisma.service';
-import { PLAN_PRICES } from '../../common/plan-limits';
+import { PLAN_PRICES, PLAN_PRICES_ANNUAL } from '../../common/plan-limits';
+import { BillingInterval } from '@prisma/client';
+
+/** Converte preço anual em MRR mensal equivalente. */
+function getMonthlyMrr(plan: SubscriptionPlan, cycle?: BillingInterval | null): number {
+  if (cycle === 'ANNUAL') {
+    return Math.round(PLAN_PRICES_ANNUAL[plan] / 12);
+  }
+  return PLAN_PRICES[plan];
+}
 
 type HealthStatus = 'healthy' | 'degraded' | 'down';
 
@@ -87,7 +96,7 @@ export class AdminService {
       this.prisma.trainer.count(),
       this.prisma.nutritionist.count(),
       this.prisma.workout.count(),
-      this.prisma.tenantSubscription.findMany({ select: { plan: true, status: true } }),
+      this.prisma.tenantSubscription.findMany({ select: { plan: true, status: true, billingCycle: true } }),
       this.prisma.tenantSubscription.count({
         where: { status: SubscriptionStatus.CANCELED, updatedAt: { gte: thirtyDaysAgo } },
       }),
@@ -97,7 +106,7 @@ export class AdminService {
     let mrr = 0;
     for (const s of subscriptions) {
       planCounts[s.plan] = (planCounts[s.plan] || 0) + 1;
-      if (s.status === SubscriptionStatus.ACTIVE) mrr += PLAN_PRICES[s.plan];
+      if (s.status === SubscriptionStatus.ACTIVE) mrr += getMonthlyMrr(s.plan, s.billingCycle);
     }
 
     const totalActive = subscriptions.filter((s) => s.status === SubscriptionStatus.ACTIVE).length;
@@ -300,7 +309,7 @@ export class AdminService {
         take: limit,
         orderBy: { createdAt: 'desc' },
         include: {
-          subscription: { select: { plan: true, status: true } },
+          subscription: { select: { plan: true, status: true, billingCycle: true } },
           _count: { select: { users: true } },
         },
       }),

@@ -12,11 +12,15 @@ import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
 
-const PLAN_CONFIG: Record<string, { label: string; color: string; gradient: string; price: number }> = {
-  FREE: { label: 'Free', color: 'text-gray-400', gradient: 'from-gray-500 to-gray-600', price: 0 },
-  BASIC: { label: 'Starter', color: 'text-cyan-400', gradient: 'from-cyan-500 to-blue-500', price: 35 },
-  PRO: { label: 'Pro', color: 'text-purple-400', gradient: 'from-purple-500 to-indigo-500', price: 55 },
-  ENTERPRISE: { label: 'Elite', color: 'text-yellow-400', gradient: 'from-yellow-500 to-amber-500', price: 95 },
+/** Preços alinhados com apps/api/src/common/plan-limits.ts */
+const PRICE_MONTHLY: Record<string, number> = { FREE: 0, BASIC: 35, PRO: 55, ENTERPRISE: 95 };
+const PRICE_ANNUAL: Record<string, number> = { FREE: 0, BASIC: 350, PRO: 550, ENTERPRISE: 950 };
+
+const PLAN_CONFIG: Record<string, { label: string; color: string; gradient: string }> = {
+  FREE: { label: 'Free', color: 'text-gray-400', gradient: 'from-gray-500 to-gray-600' },
+  BASIC: { label: 'Starter', color: 'text-cyan-400', gradient: 'from-cyan-500 to-blue-500' },
+  PRO: { label: 'Pro', color: 'text-purple-400', gradient: 'from-purple-500 to-indigo-500' },
+  ENTERPRISE: { label: 'Elite', color: 'text-yellow-400', gradient: 'from-yellow-500 to-amber-500' },
 };
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; icon: any }> = {
@@ -61,7 +65,12 @@ export default function AdminTenants() {
 
   const mrr = allTenants
     .filter((t) => t.subscription?.status === 'ACTIVE')
-    .reduce((sum, t) => sum + (PLAN_CONFIG[t.subscription?.plan]?.price || 0), 0);
+    .reduce((sum, t) => {
+      const plan = t.subscription?.plan || 'FREE';
+      const cycle = t.subscription?.billingCycle || 'MONTHLY';
+      if (cycle === 'ANNUAL') return sum + Math.round((PRICE_ANNUAL[plan] || 0) / 12);
+      return sum + (PRICE_MONTHLY[plan] || 0);
+    }, 0);
 
   return (
     <div className="space-y-6">
