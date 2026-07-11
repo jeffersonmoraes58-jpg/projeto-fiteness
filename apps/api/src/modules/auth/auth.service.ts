@@ -336,21 +336,21 @@ export class AuthService {
       throw new UnauthorizedException('Chave de administrador inválida');
     }
 
-    // Primeiro tenta encontrar um tenant existente, ou cria um padrão
-    let tenant = await this.prisma.tenant.findFirst();
-    if (!tenant) {
-      tenant = await this.prisma.tenant.create({
-        data: { name: 'Default Studio', slug: 'default-studio', isActive: true },
-      });
-      await this.prisma.tenantSubscription.create({
-        data: { tenantId: tenant.id, plan: 'PRO' as any, status: 'ACTIVE' as any },
-      });
-    }
-
-    let user = await this.prisma.user.findFirst({ where: { email, tenantId: tenant.id } });
+    // Busca o usuário globalmente (sem filtrar por tenant, igual ao login)
+    let user = await this.prisma.user.findFirst({ where: { email } });
 
     if (!user) {
-      // Usuário não existe — cria com os dados do seed
+      // Usuário não existe — cria com tenant padrão
+      let tenant = await this.prisma.tenant.findFirst();
+      if (!tenant) {
+        tenant = await this.prisma.tenant.create({
+          data: { name: 'Default Studio', slug: 'default-studio', isActive: true },
+        });
+        await this.prisma.tenantSubscription.create({
+          data: { tenantId: tenant.id, plan: 'PRO' as any, status: 'ACTIVE' as any },
+        });
+      }
+
       const roleMap: Record<string, any> = {
         'student@demo.com': 'STUDENT',
         'trainer@demo.com': 'TRAINER',
