@@ -167,7 +167,20 @@ export class SubscriptionService {
     const sub = await this.prisma.tenantSubscription.findUnique({
       where: { tenantId },
     });
-    return { plan, displayName, limits, subscription: sub };
+
+    // Se o usuário tem planOverride, o status real não importa — forçamos ACTIVE
+    let effectiveSub = sub;
+    if (userId && sub) {
+      const user = await this.prisma.user.findUnique({
+        where: { id: userId },
+        select: { planOverride: true },
+      });
+      if (user?.planOverride) {
+        effectiveSub = { ...sub, status: 'ACTIVE' as any };
+      }
+    }
+
+    return { plan, displayName, limits, subscription: effectiveSub };
   }
 
   /**
