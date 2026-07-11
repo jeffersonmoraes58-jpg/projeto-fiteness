@@ -411,6 +411,47 @@ export class AdminService {
     return user;
   }
 
+  async deleteUser(id: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id },
+      include: { profile: true, student: true, trainer: true, nutritionist: true },
+    });
+
+    if (!user) throw new NotFoundException('Usuário não encontrado');
+
+    // Deleta em ordem: primeiro as entidades filhas, depois o user
+    // Prisma cascateia profile, notifications, refreshTokens, deviceTokens, auditLogs
+    // Mas student/trainer/nutritionist precisam ser deletados manualmente se existirem
+    if (user.student) {
+      await this.prisma.student.delete({ where: { userId: id } });
+    }
+    if (user.trainer) {
+      await this.prisma.trainer.delete({ where: { userId: id } });
+    }
+    if (user.nutritionist) {
+      await this.prisma.nutritionist.delete({ where: { userId: id } });
+    }
+
+    // Remove do trainer_students e nutritionist_patients
+    await this.prisma.trainerStudent.deleteMany({ where: { OR: [{ studentId: user.student?.id ?? 'none' }, { trainerId: user.trainer?.id ?? 'none' }] } });
+    await this.prisma.nutritionistPatient.deleteMany({ where: { OR: [{ studentId: user.student?.id ?? 'none' }, { nutritionistId: user.nutritionist?.id ?? 'none' }] } });
+
+    // Remove student_id de workoutPlans, dietPlans, etc
+    if (user.student) {
+      await this.prisma.workoutPlan.deleteMany({ where: { studentId: user.student.id } });
+      await this.prisma.dietPlan.deleteMany({ where: { studentId: user.student.id } });
+      await this.prisma.workoutLog.deleteMany({ where: { studentId: user.student.id } });
+      await this.prisma.studentChallenge.deleteMany({ where: { studentId: user.student.id } });
+      await this.prisma.lessonProgress.deleteMany({ where: { studentId: user.student.id } });
+      await this.prisma.studentBilling.deleteMany({ where: { studentId: user.student.id } });
+    }
+
+    // Delete o user (cascade no profile, notifications, refreshTokens, etc)
+    await this.prisma.user.delete({ where: { id } });
+
+    return { message: 'Usuário excluído com sucesso', email: user.email };
+  }
+
   async updateUser(id: string, data: { isActive?: boolean; role?: string }) {
     const user = await this.prisma.user.findUnique({ where: { id } });
     if (!user) throw new NotFoundException('Usuário não encontrado');

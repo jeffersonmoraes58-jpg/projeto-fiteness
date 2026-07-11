@@ -89,6 +89,12 @@ export class AdminController {
     return this.service.updateUser(id, body);
   }
 
+  @Delete('users/:id')
+  @ApiOperation({ summary: 'Excluir usuário e todos os dados relacionados (cuidado: irreversível!)' })
+  deleteUser(@Param('id') id: string) {
+    return this.service.deleteUser(id);
+  }
+
   @Patch('users/:id/plan-override')
   @ApiOperation({ summary: 'Definir ou remover override de plano para um usuário específico' })
   updateUserPlanOverride(@Param('id') id: string, @Body() body: { planOverride?: string | null }) {

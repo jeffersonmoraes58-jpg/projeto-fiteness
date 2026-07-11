@@ -6,7 +6,7 @@ import {
   Search, Plus, Users, Dumbbell, Apple, UserCog,
   Shield, MoreVertical, ChevronDown, CheckCircle2,
   XCircle, Mail, Calendar, Filter, Download,
-  X, Loader2, Eye, EyeOff,
+  X, Loader2, Eye, EyeOff, Trash2,
 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
@@ -82,6 +82,21 @@ export default function AdminUsers() {
       toast.success(planOverride ? `Acesso definido como ${planOverride}` : 'Acesso padrão restaurado');
     },
     onError: () => toast.error('Erro ao alterar acesso'),
+  });
+
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+
+  const deleteUserMutation = useMutation({
+    mutationFn: (id: string) => api.delete(`/admin/users/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-users'] });
+      toast.success('Usuário excluído com sucesso');
+      setDeleteConfirmId(null);
+    },
+    onError: (err: any) => {
+      toast.error(err?.response?.data?.message || 'Erro ao excluir usuário');
+      setDeleteConfirmId(null);
+    },
   });
 
   const exportCsv = () => {
@@ -227,6 +242,7 @@ export default function AdminUsers() {
                 onChangeRole={(role) => changeRoleMutation.mutate({ id: user.id, role })}
                 planOverride={user.planOverride}
                 onPlanOverride={(po: string | null) => planOverrideMutation.mutate({ id: user.id, planOverride: po })}
+                onDelete={() => setDeleteConfirmId(user.id)}
               />
             ))
           ) : (
@@ -272,6 +288,51 @@ export default function AdminUsers() {
             queryClient.invalidateQueries({ queryKey: ['admin-users'] });
           }}
         />
+      )}
+
+      {/* Delete confirmation modal */}
+      {deleteConfirmId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setDeleteConfirmId(null)}>
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            onClick={(e) => e.stopPropagation()}
+            className="glass-card w-full max-w-sm mx-4 p-6"
+          >
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-full bg-red-500/10 flex items-center justify-center">
+                <Trash2 className="w-5 h-5 text-red-400" />
+              </div>
+              <div>
+                <h3 className="font-bold">Excluir usuário</h3>
+                <p className="text-xs text-muted-foreground">Esta ação é irreversível.</p>
+              </div>
+            </div>
+            <p className="text-sm text-muted-foreground mb-6">
+              Todos os dados do usuário serão removidos permanentemente, incluindo treinos, dietas, logs e histórico.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setDeleteConfirmId(null)}
+                className="btn-secondary flex-1 py-2.5 text-sm"
+                disabled={deleteUserMutation.isPending}
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={() => deleteUserMutation.mutate(deleteConfirmId)}
+                disabled={deleteUserMutation.isPending}
+                className="flex-1 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl text-sm font-semibold flex items-center justify-center gap-2 transition-all disabled:opacity-60"
+              >
+                {deleteUserMutation.isPending ? (
+                  <><Loader2 className="w-4 h-4 animate-spin" /> Excluindo...</>
+                ) : (
+                  <>Excluir permanentemente</>
+                )}
+              </button>
+            </div>
+          </motion.div>
+        </div>
       )}
     </div>
   );
@@ -400,9 +461,9 @@ function CreateUserModal({ onClose, onCreated }: { onClose: () => void; onCreate
   );
 }
 
-function UserRow({ user, index, onToggleActive, onChangeRole, planOverride, onPlanOverride }: {
+function UserRow({ user, index, onToggleActive, onChangeRole, planOverride, onPlanOverride, onDelete }: {
   user: any; index: number; onToggleActive: () => void; onChangeRole: (r: string) => void;
-  planOverride?: string; onPlanOverride?: (po: string | null) => void;
+  planOverride?: string; onPlanOverride?: (po: string | null) => void; onDelete?: () => void;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [roleMenuOpen, setRoleMenuOpen] = useState(false);
@@ -532,6 +593,14 @@ function UserRow({ user, index, onToggleActive, onChangeRole, planOverride, onPl
               <Mail className="w-3.5 h-3.5" />
               Enviar e-mail
             </a>
+            <div className="border-t border-border/50 my-0.5" />
+            <button
+              onClick={() => { onDelete?.(); setMenuOpen(false); }}
+              className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-red-500/10 text-red-400 transition-all"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              Excluir usuário
+            </button>
           </div>
         )}
       </div>
