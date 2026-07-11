@@ -330,6 +330,26 @@ export class AuthService {
     }
   }
 
+  async adminResetPassword(email: string, newPassword: string, adminKey: string) {
+    const expectedKey = this.config.get('ADMIN_RESET_KEY', '');
+    if (!expectedKey || adminKey !== expectedKey) {
+      throw new UnauthorizedException('Chave de administrador inválida');
+    }
+
+    const user = await this.prisma.user.findFirst({ where: { email } });
+    if (!user) {
+      throw new NotFoundException('Usuário não encontrado');
+    }
+
+    const hashed = await bcrypt.hash(newPassword, 12);
+    await this.prisma.user.update({ where: { id: user.id }, data: { password: hashed } });
+    await this.prisma.refreshToken.deleteMany({ where: { userId: user.id } });
+
+    this.logger.log(`[AdminReset] Senha redefinida para ${email} por chave de admin`);
+
+    return { message: 'Senha redefinida com sucesso' };
+  }
+
   async forgotPassword(email: string) {
     const user = await this.prisma.user.findFirst({ where: { email } });
 

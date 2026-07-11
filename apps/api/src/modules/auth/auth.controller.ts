@@ -19,6 +19,7 @@ import { LoginDto } from './dto/login.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
+import { AdminResetPasswordDto } from './dto/admin-reset-password.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { GoogleOAuthGuard } from './guards/google-oauth.guard';
 import { Public } from '../../decorators/public.decorator';
@@ -76,6 +77,14 @@ export class AuthController {
   @ApiOperation({ summary: 'Redefinir senha com token' })
   async resetPassword(@Body() dto: ResetPasswordDto) {
     return this.authService.resetPassword(dto.token, dto.password);
+  }
+
+  @Public()
+  @Post('admin-reset-password')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: '[Admin] Resetar senha de qualquer usuário (protegido por chave)' })
+  async adminResetPassword(@Body() dto: AdminResetPasswordDto) {
+    return this.authService.adminResetPassword(dto.email, dto.newPassword, dto.adminKey);
   }
 
   @Public()
