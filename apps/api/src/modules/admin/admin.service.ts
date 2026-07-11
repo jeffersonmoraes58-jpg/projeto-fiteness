@@ -414,40 +414,87 @@ export class AdminService {
   async deleteUser(id: string) {
     const user = await this.prisma.user.findUnique({
       where: { id },
-      include: { profile: true, student: true, trainer: true, nutritionist: true },
+      include: {
+        student: true,
+        trainer: true,
+        nutritionist: true,
+      },
     });
 
     if (!user) throw new NotFoundException('Usuário não encontrado');
 
-    // Deleta em ordem: primeiro as entidades filhas, depois o user
-    // Prisma cascateia profile, notifications, refreshTokens, deviceTokens, auditLogs
-    // Mas student/trainer/nutritionist precisam ser deletados manualmente se existirem
-    if (user.student) {
-      await this.prisma.student.delete({ where: { userId: id } });
-    }
-    if (user.trainer) {
-      await this.prisma.trainer.delete({ where: { userId: id } });
-    }
-    if (user.nutritionist) {
-      await this.prisma.nutritionist.delete({ where: { userId: id } });
-    }
+    const sid = user.student?.id;
+    const tid = user.trainer?.id;
+    const nid = user.nutritionist?.id;
 
-    // Remove do trainer_students e nutritionist_patients
-    await this.prisma.trainerStudent.deleteMany({ where: { OR: [{ studentId: user.student?.id ?? 'none' }, { trainerId: user.trainer?.id ?? 'none' }] } });
-    await this.prisma.nutritionistPatient.deleteMany({ where: { OR: [{ studentId: user.student?.id ?? 'none' }, { nutritionistId: user.nutritionist?.id ?? 'none' }] } });
+    // Usa transação para garantir atomicidade
+    await this.prisma.$transaction(async (tx) => {
+      // ── Deleta todos os registros que referenciam Student ──
+      if (sid) {
+        await tx.anamnesis.deleteMany({ where: { studentId: sid } });
+        await tx.bodyMeasurement.deleteMany({ where: { studentId: sid } });
+        await tx.workoutPlan.deleteMany({ where: { studentId: sid } });
+        await tx.dietPlan.deleteMany({ where: { studentId: sid } });
+        await tx.goal.deleteMany({ where: { studentId: sid } });
+        await tx.waterLog.deleteMany({ where: { studentId: sid } });
+        await tx.mealLog.deleteMany({ where: { studentId: sid } });
+        await tx.workoutLog.deleteMany({ where: { studentId: sid } });
+        await tx.progressPhoto.deleteMany({ where: { studentId: sid } });
+        await tx.physicalAssessment.deleteMany({ where: { studentId: sid } });
+        await tx.studentChallenge.deleteMany({ where: { studentId: sid } });
+        await tx.lessonProgress.deleteMany({ where: { studentId: sid } });
+        await tx.achievement.deleteMany({ where: { studentId: sid } });
+        await tx.habitLog.deleteMany({ where: { habit: { studentId: sid } } });
+        await tx.habit.deleteMany({ where: { studentId: sid } });
+        await tx.nutritionalAssessment.deleteMany({ where: { studentId: sid } });
+        await tx.clinicalNote.deleteMany({ where: { studentId: sid } });
+        await tx.nutritionalConsultation.deleteMany({ where: { studentId: sid } });
+        await tx.supplementationPlan.deleteMany({ where: { studentId: sid } });
+        await tx.patientExam.deleteMany({ where: { studentId: sid } });
+        await tx.studentBilling.deleteMany({ where: { studentId: sid } });
+        await tx.trainerStudent.deleteMany({ where: { studentId: sid } });
+        await tx.nutritionistPatient.deleteMany({ where: { studentId: sid } });
+        await tx.invoice.deleteMany({ where: { billing: { studentId: sid } } });
+        // Student no final
+        await tx.student.delete({ where: { id: sid } });
+      }
 
-    // Remove student_id de workoutPlans, dietPlans, etc
-    if (user.student) {
-      await this.prisma.workoutPlan.deleteMany({ where: { studentId: user.student.id } });
-      await this.prisma.dietPlan.deleteMany({ where: { studentId: user.student.id } });
-      await this.prisma.workoutLog.deleteMany({ where: { studentId: user.student.id } });
-      await this.prisma.studentChallenge.deleteMany({ where: { studentId: user.student.id } });
-      await this.prisma.lessonProgress.deleteMany({ where: { studentId: user.student.id } });
-      await this.prisma.studentBilling.deleteMany({ where: { studentId: user.student.id } });
-    }
+      // ── Deleta todos os registros que referenciam Trainer ──
+      if (tid) {
+        await tx.trainerStudent.deleteMany({ where: { trainerId: tid } });
+        await tx.studentBilling.deleteMany({ where: { trainerId: tid } });
+        await tx.invoice.deleteMany({ where: { billing: { trainerId: tid } } });
+        await tx.appointment.deleteMany({ where: { trainerId: tid } });
+        await tx.physicalAssessment.deleteMany({ where: { trainerId: tid } });
+        await tx.challenge.deleteMany({ where: { trainerId: tid } });
+        await tx.trainerPricing.deleteMany({ where: { trainerId: tid } });
+        await tx.workoutExercise.deleteMany({ where: { workout: { trainerId: tid } } });
+        await tx.workout.deleteMany({ where: { trainerId: tid } });
+        await tx.exercise.deleteMany({ where: { trainerId: tid } });
+        await tx.trainer.delete({ where: { id: tid } });
+      }
 
-    // Delete o user (cascade no profile, notifications, refreshTokens, etc)
-    await this.prisma.user.delete({ where: { id } });
+      // ── Deleta todos os registros que referenciam Nutritionist ──
+      if (nid) {
+        await tx.nutritionistPatient.deleteMany({ where: { nutritionistId: nid } });
+        await tx.clinicalNote.deleteMany({ where: { nutritionistId: nid } });
+        await tx.patientExam.deleteMany({ where: { nutritionistId: nid } });
+        await tx.nutritionalConsultation.deleteMany({ where: { nutritionistId: nid } });
+        await tx.supplementationPlan.deleteMany({ where: { nutritionistId: nid } });
+        await tx.mealFood.deleteMany({ where: { food: { nutritionistId: nid } } });
+        await tx.foodDatabase.deleteMany({ where: { nutritionistId: nid } });
+        await tx.dietMeal.deleteMany({ where: { diet: { nutritionistId: nid } } });
+        await tx.diet.deleteMany({ where: { nutritionistId: nid } });
+        await tx.nutritionist.delete({ where: { id: nid } });
+      }
+
+      // ── Deleta mensagens do chat ──
+      await tx.message.deleteMany({ where: { senderId: id } });
+      await tx.chatParticipant.deleteMany({ where: { userId: id } });
+
+      // ── Deleta o User (cascade em profile, notifications, refreshTokens, deviceTokens, auditLogs) ──
+      await tx.user.delete({ where: { id } });
+    });
 
     return { message: 'Usuário excluído com sucesso', email: user.email };
   }
