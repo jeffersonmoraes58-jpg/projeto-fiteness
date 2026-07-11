@@ -414,11 +414,7 @@ export class AdminService {
   async deleteUser(id: string) {
     const user = await this.prisma.user.findUnique({
       where: { id },
-      include: {
-        student: true,
-        trainer: true,
-        nutritionist: true,
-      },
+      include: { student: true, trainer: true, nutritionist: true },
     });
 
     if (!user) throw new NotFoundException('Usuário não encontrado');
@@ -427,10 +423,61 @@ export class AdminService {
     const tid = user.trainer?.id;
     const nid = user.nutritionist?.id;
 
-    // Usa transação para garantir atomicidade
     await this.prisma.$transaction(async (tx) => {
-      // ── Deleta todos os registros que referenciam Student ──
+      // 1. Deleta registros que referenciam o student (primeiro os netos, depois filhos, depois o student)
       if (sid) {
+        // Habit logs → habits
+        const habitIds = await tx.habit.findMany({
+          where: { studentId: sid },
+          select: { id: true },
+        });
+        const habitIdList = habitIds.map((h) => h.id);
+        if (habitIdList.length > 0) {
+          await tx.habitLog.deleteMany({ where: { habitId: { in: habitIdList } } });
+        }
+        await tx.habit.deleteMany({ where: { studentId: sid } });
+
+        // Invoices → student billings
+        const billingIds = await tx.studentBilling.findMany({
+          where: { studentId: sid },
+          select: { id: true },
+        });
+        const billingIdList = billingIds.map((b) => b.id);
+        if (billingIdList.length > 0) {
+          await tx.invoice.deleteMany({ where: { billingId: { in: billingIdList } } });
+        }
+
+        // Workout exercise logs → workout logs
+        const wlIds = await tx.workoutLog.findMany({
+          where: { studentId: sid },
+          select: { id: true },
+        });
+        const wlIdList = wlIds.map((w) => w.id);
+        if (wlIdList.length > 0) {
+          await tx.workoutExerciseLog.deleteMany({ where: { workoutLogId: { in: wlIdList } } });
+        }
+
+        // Meal log items → meal logs
+        const mlIds = await tx.mealLog.findMany({
+          where: { studentId: sid },
+          select: { id: true },
+        });
+        const mlIdList = mlIds.map((m) => m.id);
+        if (mlIdList.length > 0) {
+          await tx.mealLogItem.deleteMany({ where: { logId: { in: mlIdList } } });
+        }
+
+        // Supplementation plan items → plans
+        const spIds = await tx.supplementationPlan.findMany({
+          where: { studentId: sid },
+          select: { id: true },
+        });
+        const spIdList = spIds.map((s) => s.id);
+        if (spIdList.length > 0) {
+          await tx.supplementationPlanItem.deleteMany({ where: { planId: { in: spIdList } } });
+        }
+
+        // Agora deleta tudo diretamente referenciado por studentId
         await tx.anamnesis.deleteMany({ where: { studentId: sid } });
         await tx.bodyMeasurement.deleteMany({ where: { studentId: sid } });
         await tx.workoutPlan.deleteMany({ where: { studentId: sid } });
@@ -444,8 +491,6 @@ export class AdminService {
         await tx.studentChallenge.deleteMany({ where: { studentId: sid } });
         await tx.lessonProgress.deleteMany({ where: { studentId: sid } });
         await tx.achievement.deleteMany({ where: { studentId: sid } });
-        await tx.habitLog.deleteMany({ where: { habit: { studentId: sid } } });
-        await tx.habit.deleteMany({ where: { studentId: sid } });
         await tx.nutritionalAssessment.deleteMany({ where: { studentId: sid } });
         await tx.clinicalNote.deleteMany({ where: { studentId: sid } });
         await tx.nutritionalConsultation.deleteMany({ where: { studentId: sid } });
@@ -454,45 +499,86 @@ export class AdminService {
         await tx.studentBilling.deleteMany({ where: { studentId: sid } });
         await tx.trainerStudent.deleteMany({ where: { studentId: sid } });
         await tx.nutritionistPatient.deleteMany({ where: { studentId: sid } });
-        await tx.invoice.deleteMany({ where: { billing: { studentId: sid } } });
-        // Student no final
         await tx.student.delete({ where: { id: sid } });
       }
 
-      // ── Deleta todos os registros que referenciam Trainer ──
+      // 2. Deleta registros que referenciam o trainer
       if (tid) {
+        // Workout exercises → workouts
+        const wIds = await tx.workout.findMany({
+          where: { trainerId: tid },
+          select: { id: true },
+        });
+        const wIdList = wIds.map((w) => w.id);
+        if (wIdList.length > 0) {
+          const weIds = await tx.workoutExercise.findMany({
+            where: { workoutId: { in: wIdList } },
+            select: { id: true },
+          });
+          const weIdList = weIds.map((we) => we.id);
+          if (weIdList.length > 0) {
+            await tx.workoutExerciseLog.deleteMany({ where: { workoutExerciseId: { in: weIdList } } });
+          }
+          await tx.workoutPlan.deleteMany({ where: { workoutId: { in: wIdList } } });
+          await tx.workoutExercise.deleteMany({ where: { workoutId: { in: wIdList } } });
+        }
+
+        // Invoices → billings
+        const tbIds = await tx.studentBilling.findMany({
+          where: { trainerId: tid },
+          select: { id: true },
+        });
+        const tbIdList = tbIds.map((b) => b.id);
+        if (tbIdList.length > 0) {
+          await tx.invoice.deleteMany({ where: { billingId: { in: tbIdList } } });
+        }
+
         await tx.trainerStudent.deleteMany({ where: { trainerId: tid } });
         await tx.studentBilling.deleteMany({ where: { trainerId: tid } });
-        await tx.invoice.deleteMany({ where: { billing: { trainerId: tid } } });
         await tx.appointment.deleteMany({ where: { trainerId: tid } });
         await tx.physicalAssessment.deleteMany({ where: { trainerId: tid } });
         await tx.challenge.deleteMany({ where: { trainerId: tid } });
         await tx.trainerPricing.deleteMany({ where: { trainerId: tid } });
-        await tx.workoutExercise.deleteMany({ where: { workout: { trainerId: tid } } });
         await tx.workout.deleteMany({ where: { trainerId: tid } });
         await tx.exercise.deleteMany({ where: { trainerId: tid } });
         await tx.trainer.delete({ where: { id: tid } });
       }
 
-      // ── Deleta todos os registros que referenciam Nutritionist ──
+      // 3. Deleta registros que referenciam o nutritionist
       if (nid) {
+        // Diet meals → diets
+        const dIds = await tx.diet.findMany({
+          where: { nutritionistId: nid },
+          select: { id: true },
+        });
+        const dIdList = dIds.map((d) => d.id);
+        if (dIdList.length > 0) {
+          // Meal foods → diet meals
+          const dmIds = await tx.dietMeal.findMany({
+            where: { dietId: { in: dIdList } },
+            select: { id: true },
+          });
+          const dmIdList = dmIds.map((dm) => dm.id);
+          if (dmIdList.length > 0) {
+            await tx.mealFood.deleteMany({ where: { mealId: { in: dmIdList } } });
+          }
+          await tx.dietMeal.deleteMany({ where: { dietId: { in: dIdList } } });
+          await tx.dietPlan.deleteMany({ where: { dietId: { in: dIdList } } });
+        }
+
         await tx.nutritionistPatient.deleteMany({ where: { nutritionistId: nid } });
         await tx.clinicalNote.deleteMany({ where: { nutritionistId: nid } });
         await tx.patientExam.deleteMany({ where: { nutritionistId: nid } });
         await tx.nutritionalConsultation.deleteMany({ where: { nutritionistId: nid } });
         await tx.supplementationPlan.deleteMany({ where: { nutritionistId: nid } });
-        await tx.mealFood.deleteMany({ where: { food: { nutritionistId: nid } } });
         await tx.foodDatabase.deleteMany({ where: { nutritionistId: nid } });
-        await tx.dietMeal.deleteMany({ where: { diet: { nutritionistId: nid } } });
         await tx.diet.deleteMany({ where: { nutritionistId: nid } });
         await tx.nutritionist.delete({ where: { id: nid } });
       }
 
-      // ── Deleta mensagens do chat ──
+      // 4. Delete chat messages and user
       await tx.message.deleteMany({ where: { senderId: id } });
       await tx.chatParticipant.deleteMany({ where: { userId: id } });
-
-      // ── Deleta o User (cascade em profile, notifications, refreshTokens, deviceTokens, auditLogs) ──
       await tx.user.delete({ where: { id } });
     });
 
