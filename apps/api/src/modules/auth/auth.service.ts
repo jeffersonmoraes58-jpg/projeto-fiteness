@@ -336,16 +336,96 @@ export class AuthService {
       throw new UnauthorizedException('Chave de administrador inválida');
     }
 
-    const user = await this.prisma.user.findFirst({ where: { email } });
-    if (!user) {
-      throw new NotFoundException('Usuário não encontrado');
+    // Primeiro tenta encontrar um tenant existente, ou cria um padrão
+    let tenant = await this.prisma.tenant.findFirst();
+    if (!tenant) {
+      tenant = await this.prisma.tenant.create({
+        data: { name: 'Default Studio', slug: 'default-studio', isActive: true },
+      });
+      await this.prisma.tenantSubscription.create({
+        data: { tenantId: tenant.id, plan: 'PRO' as any, status: 'ACTIVE' as any },
+      });
     }
 
-    const hashed = await bcrypt.hash(newPassword, 12);
-    await this.prisma.user.update({ where: { id: user.id }, data: { password: hashed } });
-    await this.prisma.refreshToken.deleteMany({ where: { userId: user.id } });
+    let user = await this.prisma.user.findFirst({ where: { email, tenantId: tenant.id } });
 
-    this.logger.log(`[AdminReset] Senha redefinida para ${email} por chave de admin`);
+    if (!user) {
+      // Usuário não existe — cria com os dados do seed
+      const roleMap: Record<string, any> = {
+        'student@demo.com': 'STUDENT',
+        'trainer@demo.com': 'TRAINER',
+        'nutri@demo.com': 'NUTRITIONIST',
+        'admin@fitsaas.com': 'ADMIN',
+      };
+      const nameMap: Record<string, { first: string; last: string }> = {
+        'student@demo.com': { first: 'Pedro', last: 'Aluno' },
+        'trainer@demo.com': { first: 'Joao', last: 'Trainer' },
+        'nutri@demo.com': { first: 'Maria', last: 'Nutricionista' },
+        'admin@fitsaas.com': { first: 'Admin', last: 'FitSaaS' },
+      };
+
+      const role = roleMap[email] || 'STUDENT';
+      const names = nameMap[email] || { first: 'Usuario', last: email.split('@')[0] };
+
+      const hashed = await bcrypt.hash(newPassword, 12);
+      user = await this.prisma.user.create({
+        data: {
+          email,
+          password: hashed,
+          role,
+          tenantId: tenant.id,
+          isActive: true,
+          emailVerified: true,
+          profile: { create: { firstName: names.first, lastName: names.last } },
+        },
+      });
+
+      // Criar perfil específico
+      if (role === 'STUDENT') {
+        await this.prisma.student.upsert({
+          where: { userId: user.id },
+          update: {},
+          create: { userId: user.id, points: 120, streak: 5, level: 2 },
+        });
+      } else if (role === 'TRAINER') {
+        await this.prisma.trainer.upsert({
+          where: { userId: user.id },
+          update: {},
+          create: { userId: user.id, specialties: ['Musculacao', 'Funcional'] },
+        });
+      } else if (role === 'NUTRITIONIST') {
+        await this.prisma.nutritionist.upsert({
+          where: { userId: user.id },
+          update: {},
+          create: { userId: user.id, specialties: ['Nutricao Esportiva'] },
+        });
+      }
+
+      // Conectar student e trainer se ambos existirem
+      if (role === 'STUDENT') {
+        const trainer = await this.prisma.user.findFirst({
+          where: { email: 'trainer@demo.com', tenantId: tenant.id },
+        });
+        if (trainer) {
+          const t = await this.prisma.trainer.findUnique({ where: { userId: trainer.id } });
+          const s = await this.prisma.student.findUnique({ where: { userId: user.id } });
+          if (t && s) {
+            await this.prisma.trainerStudent.upsert({
+              where: { trainerId_studentId: { trainerId: t.id, studentId: s.id } },
+              update: {},
+              create: { trainerId: t.id, studentId: s.id, monthlyFee: 300 },
+            });
+          }
+        }
+      }
+
+      this.logger.log(`[AdminReset] Usuário ${email} criado com senha redefinida`);
+    } else {
+      const hashed = await bcrypt.hash(newPassword, 12);
+      await this.prisma.user.update({ where: { id: user.id }, data: { password: hashed } });
+      await this.prisma.refreshToken.deleteMany({ where: { userId: user.id } });
+      this.logger.log(`[AdminReset] Senha redefinida para ${email} por chave de admin`);
+    }
 
     return { message: 'Senha redefinida com sucesso' };
   }
