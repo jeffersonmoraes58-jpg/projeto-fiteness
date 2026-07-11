@@ -423,7 +423,7 @@ export class AdminService {
     const tid = user.trainer?.id;
     const nid = user.nutritionist?.id;
 
-    await this.prisma.$transaction(async (tx) => {
+      await this.prisma.$transaction(async (tx) => {
       // 1. Deleta registros que referenciam o student (primeiro os netos, depois filhos, depois o student)
       if (sid) {
         // Habit logs → habits
