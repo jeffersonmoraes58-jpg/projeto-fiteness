@@ -420,15 +420,12 @@ export class AdminService {
     if (!user) throw new NotFoundException('Usuário não encontrado');
 
     // Desabilita temporariamente todas as FKs para permitir a deleção
-    // usando SET session_replication_role = 'replica' (PostgreSQL)
-    await this.prisma.$executeRawUnsafe(`SET session_replication_role = 'replica'`);
+    await this.prisma.$executeRaw`SET session_replication_role = 'replica'`;
 
     try {
-      // Deleta o usuário — todas as FK constraints são ignoradas
       await this.prisma.user.delete({ where: { id } });
     } finally {
-      // Reativa as FKs
-      await this.prisma.$executeRawUnsafe(`SET session_replication_role = 'origin'`);
+      await this.prisma.$executeRaw`SET session_replication_role = 'origin'`;
     }
 
     return { message: 'Usuário excluído com sucesso', email: user.email };
