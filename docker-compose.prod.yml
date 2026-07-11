@@ -74,7 +74,6 @@ services:
       GOOGLE_CALLBACK_URL: ${GOOGLE_CALLBACK_URL:-disabled}
       MUSCLEWIKI_API_KEY: ${MUSCLEWIKI_API_KEY}
       JAMENDO_CLIENT_ID: ${JAMENDO_CLIENT_ID}
-      ADMIN_RESET_KEY: ${ADMIN_RESET_KEY}
     depends_on:
       postgres:
         condition: service_healthy
