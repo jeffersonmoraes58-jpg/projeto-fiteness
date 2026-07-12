@@ -43,6 +43,7 @@ const navByRole: Record<string, NavItem[]> = {
     { icon: Home, label: 'Dashboard', href: '/nutritionist' },
     { icon: Users, label: 'Pacientes', href: '/nutritionist/patients' },
     { icon: Apple, label: 'Dietas', href: '/nutritionist/diets' },
+    { icon: Target, label: 'Calculadora', href: '/nutritionist/tmb-calculator' },
     { icon: Utensils, label: 'Alimentos', href: '/nutritionist/foods' },
     { icon: Calendar, label: 'Agenda', href: '/nutritionist/schedule' },
     { icon: MessageCircle, label: 'Chat', href: '/nutritionist/chat', isChat: true },

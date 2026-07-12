@@ -548,6 +548,97 @@ export class NutritionistsService {
     });
   }
 
+  // ── Calculadora TMB/GET + Macros ─────────────────────────
+
+  async calculateTMB(params: {
+    weight: number;
+    height: number;
+    age: number;
+    gender: string;
+    activityLevel: string;
+    goal: string;
+    formula?: string;
+  }) {
+    const { weight, height, age, gender, activityLevel, goal, formula = 'mifflin' } = params;
+
+    // Fatores de atividade
+    const activityFactors: Record<string, number> = {
+      SEDENTARY: 1.2,
+      LIGHTLY_ACTIVE: 1.375,
+      MODERATELY_ACTIVE: 1.55,
+      VERY_ACTIVE: 1.725,
+      EXTRA_ACTIVE: 1.9,
+    };
+
+    const factor = activityFactors[activityLevel] || 1.55;
+
+    // Cálculo TMB
+    let tmb: number;
+    if (formula === 'harris') {
+      tmb = gender === 'MALE'
+        ? 88.36 + (13.4 * weight) + (4.8 * height) - (5.7 * age)
+        : 447.6 + (9.2 * weight) + (3.1 * height) - (4.3 * age);
+    } else if (formula === 'fao') {
+      tmb = gender === 'MALE'
+        ? (15.3 * weight) + 679
+        : (14.7 * weight) + 496;
+    } else {
+      // Mifflin-St Jeor (default)
+      tmb = gender === 'MALE'
+        ? (10 * weight) + (6.25 * height) - (5 * age) + 5
+        : (10 * weight) + (6.25 * height) - (5 * age) - 161;
+    }
+
+    const get = Math.round(tmb * factor);
+
+    // Ajuste calórico por objetivo
+    let targetCalories: number;
+    let proteinPerKg: number;
+    let fatPct: number;
+
+    switch (goal) {
+      case 'LOSE_WEIGHT':
+        targetCalories = Math.round(get * 0.8); // déficit 20%
+        proteinPerKg = 2.0; // alta proteína pra preservar massa
+        fatPct = 0.25;
+        break;
+      case 'GAIN_MUSCLE':
+        targetCalories = Math.round(get * 1.15); // superávit 15%
+        proteinPerKg = 1.8;
+        fatPct = 0.25;
+        break;
+      case 'MAINTAIN_WEIGHT':
+        targetCalories = get;
+        proteinPerKg = 1.6;
+        fatPct = 0.25;
+        break;
+      default:
+        targetCalories = get;
+        proteinPerKg = 1.6;
+        fatPct = 0.25;
+    }
+
+    const proteinGrams = Math.round(weight * proteinPerKg);
+    const proteinKcal = proteinGrams * 4;
+    const fatKcal = Math.round(targetCalories * fatPct);
+    const fatGrams = Math.round(fatKcal / 9);
+    const carbsKcal = targetCalories - proteinKcal - fatKcal;
+    const carbsGrams = Math.round(carbsKcal / 4);
+
+    return {
+      tmb: Math.round(tmb),
+      get,
+      targetCalories,
+      macros: {
+        protein: { grams: proteinGrams, kcal: proteinKcal, pct: Math.round((proteinKcal / targetCalories) * 100) },
+        carbs: { grams: carbsGrams, kcal: carbsKcal, pct: Math.round((carbsKcal / targetCalories) * 100) },
+        fat: { grams: fatGrams, kcal: fatKcal, pct: Math.round((fatKcal / targetCalories) * 100) },
+      },
+      formula,
+      activityFactor: factor,
+    };
+  }
+
   async updateSupplementationPlan(userId: string, planId: string, data: any) {
     const n = await this.getNutritionist(userId);
     const plan = await this.prisma.supplementationPlan.findFirst({

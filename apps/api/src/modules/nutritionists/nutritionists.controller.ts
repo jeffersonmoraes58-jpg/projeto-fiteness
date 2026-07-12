@@ -278,4 +278,18 @@ export class NutritionistsController {
   update(@CurrentUser() user: any, @Body() body: any) {
     return this.service.update(user.id, body);
   }
+
+  @Post('me/calculate-tmb')
+  @ApiOperation({ summary: 'Calcular TMB, GET e distribuição de macronutrientes' })
+  calculateTMB(@CurrentUser() user: any, @Body() body: {
+    weight: number;
+    height: number;
+    age: number;
+    gender: string;
+    activityLevel: string;
+    goal: string;
+    formula?: string;
+  }) {
+    return this.service.calculateTMB(body);
+  }
 }
