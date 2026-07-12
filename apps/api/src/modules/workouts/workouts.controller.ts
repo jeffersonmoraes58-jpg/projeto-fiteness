@@ -15,6 +15,7 @@ import { WorkoutsService } from './workouts.service';
 import { CreateWorkoutDto } from './dto/create-workout.dto';
 import { UpdateWorkoutDto } from './dto/update-workout.dto';
 import { AssignWorkoutDto } from './dto/assign-workout.dto';
+import { UseTemplateDto } from './dto/use-template.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../../decorators/roles.decorator';
@@ -46,6 +47,17 @@ export class WorkoutsController {
   @ApiOperation({ summary: 'Listar templates de treino' })
   getTemplates(@Query('search') search?: string) {
     return this.workoutsService.getTemplates(search);
+  }
+
+  @Post('templates/:id/use')
+  @Roles(UserRole.TRAINER)
+  @ApiOperation({ summary: 'Criar treino a partir de um template' })
+  useTemplate(
+    @Param('id') id: string,
+    @CurrentUser('id') userId: string,
+    @Body() dto?: UseTemplateDto,
+  ) {
+    return this.workoutsService.useTemplate(id, userId, dto);
   }
 
   @Get(':id')

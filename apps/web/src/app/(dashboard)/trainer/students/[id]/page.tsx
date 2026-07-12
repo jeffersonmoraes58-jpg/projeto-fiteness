@@ -8,6 +8,7 @@ import {
   Clock, Zap, ChevronRight, ClipboardList, TrendingUp,
   Heart, Activity, Moon, Brain, Target, Info,
   Plus, X, Search, Pencil, Scale, Save, Mail, Share2, Send,
+  FileText, Download,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
@@ -147,6 +148,87 @@ export default function StudentDetailPage() {
     onError: () => toast.error('Erro ao enviar link da anamnese'),
   });
 
+  const [reportLoading, setReportLoading] = useState(false);
+
+  async function downloadStudentReport() {
+    if (!student?.id) return;
+    setReportLoading(true);
+    try {
+      const res = await api.get(`/trainers/me/students/${student.id}/report`);
+      const report = res.data?.data ?? res.data;
+      const date = new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' });
+      generateReportPDF(report, date);
+      toast.success('Relatório gerado!');
+    } catch {
+      toast.error('Erro ao gerar relatório');
+    } finally {
+      setReportLoading(false);
+    }
+  }
+
+  function generateReportPDF(report: any, date: string) {
+    const s = report.student;
+    const sum = report.summary;
+
+    const weightRows = (report.weightTrend || []).map((w: any) =>
+      `<tr><td style="padding:4px 8px;text-align:center;font-size:12px;color:#374151;">${w.date}</td><td style="padding:4px 8px;text-align:center;font-size:12px;color:#111827;font-weight:600;">${w.weight}kg</td><td style="padding:4px 8px;text-align:center;font-size:12px;color:#374151;">${w.bodyFat ?? '-'}%</td><td style="padding:4px 8px;text-align:center;font-size:12px;color:#374151;">${w.muscleMass ?? '-'}kg</td></tr>`
+    ).join('') || '<tr><td colspan="4" style="padding:8px;text-align:center;color:#9ca3af;">Sem dados de peso</td></tr>';
+
+    const measureRows = (report.measurements || []).slice(0, 5).map((m: any) =>
+      `<tr><td style="padding:4px 8px;text-align:center;font-size:12px;color:#374151;">${m.date}</td><td style="padding:4px 8px;text-align:center;font-size:12px;font-weight:600;">${m.weight}kg</td><td style="padding:4px 8px;text-align:center;font-size:12px;">${m.waist ?? '-'}</td><td style="padding:4px 8px;text-align:center;font-size:12px;">${m.hip ?? '-'}</td><td style="padding:4px 8px;text-align:center;font-size:12px;">${m.chest ?? '-'}</td><td style="padding:4px 8px;text-align:center;font-size:12px;">${m.arm ?? '-'}</td><td style="padding:4px 8px;text-align:center;font-size:12px;">${m.thigh ?? '-'}</td></tr>`
+    ).join('') || '<tr><td colspan="7" style="padding:8px;text-align:center;color:#9ca3af;">Sem medidas</td></tr>';
+
+    const planRows = (report.currentPlans || []).map((p: any) => {
+      const exRows = (p.exercises || []).map((ex: any, i: number) =>
+        `<tr><td style="padding:4px 12px 4px 24px;font-size:11px;color:#6b7280;">${i + 1}. ${ex.name}</td><td style="padding:4px 8px;text-align:center;font-size:11px;color:#374151;">${ex.sets}x${ex.reps}</td><td style="padding:4px 8px;text-align:center;font-size:11px;color:#374151;">${ex.weight ?? '-'}kg</td></tr>`
+      ).join('');
+      return `<tr style="background:#f5f3ff;"><td colspan="3" style="padding:8px 12px;font-weight:600;font-size:13px;color:#7c3aed;">${p.name} · ${p.duration}min</td></tr>${exRows}`;
+    }).join('') || '<tr><td colspan="3" style="padding:8px;text-align:center;color:#9ca3af;">Sem treinos ativos</td></tr>';
+
+    const logRows = (report.recentLogs || []).slice(0, 10).map((l: any) =>
+      `<tr><td style="padding:4px 8px;font-size:12px;color:#374151;">${l.date}</td><td style="padding:4px 8px;text-align:center;font-size:12px;">${l.duration ?? '-'}min</td><td style="padding:4px 8px;text-align:center;font-size:12px;">${l.status ?? '-'}</td><td style="padding:4px 8px;text-align:center;font-size:12px;">${l.feeling ?? '-'}/5</td></tr>`
+    ).join('') || '<tr><td colspan="4" style="padding:8px;text-align:center;color:#9ca3af;">Sem treinos registrados</td></tr>';
+
+    const html = `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><title>Relatório — ${s.name}</title>
+    <style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:'Segoe UI',Arial,sans-serif;color:#111827;background:#fff;padding:40px}
+    @media print{body{padding:24px}button{display:none!important}@page{margin:12mm 10mm}.section{page-break-inside:avoid}}
+    .header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:28px;border-bottom:3px solid #7c3aed;padding-bottom:20px}
+    .logo{font-size:24px;font-weight:700;color:#7c3aed}.logo span{color:#6b7280;font-weight:400;font-size:14px;margin-left:8px}
+    .date{font-size:12px;color:#6b7280;text-align:right;margin-top:4px}
+    .kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:28px}
+    .kpi{border:1px solid #e5e7eb;border-radius:12px;padding:16px;text-align:center}
+    .kpi-val{font-size:24px;font-weight:700;color:#7c3aed}
+    .kpi-label{font-size:11px;color:#6b7280;margin-top:2px}
+    .section{margin-bottom:24px}
+    .section-title{font-size:16px;font-weight:600;color:#111827;margin-bottom:12px;padding-bottom:6px;border-bottom:1px solid #e5e7eb}
+    table{width:100%;border-collapse:collapse}
+    thead th{background:#f9fafb;color:#6b7280;padding:8px;font-size:11px;font-weight:600;text-align:center;border-bottom:1px solid #e5e7eb}
+    tbody tr:nth-child(odd){background:#fafafa}
+    .footer{margin-top:32px;text-align:center;font-size:11px;color:#9ca3af;border-top:1px solid #e5e7eb;padding-top:16px}
+    .print-btn{position:fixed;bottom:24px;right:24px;background:#7c3aed;color:white;border:none;padding:14px 24px;border-radius:12px;font-size:15px;font-weight:600;cursor:pointer;box-shadow:0 4px 16px rgba(124,58,237,.4)}
+    </style></head><body>
+    <div class="header"><div><div class="logo">FitlyNutri <span>Relatório do Aluno</span></div><div style="font-size:20px;font-weight:700;margin-top:4px">${s.name}</div>
+    <div style="font-size:12px;color:#6b7280;margin-top:2px">${s.email}${s.phone ? ' · ' + s.phone : ''} · Desde ${new Date(s.since).toLocaleDateString('pt-BR')}</div></div><div class="date">Emitido em ${date}</div></div>
+    <div class="kpi-grid">
+      <div class="kpi"><div class="kpi-val">${sum.totalWorkouts}</div><div class="kpi-label">Treinos Totais</div></div>
+      <div class="kpi"><div class="kpi-val">${sum.completedThisMonth}</div><div class="kpi-label">Treinos (30 dias)</div></div>
+      <div class="kpi"><div class="kpi-val">${sum.adherenceRate}%</div><div class="kpi-label">Taxa de Adesão</div></div>
+      <div class="kpi"><div class="kpi-val">🔥${sum.streak}</div><div class="kpi-label">Streak Atual</div></div>
+    </div>
+    <div class="section"><div class="section-title">📊 Evolução do Peso</div><table><thead><tr><th>Data</th><th>Peso</th><th>Gordura</th><th>Massa Muscular</th></tr></thead><tbody>${weightRows}</tbody></table></div>
+    <div class="section"><div class="section-title">📏 Medidas Corporais</div><table><thead><tr><th>Data</th><th>Peso</th><th>Cintura</th><th>Quadril</th><th>Peito</th><th>Braço</th><th>Coxa</th></tr></thead><tbody>${measureRows}</tbody></table></div>
+    <div class="section"><div class="section-title">💪 Planos de Treino Atuais</div><table><thead><tr><th>Exercício</th><th>Volume</th><th>Carga</th></tr></thead><tbody>${planRows}</tbody></table></div>
+    <div class="section"><div class="section-title">📅 Histórico Recente de Treinos</div><table><thead><tr><th>Data</th><th>Duração</th><th>Status</th><th>Sentimento</th></tr></thead><tbody>${logRows}</tbody></table></div>
+    <div class="footer">Gerado pelo FitlyNutri · Relatório para acompanhamento do aluno</div>
+    <button class="print-btn" onclick="window.print()">⬇ Salvar PDF / Imprimir</button>
+    </body></html>`;
+    const w = window.open('', '_blank', 'width=1000,height=750');
+    if (!w) { toast.error('Permita pop-ups para gerar o relatório'); return; }
+    w.document.write(html);
+    w.document.close();
+    w.focus();
+  }
+
   if (isLoading) {
     return (
       <div className="max-w-2xl mx-auto space-y-4">
@@ -217,6 +299,16 @@ export default function StudentDetailPage() {
                 </a>
               );
             })()}
+            <button
+              onClick={downloadStudentReport}
+              disabled={reportLoading}
+              className="w-9 h-9 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center hover:bg-primary/20 transition-all disabled:opacity-50"
+              title="Gerar relatório do aluno"
+            >
+              {reportLoading
+                ? <svg className="w-4 h-4 text-primary animate-spin" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" opacity=".3"/><path d="M12 2a10 10 0 019.95 9" stroke="currentColor" strokeWidth="3" strokeLinecap="round"/></svg>
+                : <FileText className="w-4 h-4 text-primary" />}
+            </button>
             <Link href="/trainer/chat" className="w-9 h-9 rounded-xl glass flex items-center justify-center hover:bg-accent transition-all">
               <MessageCircle className="w-4 h-4 text-muted-foreground" />
             </Link>

@@ -123,8 +123,46 @@ export class NotificationsScheduler {
     }
   }
 
-  // Alunos inativos há 7 dias — toda segunda às 8h
-  @Cron('0 8 * * 1')
+  // Alunos inativos há 3 dias — todo dia às 8h (alerta preventivo)
+  @Cron('0 8 * * *')
+  async inactivityWarning3Days() {
+    const threeDaysAgo = new Date(Date.now() - 3 * 86400000);
+
+    const relations = await this.prisma.trainerStudent.findMany({
+      where: { isActive: true },
+      include: {
+        trainer: { include: { user: { select: { id: true } } } },
+        student: {
+          include: {
+            user: { include: { profile: true } },
+            workoutLogs: { orderBy: { completedAt: 'desc' }, take: 1, select: { completedAt: true } },
+          },
+        },
+      },
+    });
+
+    for (const rel of relations) {
+      const lastLog = rel.student.workoutLogs[0];
+      // Só notifica se o último treino foi há 3-6 dias (para não duplicar com o de 7)
+      if (!lastLog) continue;
+      const daysSinceLast = Math.floor((Date.now() - new Date(lastLog.completedAt).getTime()) / 86400000);
+      if (daysSinceLast < 3 || daysSinceLast > 6) continue;
+
+      const studentName = [rel.student.user.profile?.firstName, rel.student.user.profile?.lastName]
+        .filter(Boolean).join(' ') || 'Aluno(a)';
+      const lastStr = new Date(lastLog.completedAt).toLocaleDateString('pt-BR');
+
+      await this.notifications.create({
+        userId: rel.trainer.userId,
+        type: 'SYSTEM',
+        title: `💛 ${studentName} há 3 dias sem treinar`,
+        body: `${studentName} não treina desde ${lastStr}. Um incentivo agora pode fazer a diferença!`,
+      });
+    }
+  }
+
+  // Alunos inativos há 7 dias — todo dia às 8h
+  @Cron('0 8 * * *')
   async inactiveStudentAlert() {
     const sevenDaysAgo = new Date(Date.now() - 7 * 86400000);
 
@@ -154,8 +192,16 @@ export class NotificationsScheduler {
       await this.notifications.create({
         userId: rel.trainer.userId,
         type: 'SYSTEM',
-        title: `⚠️ ${studentName} está inativo(a)`,
-        body: `${studentName} não treina há mais de 7 dias. Último treino: ${lastStr}. Que tal entrar em contato?`,
+        title: `🔴 ${studentName} está inativo(a) há 7+ dias`,
+        body: `${studentName} não treina há mais de 7 dias. Último treino: ${lastStr}. Considere entrar em contato!`,
+      });
+
+      // Também notificar o aluno como incentivo
+      await this.notifications.create({
+        userId: rel.student.userId,
+        type: 'WORKOUT_REMINDER',
+        title: '💪 Sentimos sua falta!',
+        body: 'Já faz uma semana desde seu último treino. Que tal voltar hoje? Seu corpo agradece!',
       });
     }
   }

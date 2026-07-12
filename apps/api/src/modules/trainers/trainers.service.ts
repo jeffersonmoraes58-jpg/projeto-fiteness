@@ -471,6 +471,162 @@ export class TrainersService {
     };
   }
 
+  async getStudentReport(userId: string, studentId: string) {
+    const trainer = await this.getTrainer(userId);
+
+    // Verifica que o aluno pertence a este trainer
+    const relation = await this.prisma.trainerStudent.findFirst({
+      where: { trainerId: trainer.id, studentId },
+      include: {
+        student: {
+          include: {
+            user: { include: { profile: true } },
+            anamnesis: true,
+          },
+        },
+      },
+    });
+    if (!relation) throw new NotFoundException('Aluno não encontrado ou não pertence a este trainer');
+
+    const student = relation.student;
+
+    // Medições (progress photos + measurements)
+    const [measurements, assessments, photos, workoutPlans, workoutLogs] = await Promise.all([
+      this.prisma.bodyMeasurement.findMany({
+        where: { studentId: student.id },
+        orderBy: { measuredAt: 'desc' },
+        take: 20,
+      }),
+      this.prisma.physicalAssessment.findMany({
+        where: { studentId: student.id },
+        orderBy: { assessedAt: 'desc' },
+        take: 5,
+      }),
+      this.prisma.progressPhoto.findMany({
+        where: { studentId: student.id },
+        orderBy: { takenAt: 'desc' },
+        take: 8,
+      }),
+      this.prisma.workoutPlan.findMany({
+        where: { studentId: student.id, isActive: true },
+        include: {
+          workout: {
+            include: {
+              exercises: { include: { exercise: true }, orderBy: { order: 'asc' } },
+            },
+          },
+        },
+        orderBy: { order: 'asc' },
+      }),
+      this.prisma.workoutLog.findMany({
+        where: { studentId: student.id },
+        orderBy: { completedAt: 'desc' },
+        take: 50,
+      }),
+    ]);
+
+    // Últimos 30 dias de logs
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 86400000);
+    const recentLogs = workoutLogs.filter((l) => new Date(l.completedAt) >= thirtyDaysAgo);
+    const totalPlans = workoutPlans.length;
+    const completedThisMonth = recentLogs.length;
+    const adherenceRate = totalPlans > 0
+      ? Math.round((completedThisMonth / (totalPlans * 4.3)) * 100) // ~4.3 semanas/mês
+      : 0;
+
+    // Tendência de peso
+    const weightTrend = measurements
+      .filter((m) => m.weight != null)
+      .slice(0, 10)
+      .reverse()
+      .map((m) => ({
+        date: this.toBRDate(m.measuredAt),
+        weight: m.weight,
+        bodyFat: m.bodyFat,
+        muscleMass: m.muscleMass,
+      }));
+
+    // Progressão de cargas — disponível quando exerciseLogs é populado (workoutLog.exerciseLogs)
+    // Os logs retornados aqui não incluem exerciseLogs (performance), mas o campo é suportado no schema
+    const exerciseProgress: Record<string, { name: string; weights: { date: string; weight: number }[] }> = {};
+
+    return {
+      student: {
+        name: [student.user.profile?.firstName, student.user.profile?.lastName].filter(Boolean).join(' ') || student.user.email,
+        email: student.user.email,
+        phone: student.user.profile?.phone,
+        avatarUrl: student.user.profile?.avatarUrl,
+        birthDate: student.user.profile?.birthDate,
+        goals: student.anamnesis?.mainGoal ? [student.anamnesis.mainGoal] : [],
+        activityLevel: (student.anamnesis as any)?.activityLevel,
+        streak: student.streak,
+        points: student.points,
+        level: student.level,
+        since: student.createdAt,
+      },
+      summary: {
+        totalWorkouts: workoutLogs.length,
+        completedThisMonth,
+        adherenceRate,
+        streak: student.streak,
+        points: student.points,
+      },
+      weightTrend,
+      measurements: measurements.slice(0, 10).map((m) => ({
+        date: this.toBRDate(m.measuredAt),
+        weight: m.weight,
+        bodyFat: m.bodyFat,
+        muscleMass: m.muscleMass,
+        waist: m.waist,
+        hip: m.hip,
+        chest: m.chest,
+        arm: m.arm,
+        thigh: m.thigh,
+        notes: m.notes,
+      })),
+      assessments: assessments.map((a) => ({
+        date: this.toBRDate(a.assessedAt),
+        weight: a.weight,
+        height: a.height,
+        bmi: a.bmi,
+        bodyFatPercent: a.bodyFatPercent,
+        muscleMassKg: a.muscleMassKg,
+        waistCm: a.waistCm,
+        hipCm: a.hipCm,
+        chestCm: a.chestCm,
+        rightArmCm: a.rightArmCm,
+        rightThighCm: a.rightThighCm,
+        rightCalfCm: a.rightCalfCm,
+        notes: a.notes,
+      })),
+      photos: photos.map((p) => ({
+        url: p.photoUrl,
+        angle: p.angle,
+        date: this.toBRDate(p.takenAt),
+      })),
+      currentPlans: workoutPlans.map((p) => ({
+        name: p.workout.name,
+        division: p.division,
+        duration: p.workout.duration,
+        dayOfWeek: p.dayOfWeek,
+        exercises: p.workout.exercises.map((ex) => ({
+          name: ex.exercise.name,
+          sets: ex.sets,
+          reps: ex.reps,
+          weight: ex.weight,
+          restSeconds: ex.restSeconds,
+        })),
+      })),
+      recentLogs: workoutLogs.slice(0, 10).map((l) => ({
+        date: this.toBRDate(l.completedAt),
+        duration: l.duration,
+        status: l.status,
+        feeling: l.feeling,
+        notes: l.notes,
+      })),
+    };
+  }
+
   async update(userId: string, data: any) {
     const trainer = await this.getTrainer(userId);
     const { profile, trainer: trainerData } = data;

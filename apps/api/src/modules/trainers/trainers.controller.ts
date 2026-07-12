@@ -88,4 +88,10 @@ export class TrainersController {
   getAnalytics(@CurrentUser() user: any) {
     return this.service.getAnalytics(user.id);
   }
+
+  @Get('me/students/:studentId/report')
+  @ApiOperation({ summary: 'Relatório detalhado de um aluno específico' })
+  getStudentReport(@CurrentUser() user: any, @Param('studentId') studentId: string) {
+    return this.service.getStudentReport(user.id, studentId);
+  }
 }

@@ -4,6 +4,7 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { CreateWorkoutDto } from './dto/create-workout.dto';
 import { UpdateWorkoutDto } from './dto/update-workout.dto';
 import { AssignWorkoutDto } from './dto/assign-workout.dto';
+import { UseTemplateDto } from './dto/use-template.dto';
 import { WorkoutStatus } from '@prisma/client';
 
 @Injectable()
@@ -149,6 +150,53 @@ export class WorkoutsService {
         exercises: { include: { exercise: true }, orderBy: { order: 'asc' } },
       },
     });
+  }
+
+  async useTemplate(templateId: string, userId: string, dto?: UseTemplateDto) {
+    const trainer = await this.prisma.trainer.findUnique({ where: { userId } });
+    if (!trainer) throw new ForbiddenException('Usuário não é trainer');
+
+    const template = await this.prisma.workout.findUnique({
+      where: { id: templateId },
+      include: { exercises: { include: { exercise: true }, orderBy: { order: 'asc' } } },
+    });
+    if (!template || !template.isTemplate) {
+      throw new NotFoundException('Template não encontrado');
+    }
+
+    // Duplicate the template as a new workout for this trainer
+    const newWorkout = await this.prisma.workout.create({
+      data: {
+        name: dto?.name || `Cópia: ${template.name}`,
+        description: dto?.description ?? template.description,
+        status: WorkoutStatus.DRAFT,
+        level: dto?.level ?? template.level,
+        duration: dto?.duration ?? template.duration,
+        tags: dto?.tags ?? template.tags,
+        isTemplate: false,
+        trainerId: trainer.id,
+        exercises: {
+          create: template.exercises.map((ex, index) => ({
+            exerciseId: ex.exerciseId,
+            order: index,
+            sets: ex.sets,
+            reps: ex.reps,
+            weight: ex.weight,
+            restSeconds: ex.restSeconds,
+            tempo: ex.tempo,
+            notes: ex.notes,
+            isDropSet: ex.isDropSet,
+            isSuperSet: ex.isSuperSet,
+            superSetGroupId: ex.superSetGroupId,
+          })),
+        },
+      },
+      include: {
+        exercises: { include: { exercise: true }, orderBy: { order: 'asc' } },
+      },
+    });
+
+    return { workoutId: newWorkout.id, workout: newWorkout };
   }
 
   async remove(id: string) {
