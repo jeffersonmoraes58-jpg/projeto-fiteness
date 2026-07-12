@@ -8,7 +8,7 @@ import {
   Dumbbell, Users, Apple, BarChart3, MessageCircle, Bell,
   Settings, LogOut, ChevronLeft, Trophy,
   Calendar, CreditCard, Brain, Home, Utensils,
-  Activity, Target, Star, Building2,
+  Activity, Target, Star, Building2, Shield, Zap,
 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { useAuthStore } from '@/store/auth';
@@ -72,6 +72,8 @@ const navByRole: Record<string, NavItem[]> = {
     { icon: BarChart3, label: 'Analytics', href: '/admin/analytics' },
     { icon: Bell, label: 'Notificações', href: '/admin/notifications' },
     { icon: Settings, label: 'Configurações', href: '/admin/settings' },
+    { icon: Shield, label: 'Auditoria', href: '/admin/audit-logs' },
+    { icon: Zap, label: 'Feature Flags', href: '/admin/tenant-settings' },
   ],
 };
 

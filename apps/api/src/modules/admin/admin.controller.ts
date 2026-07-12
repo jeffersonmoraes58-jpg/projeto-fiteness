@@ -134,4 +134,66 @@ export class AdminController {
   updateSettings(@Body() body: { features?: any; limits?: any; email?: any }) {
     return this.service.updateSettings(body);
   }
+
+  // ── Audit Log ──────────────────────────────────────────────
+
+  @Get('audit-logs')
+  @ApiOperation({ summary: 'Listar logs de auditoria' })
+  getAuditLogs(
+    @Query('search') search?: string,
+    @Query('action') action?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.service.getAuditLogs({
+      search,
+      action,
+      page: page ? +page : 1,
+      limit: limit ? +limit : 30,
+    });
+  }
+
+  @Get('audit-logs/actions')
+  @ApiOperation({ summary: 'Listar ações distintas do audit log' })
+  getAuditActions() {
+    return this.service.getAuditActions();
+  }
+
+  // ── Tenant Settings (Feature Flags) ────────────────────────
+
+  @Get('tenant-settings')
+  @ApiOperation({ summary: 'Listar configurações de tenants (feature flags)' })
+  getTenantSettings(
+    @Query('search') search?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.service.getAllTenantSettings(search, page ? +page : 1, limit ? +limit : 20);
+  }
+
+  @Patch('tenant-settings/:tenantId')
+  @ApiOperation({ summary: 'Atualizar feature flags de um tenant' })
+  updateTenantSettings(
+    @Param('tenantId') tenantId: string,
+    @Body() body: {
+      allowStudentSelfSignup?: boolean;
+      maxStudents?: number;
+      maxTrainers?: number;
+      enableAI?: boolean;
+      enableChat?: boolean;
+      enableNotifications?: boolean;
+      enableGamification?: boolean;
+      enableNutrition?: boolean;
+    },
+  ) {
+    return this.service.updateTenantSettings(tenantId, body);
+  }
+
+  // ── Relatório Financeiro Exportável ────────────────────────
+
+  @Get('financial-report')
+  @ApiOperation({ summary: 'Relatório financeiro detalhado para exportação' })
+  getFinancialReport() {
+    return this.service.getFinancialReport();
+  }
 }

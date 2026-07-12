@@ -613,4 +613,121 @@ export class AdminService {
     ]);
     return { stats, analytics, recentTenants, recentUsers, health };
   }
+
+  // ── Audit Log ─────────────────────────────────────────────
+
+  async getAuditLogs(params: { search?: string; page?: number; limit?: number; action?: string }) {
+    const page = params.page || 1;
+    const limit = params.limit || 30;
+    const where: any = {};
+    if (params.action) where.action = params.action;
+    if (params.search) {
+      where.OR = [
+        { action: { contains: params.search, mode: 'insensitive' } },
+        { resource: { contains: params.search, mode: 'insensitive' } },
+      ];
+    }
+    const [logs, total] = await Promise.all([
+      this.prisma.auditLog.findMany({
+        where,
+        skip: (page - 1) * limit,
+        take: limit,
+        include: { user: { select: { id: true, email: true, role: true } } },
+        orderBy: { createdAt: 'desc' },
+      }),
+      this.prisma.auditLog.count({ where }),
+    ]);
+    return { logs, total, page, limit };
+  }
+
+  async getAuditActions(): Promise<string[]> {
+    const result: any[] = await this.prisma.$queryRaw`
+      SELECT action, COUNT(*)::int as count
+      FROM audit_logs
+      GROUP BY action
+      ORDER BY count DESC
+    `;
+    return result.map((r: any) => r.action);
+  }
+
+  // ── Tenant Settings (Feature Flags) ───────────────────────
+
+  async getAllTenantSettings(search?: string, page = 1, limit = 20) {
+    const where: any = {};
+    if (search) {
+      where.tenant = { name: { contains: search, mode: 'insensitive' } };
+    }
+    const [settings, total] = await Promise.all([
+      this.prisma.tenantSettings.findMany({
+        where,
+        skip: (page - 1) * limit,
+        take: limit,
+        include: { tenant: { select: { id: true, name: true } } },
+        orderBy: { updatedAt: 'desc' },
+      }),
+      this.prisma.tenantSettings.count({ where }),
+    ]);
+    return { settings, total, page, limit };
+  }
+
+  async updateTenantSettings(tenantId: string, data: {
+    allowStudentSelfSignup?: boolean;
+    maxStudents?: number;
+    maxTrainers?: number;
+    enableAI?: boolean;
+    enableChat?: boolean;
+    enableNotifications?: boolean;
+    enableGamification?: boolean;
+    enableNutrition?: boolean;
+  }) {
+    const settings = await this.prisma.tenantSettings.upsert({
+      where: { tenantId },
+      update: data,
+      create: { tenantId, ...data },
+    });
+    return settings;
+  }
+
+  // ── Relatório Financeiro Exportável ───────────────────────
+
+  async getFinancialReport() {
+    const allSubs = await this.prisma.tenantSubscription.findMany({
+      include: { tenant: { select: { id: true, name: true } } },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    const rows = allSubs.map((s) => ({
+      tenantId: s.tenantId,
+      tenantName: s.tenant.name,
+      plan: s.plan,
+      status: s.status,
+      billingCycle: s.billingCycle,
+      mrr: getMonthlyMrr(s.plan, s.billingCycle),
+      periodStart: s.currentPeriodStart,
+      periodEnd: s.currentPeriodEnd,
+      cancelAtPeriodEnd: s.cancelAtPeriodEnd,
+      createdAt: s.createdAt,
+    }));
+
+    const active = rows.filter((r) => r.status === 'ACTIVE');
+    const totalMrr = active.reduce((s, r) => s + r.mrr, 0);
+    const pastDue = rows.filter((r) => r.status === 'PAST_DUE').length;
+    const canceled = rows.filter((r) => r.status === 'CANCELED').length;
+    const expired = rows.filter((r) => r.status === 'EXPIRED').length;
+    const trial = rows.filter((r) => r.status === 'TRIAL').length;
+
+    return {
+      summary: {
+        totalTenants: rows.length,
+        activeTenants: active.length,
+        totalMrr,
+        pastDue,
+        canceled,
+        expired,
+        trial,
+        generatedAt: new Date().toISOString(),
+      },
+      rows,
+    };
+  }
 }
