@@ -255,6 +255,41 @@ export class NutritionistsService {
     return { deleted: true };
   }
 
+  async getFinancials(userId: string) {
+    const n = await this.getNutritionist(userId);
+
+    const patients = await this.prisma.nutritionistPatient.findMany({
+      where: { nutritionistId: n.id, isActive: true },
+      include: { student: { include: { user: { include: { profile: true } } } } },
+    });
+
+    const withFee = patients.filter((p) => (p.monthlyFee ?? 0) > 0);
+    const withoutFee = patients.length - withFee.length;
+    const totalMonthly = withFee.reduce((sum, p) => sum + (p.monthlyFee ?? 0), 0);
+    const ticketMedio = withFee.length > 0 ? Math.round(totalMonthly / withFee.length) : 0;
+    const projectedAnnual = totalMonthly * 12;
+
+    const recent = patients
+      .sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime())
+      .slice(0, 4)
+      .map((p) => ({
+        id: p.student.id,
+        name: `${p.student.user?.profile?.firstName || ''} ${p.student.user?.profile?.lastName || ''}`.trim(),
+        fee: p.monthlyFee ?? 0,
+        startedAt: p.startedAt,
+      }));
+
+    return {
+      totalPatients: patients.length,
+      payingPatients: withFee.length,
+      withoutFee,
+      totalMonthly,
+      ticketMedio,
+      projectedAnnual,
+      recent,
+    };
+  }
+
   async getReports(userId: string) {
     const n = await this.getNutritionist(userId);
     const since = new Date(Date.now() - 30 * 86400000);

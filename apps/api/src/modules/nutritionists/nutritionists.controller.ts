@@ -81,6 +81,12 @@ export class NutritionistsController {
     return this.service.deleteFood(user.id, foodId);
   }
 
+  @Get('me/financials')
+  @ApiOperation({ summary: 'Dashboard financeiro' })
+  getFinancials(@CurrentUser() user: any) {
+    return this.service.getFinancials(user.id);
+  }
+
   @Get('me/reports')
   @ApiOperation({ summary: 'Relatórios dos últimos 30 dias' })
   getReports(@CurrentUser() user: any) {

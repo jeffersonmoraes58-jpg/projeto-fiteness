@@ -4,7 +4,7 @@ import { motion } from 'framer-motion';
 import {
   Users, Apple, Calendar, TrendingUp, ArrowUpRight,
   ChevronRight, Plus, Star, Clock, CheckCircle2,
-  Utensils, Brain, MessageCircle,
+  Utensils, Brain, MessageCircle, DollarSign, CreditCard,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
@@ -24,6 +24,11 @@ export default function NutritionistDashboard() {
   const { data: dashboard } = useQuery({
     queryKey: ['nutritionist-dashboard'],
     queryFn: () => api.get('/nutritionists/me/dashboard').then((r) => r.data.data),
+  });
+
+  const { data: financials } = useQuery({
+    queryKey: ['nutritionist-financials'],
+    queryFn: () => api.get('/nutritionists/me/financials').then((r) => r.data.data),
   });
 
   const stats = dashboard?.stats;
@@ -71,6 +76,34 @@ export default function NutritionistDashboard() {
             </div>
             <div className="text-2xl font-bold">
               {stats ? (stats[card.key] ?? '—') : '—'}{card.suffix || ''}
+            </div>
+            <div className="text-xs text-muted-foreground mt-1">{card.label}</div>
+          </motion.div>
+        ))}
+      </div>
+
+      {/* Financial cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {[
+          { key: 'totalMonthly', label: 'Faturamento Mensal', icon: DollarSign, color: 'from-amber-600 to-yellow-600', prefix: 'R$ ' },
+          { key: 'ticketMedio', label: 'Ticket Médio', icon: CreditCard, color: 'from-rose-600 to-pink-600', prefix: 'R$ ' },
+          { key: 'projectedAnnual', label: 'Projeção Anual', icon: TrendingUp, color: 'from-teal-600 to-emerald-600', prefix: 'R$ ' },
+          { key: 'payingPatients', label: 'Pacientes Pagantes', icon: Users, color: 'from-sky-600 to-blue-600', suffix: ` de ${financials?.totalPatients ?? '—'}` },
+        ].map((card, i) => (
+          <motion.div
+            key={card.key}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.4 + i * 0.1 }}
+            className="stat-card"
+          >
+            <div className="flex items-center justify-between mb-4">
+              <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${card.color} flex items-center justify-center`}>
+                <card.icon className="w-5 h-5 text-white" />
+              </div>
+            </div>
+            <div className="text-2xl font-bold">
+              {financials ? `${card.prefix || ''}${financials[card.key] ?? '—'}${card.suffix || ''}` : '—'}
             </div>
             <div className="text-xs text-muted-foreground mt-1">{card.label}</div>
           </motion.div>
