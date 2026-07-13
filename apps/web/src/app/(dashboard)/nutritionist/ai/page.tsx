@@ -6,8 +6,9 @@ import {
   Brain, Send, Sparkles, User, Copy, RefreshCw,
   Apple, Target, Flame, Zap, ChevronRight, Settings2,
   CheckCircle2, ChevronDown, ChevronUp, Trash2, Save,
+  Users, Search,
 } from 'lucide-react';
-import { useMutation } from '@tanstack/react-query';
+import { useQuery, useMutation } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
 
@@ -160,12 +161,16 @@ export default function NutritionistAI() {
     {
       id: '0',
       role: 'assistant',
-      content: 'Olá! Sou sua assistente de IA especializada em nutrição. Posso ajudar com:\n\n• Geração de planos alimentares personalizados\n• Cálculo de macronutrientes e calorias\n• Sugestões de substituições alimentares\n• Análise de dietas e ajustes\n• Cardápios para restrições alimentares\n\nComo posso ajudar você hoje?',
+      content: 'Olá! Sou sua assistente de IA especializada em nutrição. Posso ajudar com:\n\n• Geração de planos alimentares personalizados\n• Cálculo de macronutrientes e calorias\n• Sugestões de substituições alimentares\n• Análise de dietas e ajustes\n• Cardápios para restrições alimentares\n\nSelecione um paciente no seletor acima para eu usar o contexto clínico dele nas respostas.\n\nComo posso ajudar você hoje?',
       timestamp: new Date(),
     },
   ]);
   const [input, setInput] = useState('');
   const [trainingOpen, setTrainingOpen] = useState(false);
+  const [selectedPatientId, setSelectedPatientId] = useState<string>('');
+  const [patientSearch, setPatientSearch] = useState('');
+  const [patientDropdownOpen, setPatientDropdownOpen] = useState(false);
+  const patientDropdownRef = useRef<HTMLDivElement>(null);
   const [config, setConfig] = useState<AiConfig>(() => {
     if (typeof window === 'undefined') return EMPTY_CONFIG;
     try {
@@ -178,13 +183,53 @@ export default function NutritionistAI() {
   const [draft, setDraft] = useState<AiConfig>(config);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
+  // Fetch patients for selector
+  const { data: patients } = useQuery({
+    queryKey: ['nutritionist-patients-ai'],
+    queryFn: () => api.get('/nutritionists/me/patients').then((r) => r.data.data),
+  });
+
+  // Fetch AI context for selected patient
+  const { data: aiContext } = useQuery({
+    queryKey: ['patient-ai-context', selectedPatientId],
+    queryFn: () => api.get(`/nutritionists/me/patients/${selectedPatientId}/ai-context`).then((r) => r.data.data),
+    enabled: !!selectedPatientId,
+  });
+
+  const selectedPatient = patients?.find((p: any) => p.id === selectedPatientId);
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handleClick = (e: MouseEvent) => {
+      if (patientDropdownRef.current && !patientDropdownRef.current.contains(e.target as Node)) {
+        setPatientDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, []);
+
+  const filteredPatients = (patients || []).filter((p: any) => {
+    if (!patientSearch) return true;
+    const name = `${p.user?.profile?.firstName || ''} ${p.user?.profile?.lastName || ''}`.toLowerCase();
+    return name.includes(patientSearch.toLowerCase());
+  });
+
   const buildHistory = (msgs: Message[]) =>
     msgs.slice(1).map((m) => ({ role: m.role, content: m.content }));
 
   const sendMutation = useMutation({
     mutationFn: ({ message, history }: { message: string; history: any[] }) => {
-      const context = isConfigured(config) ? buildContext(config) : undefined;
-      return api.post('/ai/assistant', { message, history, context }).then((r) => r.data.data);
+      // Merge trainer config context with patient clinical context
+      const trainerContext = isConfigured(config) ? buildContext(config) : '';
+      const patientContext = aiContext?.contextText || '';
+      const fullContext = [trainerContext, patientContext].filter(Boolean).join('\n\n---\n\n');
+
+      return api.post('/ai/assistant', {
+        message,
+        history,
+        context: fullContext || undefined,
+      }).then((r) => r.data.data);
     },
     onSuccess: (data) => {
       setMessages((prev) => [...prev, {
@@ -231,7 +276,6 @@ export default function NutritionistAI() {
     setConfig(draft);
     localStorage.setItem('fitlynutri-ai-config', JSON.stringify(draft));
     setTrainingOpen(false);
-    // Reset chat so AI greets with new config
     setMessages([{
       id: Date.now().toString(),
       role: 'assistant',
@@ -258,9 +302,19 @@ export default function NutritionistAI() {
         </div>
         <div>
           <h1 className="text-xl font-bold">IA Nutrição</h1>
-          <p className="text-sm text-muted-foreground">Assistente especializado em nutrição</p>
+          <p className="text-sm text-muted-foreground">
+            {selectedPatient
+              ? `Contexto: ${selectedPatient.user?.profile?.firstName} ${selectedPatient.user?.profile?.lastName}`
+              : 'Assistente especializado em nutrição'}
+          </p>
         </div>
         <div className="ml-auto flex items-center gap-2">
+          {aiContext && (
+            <span className="flex items-center gap-1.5 text-xs text-purple-400 font-medium bg-purple-500/10 px-2.5 py-1 rounded-full">
+              <Brain className="w-3 h-3" />
+              IA contextual
+            </span>
+          )}
           {configured && (
             <span className="flex items-center gap-1.5 text-xs text-emerald-400 font-medium bg-emerald-500/10 px-2.5 py-1 rounded-full">
               <CheckCircle2 className="w-3 h-3" />
@@ -271,6 +325,93 @@ export default function NutritionistAI() {
             <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
             Online
           </div>
+        </div>
+      </div>
+
+      {/* ── Patient selector ── */}
+      <div className="glass rounded-2xl px-4 py-3" ref={patientDropdownRef}>
+        <div className="flex items-center gap-3">
+          <Users className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+          <div className="relative flex-1">
+            <button
+              type="button"
+              onClick={() => setPatientDropdownOpen(!patientDropdownOpen)}
+              className="w-full flex items-center justify-between text-sm hover:bg-accent/30 rounded-lg px-3 py-2 transition-all"
+            >
+              <span className={selectedPatient ? 'font-medium' : 'text-muted-foreground'}>
+                {selectedPatient
+                  ? `${selectedPatient.user?.profile?.firstName || ''} ${selectedPatient.user?.profile?.lastName || ''}`.trim()
+                  : 'Selecionar paciente (opcional — IA terá acesso ao histórico clínico)'}
+              </span>
+              <ChevronDown className={cn('w-4 h-4 text-muted-foreground transition-transform', patientDropdownOpen && 'rotate-180')} />
+            </button>
+            <AnimatePresence>
+              {patientDropdownOpen && (
+                <motion.div
+                  initial={{ opacity: 0, y: -4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -4 }}
+                  className="absolute top-full left-0 right-0 mt-1 bg-card border border-border rounded-xl shadow-xl z-20 max-h-60 overflow-hidden"
+                >
+                  <div className="p-2 border-b border-border/30">
+                    <div className="relative">
+                      <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+                      <input
+                        type="text"
+                        placeholder="Buscar paciente..."
+                        value={patientSearch}
+                        onChange={(e) => setPatientSearch(e.target.value)}
+                        className="w-full bg-transparent text-xs pl-8 py-1.5 focus:outline-none"
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                    </div>
+                  </div>
+                  <div className="overflow-y-auto max-h-48">
+                    <button
+                      type="button"
+                      onClick={() => { setSelectedPatientId(''); setPatientDropdownOpen(false); setPatientSearch(''); }}
+                      className={cn(
+                        'w-full px-3 py-2 text-sm text-left hover:bg-accent transition-all flex items-center gap-2',
+                        !selectedPatientId && 'bg-primary/10',
+                      )}
+                    >
+                      <Users className="w-3.5 h-3.5 text-muted-foreground" />
+                      <span className="text-muted-foreground">Nenhum (IA genérica)</span>
+                    </button>
+                    {filteredPatients.map((p: any) => (
+                      <button
+                        key={p.id}
+                        type="button"
+                        onClick={() => { setSelectedPatientId(p.id); setPatientDropdownOpen(false); setPatientSearch(''); }}
+                        className={cn(
+                          'w-full px-3 py-2 text-sm text-left hover:bg-accent transition-all flex items-center gap-2',
+                          selectedPatientId === p.id && 'bg-primary/10',
+                        )}
+                      >
+                        <div className="w-6 h-6 rounded-full bg-gradient-to-br from-emerald-600 to-teal-600 flex items-center justify-center text-white text-[10px] font-bold flex-shrink-0">
+                          {p.user?.profile?.firstName?.[0]}{p.user?.profile?.lastName?.[0]}
+                        </div>
+                        <span className="truncate">{p.user?.profile?.firstName} {p.user?.profile?.lastName}</span>
+                      </button>
+                    ))}
+                    {filteredPatients.length === 0 && (
+                      <p className="px-3 py-2 text-xs text-muted-foreground">Nenhum paciente encontrado</p>
+                    )}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+          {selectedPatientId && (
+            <button
+              type="button"
+              onClick={() => setSelectedPatientId('')}
+              className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+              title="Remover paciente"
+            >
+              ✕
+            </button>
+          )}
         </div>
       </div>
 
@@ -548,7 +689,9 @@ export default function NutritionistAI() {
             onKeyDown={(e) => {
               if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); }
             }}
-            placeholder="Descreva o que precisa... (Enter para enviar)"
+            placeholder={selectedPatient
+              ? `Pergunte sobre ${selectedPatient.user?.profile?.firstName}... (Enter para enviar)`
+              : 'Descreva o que precisa... (Enter para enviar)'}
             rows={1}
             className="flex-1 bg-transparent text-sm resize-none focus:outline-none py-2 px-2 max-h-32 overflow-y-auto scrollbar-hide"
             style={{ fieldSizing: 'content' } as any}
