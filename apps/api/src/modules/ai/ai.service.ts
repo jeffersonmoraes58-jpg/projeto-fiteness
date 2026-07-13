@@ -895,4 +895,101 @@ REGRAS ABSOLUTAS:
       fat: Math.round(fatGrams),
     };
   }
+
+  // ═══════════════════════════════════════════════════
+  // NUTRITIONIST AI TOOLS
+  // ═══════════════════════════════════════════════════
+
+  async nutritionTool(userId: string, tool: string, patientId?: string, params?: any) {
+    const nutritionist = await this.prisma.nutritionist.findUnique({
+      where: { userId },
+      include: { user: { include: { profile: true } } },
+    });
+    if (!nutritionist) throw new ForbiddenException('Apenas nutricionistas');
+
+    const name = nutritionist.user?.profile?.firstName || 'Nutricionista';
+    let ctx = '';
+    if (patientId) ctx = await this.buildPatientContext(nutritionist.id, patientId);
+
+    const tools: Record<string, () => Promise<any>> = {
+      meal_plan: () => this.genMealPlan(name, ctx, params),
+      weekly_menu: () => this.genWeeklyMenu(name, ctx, params),
+      food_substitution: () => this.genFoodSub(name, ctx, params),
+      diary_analysis: () => this.genDiaryAnalysis(name, ctx, params),
+      guidelines: () => this.genGuidelines(name, ctx, params),
+    };
+
+    const handler = tools[tool];
+    if (!handler) throw new BadRequestException('Ferramenta desconhecida: ' + tool);
+    return handler();
+  }
+
+  private async buildPatientContext(nId: string, pId: string): Promise<string> {
+    const [pat, assess, anam, diets, exams, goals] = await Promise.all([
+      this.prisma.nutritionistPatient.findFirst({
+        where: { id: pId, nutritionistId: nId },
+        include: { student: { include: { user: { include: { profile: true } } } } },
+      }),
+      this.prisma.nutritionalAssessment.findFirst({ where: { studentId: pId }, orderBy: { assessedAt: 'desc' } }),
+      this.prisma.anamnesis.findFirst({ where: { studentId: pId }, orderBy: { updatedAt: 'desc' } }),
+      this.prisma.diet.findMany({ where: { nutritionistId: nId, studentId: pId }, take: 3, orderBy: { createdAt: 'desc' }, select: { name: true, status: true, totalCalories: true } }),
+      this.prisma.patientExam.findMany({ where: { studentId: pId }, take: 5, orderBy: { examDate: 'desc' }, select: { title: true, notes: true, examDate: true } }),
+      this.prisma.goal.findMany({ where: { studentId: pId, isCompleted: false }, take: 5, orderBy: { createdAt: 'desc' }, select: { title: true, targetValue: true, currentValue: true, unit: true } }),
+    ]);
+    if (!pat) return '';
+    const s = pat.student;
+    const lines = [
+      `Nome: ${s.user?.profile?.firstName || ''} ${s.user?.profile?.lastName || ''}`,
+      `Objetivo: ${s.goalType || 'Não definido'} | Atividade: ${s.activityLevel || 'N/A'}`,
+    ];
+    if (assess) {
+      lines.push(`IMC: ${assess.bmi || 'N/A'} | TMB: ${assess.tmb || 'N/A'} | GET: ${assess.get || 'N/A'} kcal`);
+      lines.push(`Proteína: ${assess.proteinTarget || 'N/A'}g | Carbs: ${assess.carbsTarget || 'N/A'}g | Gordura: ${assess.fatTarget || 'N/A'}g`);
+      lines.push(`Restrições: ${assess.dietaryRestrictions?.join(', ') || 'Nenhuma'} | Alergias: ${assess.foodAllergies?.join(', ') || 'Nenhuma'}`);
+    }
+    if (anam) {
+      lines.push(`Lesões: ${anam.previousInjuries || 'Nenhuma'} | Cardio: ${anam.cardiovascularIssues ? 'Sim' : 'Não'}`);
+      lines.push(`Sono: ${anam.sleepHours || 'N/A'}h | Estresse: ${anam.stressLevel || 'N/A'}/10`);
+    }
+    if (diets.length) lines.push('Dietas:\n' + diets.map(d => `- ${d.name} (${d.status}, ${d.totalCalories || '?'} kcal)`).join('\n'));
+    if (exams.length) lines.push('Exames:\n' + exams.map(e => `- ${e.title}: ${e.notes || 'N/A'} (${new Date(e.examDate).toLocaleDateString('pt-BR')})`).join('\n'));
+    if (goals.length) lines.push('Metas:\n' + goals.map(g => `- ${g.title}: ${g.currentValue || 0}${g.unit || ''} / ${g.targetValue}${g.unit || ''}`).join('\n'));
+    return lines.join('\n\n');
+  }
+
+  private async genMealPlan(name: string, ctx: string, p?: any) {
+    const cal = p?.calories || 'calculada automaticamente';
+    const meals = p?.meals || 5;
+    const prompt = `Você é assistente IA do nutricionista ${name}. Crie PLANO ALIMENTAR com ${meals} refeições e meta de ${cal} kcal.\n\n## PACIENTE\n${ctx || 'Paciente genérico'}\n\nUse alimentos brasileiros, acessíveis. Respeite restrições. Retorne APENAS JSON:\n{"name":"Plano","totalCalories":2000,"macros":{"protein":150,"carbs":200,"fat":55},"meals":[{"name":"Café","time":"07:00","calories":400,"foods":[{"name":"Ovos","quantity":100,"unit":"g","calories":155,"protein":13,"carbs":1,"fat":11}]}],"tips":["Dica"],"shoppingList":["Item"]}`;
+    const raw = await this.complete(prompt, 4000);
+    return JSON.parse(this.extractJson(raw.replace(/```json|```/g, '').trim()));
+  }
+
+  private async genWeeklyMenu(name: string, ctx: string, p?: any) {
+    const cal = p?.calories || 'calculada automaticamente';
+    const prompt = `Você é assistente IA do nutricionista ${name}. Crie CARDÁPIO SEMANAL (7 dias) com ${cal} kcal/dia.\n\n## PACIENTE\n${ctx || 'Paciente genérico'}\n\nPara cada dia: café da manhã, almoço, jantar e 2 lanches. Varie alimentos. Retorne APENAS JSON:\n{"name":"Cardápio","dailyCalories":2000,"days":[{"day":"Segunda","meals":[{"meal":"Café da manhã","description":"Descrição do que comer","calories":400}]}],"shoppingList":["Item"],"tips":["Dica"]}`;
+    const raw = await this.complete(prompt, 5000);
+    return JSON.parse(this.extractJson(raw.replace(/```json|```/g, '').trim()));
+  }
+
+  private async genFoodSub(name: string, ctx: string, p?: any) {
+    const food = p?.food || 'alimento não especificado';
+    const reason = p?.reason || 'substituição saudável';
+    const prompt = `Você é assistente IA do nutricionista ${name}. Sugira 5 SUBSTITUIÇÕES ALIMENTARES para "${food}". Motivo: ${reason}.\n\n## PACIENTE\n${ctx || 'Paciente genérico'}\n\nConsidere restrições. Retorne APENAS JSON:\n{"originalFood":"${food}","reason":"${reason}","alternatives":[{"name":"Alimento","explanation":"Por que é boa alternativa","nutritionalNote":"Comparação nutricional","preparation":"Como preparar/usar"}]}`;
+    const raw = await this.complete(prompt, 2500);
+    return JSON.parse(this.extractJson(raw.replace(/```json|```/g, '').trim()));
+  }
+
+  private async genDiaryAnalysis(name: string, ctx: string, p?: any) {
+    const diary = p?.diary || '';
+    const prompt = `Você é assistente IA do nutricionista ${name}. Analise DIÁRIO ALIMENTAR.\n\n## PACIENTE\n${ctx || 'Paciente genérico'}\n\n## DIÁRIO\n${diary || 'Nenhum registro fornecido'}\n\nAnalise pontos fortes e fracos. Compare com metas se disponíveis. Dê 5 recomendações práticas. Retorne APENAS JSON:\n{"summary":"Resumo em 1-2 frases","positives":["3 pontos fortes"],"concerns":["3 pontos de atenção"],"recommendations":[{"title":"Título curto","detail":"Explicação prática","priority":"high|medium|low"}],"estimatedCalories":2000}`;
+    const raw = await this.complete(prompt, 3000);
+    return JSON.parse(this.extractJson(raw.replace(/```json|```/g, '').trim()));
+  }
+
+  private async genGuidelines(name: string, ctx: string, p?: any) {
+    const prompt = `Você é assistente IA do nutricionista ${name}. Gere ORIENTAÇÕES NUTRICIONAIS personalizadas em formato de carta profissional.\n\n## PACIENTE\n${ctx || 'Paciente genérico'}\n\nInclua: objetivo, estratégia, orientações gerais, alimentos recomendados, alimentos a evitar. Tom profissional e acolhedor. Retorne APENAS JSON:\n{"title":"Orientações Nutricionais","patientName":"Nome do Paciente","greeting":"Prezado(a)...","sections":[{"heading":"Objetivo Nutricional","body":"..."},{"heading":"Estratégia Alimentar","body":"..."},{"heading":"Orientações Gerais","body":"..."},{"heading":"Alimentos Recomendados","body":"..."},{"heading":"Alimentos a Evitar ou Moderar","body":"..."}],"closing":"Atenciosamente...","disclaimer":"Estas orientações não substituem consulta presencial."}`;
+    const raw = await this.complete(prompt, 3000);
+    return JSON.parse(this.extractJson(raw.replace(/```json|```/g, '').trim()));
+  }
 }

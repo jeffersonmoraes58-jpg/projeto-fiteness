@@ -7,7 +7,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Dumbbell, Users, Apple, BarChart3, MessageCircle, Bell,
   Settings, LogOut, ChevronLeft, Trophy,
-  Calendar, CreditCard, Brain, Home, Utensils,
+  Calendar, CreditCard, Brain, Home, Utensils, Wand2,
   Activity, Target, Star, Building2, Shield, Zap,
 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
@@ -48,7 +48,7 @@ const navByRole: Record<string, NavItem[]> = {
     { icon: Calendar, label: 'Agenda', href: '/nutritionist/schedule' },
     { icon: MessageCircle, label: 'Chat', href: '/nutritionist/chat', isChat: true },
     { icon: BarChart3, label: 'Relatórios', href: '/nutritionist/reports' },
-    { icon: Brain, label: 'IA Nutrição', href: '/nutritionist/ai' },
+    { icon: Wand2, label: 'Ferramentas IA', href: '/nutritionist/ai' },
     { icon: CreditCard, label: 'Meu Plano', href: '/nutritionist/subscription' },
     { icon: Settings, label: 'Configurações', href: '/nutritionist/settings' },
   ],

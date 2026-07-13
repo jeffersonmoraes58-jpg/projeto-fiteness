@@ -3,16 +3,91 @@
 import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Brain, Send, Sparkles, User, Copy, RefreshCw,
-  Apple, Target, Flame, Zap, ChevronRight, Settings2,
-  CheckCircle2, ChevronDown, ChevronUp, Trash2, Save,
-  Users, Search,
+  Sparkles, Send, Copy, RefreshCw, X, Users, Search,
+  Apple, Calendar, Shuffle, FileText, ClipboardList, Loader2,
+  ChefHat, Utensils, ChevronDown, Wand2, CheckCircle2,
 } from 'lucide-react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
+
+type ToolId = 'meal_plan' | 'weekly_menu' | 'food_substitution' | 'diary_analysis' | 'guidelines';
+
+interface ToolConfig {
+  id: ToolId;
+  label: string;
+  description: string;
+  icon: typeof Apple;
+  color: string;
+  bgColor: string;
+  needsPatient: boolean;
+  params?: { key: string; label: string; placeholder: string; type: 'number' | 'text' | 'textarea'; required?: boolean }[];
+}
+
+const TOOLS: ToolConfig[] = [
+  {
+    id: 'meal_plan',
+    label: 'Gerar Plano Alimentar',
+    description: 'Cria dieta completa com macros e refeições usando dados do paciente',
+    icon: ChefHat,
+    color: 'text-emerald-400',
+    bgColor: 'from-emerald-600/20 to-teal-600/10 border-emerald-500/30',
+    needsPatient: true,
+    params: [
+      { key: 'calories', label: 'Meta calórica (kcal)', placeholder: 'Ex: 1800 — ou deixe vazio para cálculo automático', type: 'number' },
+      { key: 'meals', label: 'Número de refeições/dia', placeholder: '5', type: 'number' },
+    ],
+  },
+  {
+    id: 'weekly_menu',
+    label: 'Montar Cardápio Semanal',
+    description: 'Gera 7 dias de café, almoço, jantar e lanches variados',
+    icon: Calendar,
+    color: 'text-purple-400',
+    bgColor: 'from-purple-600/20 to-violet-600/10 border-purple-500/30',
+    needsPatient: true,
+    params: [
+      { key: 'calories', label: 'Meta calórica diária (kcal)', placeholder: 'Ex: 2000 — ou deixe vazio para automático', type: 'number' },
+    ],
+  },
+  {
+    id: 'food_substitution',
+    label: 'Sugerir Substituições',
+    description: 'Sugere alternativas saudáveis para qualquer alimento',
+    icon: Shuffle,
+    color: 'text-orange-400',
+    bgColor: 'from-orange-600/20 to-amber-600/10 border-orange-500/30',
+    needsPatient: false,
+    params: [
+      { key: 'food', label: 'Alimento a substituir', placeholder: 'Ex: pão francês, leite integral, arroz branco...', type: 'text', required: true },
+      { key: 'reason', label: 'Motivo da substituição', placeholder: 'Ex: reduzir carboidratos, intolerância, mais proteína...', type: 'text' },
+    ],
+  },
+  {
+    id: 'diary_analysis',
+    label: 'Analisar Diário Alimentar',
+    description: 'Analisa relato alimentar do paciente e aponta melhorias',
+    icon: ClipboardList,
+    color: 'text-cyan-400',
+    bgColor: 'from-cyan-600/20 to-blue-600/10 border-cyan-500/30',
+    needsPatient: true,
+    params: [
+      { key: 'diary', label: 'Diário alimentar', placeholder: 'Cole o relato alimentar do paciente aqui... (ex: "Café: 2 ovos, 1 pão. Almoço: arroz, feijão, frango...")', type: 'textarea', required: true },
+    ],
+  },
+  {
+    id: 'guidelines',
+    label: 'Gerar Orientações',
+    description: 'Carta de orientações nutricionais personalizada',
+    icon: FileText,
+    color: 'text-pink-400',
+    bgColor: 'from-pink-600/20 to-rose-600/10 border-pink-500/30',
+    needsPatient: true,
+    params: [],
+  },
+];
 
 interface Message {
   id: string;
@@ -21,179 +96,36 @@ interface Message {
   timestamp: Date;
 }
 
-interface AiConfig {
-  assistantName: string;
-  approaches: string[];
-  patientProfiles: string[];
-  tone: string;
-  focusAreas: string[];
-  avoidAreas: string[];
-  extraNotes: string;
-}
-
-const EMPTY_CONFIG: AiConfig = {
-  assistantName: '',
-  approaches: [],
-  patientProfiles: [],
-  tone: '',
-  focusAreas: [],
-  avoidAreas: [],
-  extraNotes: '',
-};
-
-// ─── Training options ─────────────────────────────────────────────────────────
-
-const APPROACHES = [
-  { value: 'funcional', label: 'Nutrição Funcional' },
-  { value: 'low-carb', label: 'Low-carb / Cetogênica' },
-  { value: 'iifym', label: 'Dieta Flexível (IIFYM)' },
-  { value: 'esportiva', label: 'Nutrição Esportiva' },
-  { value: 'clinica', label: 'Nutrição Clínica' },
-  { value: 'vegetariana', label: 'Vegetariana / Vegana' },
-];
-
-const PATIENT_PROFILES = [
-  { value: 'emagrecimento', label: 'Emagrecimento' },
-  { value: 'hipertrofia', label: 'Hipertrofia / Ganho muscular' },
-  { value: 'atletas', label: 'Atletas de alta performance' },
-  { value: 'doencas', label: 'Doenças crônicas (diabetes, hipertensão)' },
-  { value: 'preventiva', label: 'Saúde preventiva / Longevidade' },
-  { value: 'gestantes', label: 'Gestantes / Pós-parto' },
-];
-
-const TONES = [
-  { value: 'tecnico', label: 'Técnico e preciso', desc: 'Linguagem clínica, foco em números e protocolos' },
-  { value: 'didatico', label: 'Didático e acessível', desc: 'Explica o porquê de cada recomendação' },
-  { value: 'motivacional', label: 'Motivacional e próximo', desc: 'Encoraja e humaniza as respostas' },
-  { value: 'direto', label: 'Conciso e direto', desc: 'Respostas curtas e objetivas, sem rodeios' },
-];
-
-const FOCUS_AREAS = [
-  { value: 'macros', label: 'Cálculo preciso de macros e calorias' },
-  { value: 'cardapios', label: 'Sugestão de cardápios completos' },
-  { value: 'ciencia', label: 'Embasamento científico das recomendações' },
-  { value: 'substituicoes', label: 'Substituições alimentares práticas' },
-  { value: 'suplementacao', label: 'Protocolos de suplementação' },
-  { value: 'comportamento', label: 'Comportamento alimentar e adesão' },
-];
-
-const AVOID_AREAS = [
-  { value: 'sem_evidencia', label: 'Sugestões sem evidência científica' },
-  { value: 'restritivo', label: 'Dietas extremamente restritivas' },
-  { value: 'marcas', label: 'Indicar marcas ou produtos específicos' },
-  { value: 'complexo', label: 'Linguagem excessivamente técnica' },
-  { value: 'generalizacoes', label: 'Generalizações sem considerar o contexto' },
-];
-
-const SUGGESTIONS = [
-  { icon: Apple, label: 'Gerar dieta de 1800 kcal para perda de peso', color: 'text-emerald-400' },
-  { icon: Target, label: 'Calcular macros para ganho muscular de 80kg/1,75m', color: 'text-cyan-400' },
-  { icon: Flame, label: 'Cardápio semanal para intolerante à lactose', color: 'text-orange-400' },
-  { icon: Zap, label: 'Alimentos ricos em proteína para pós-treino', color: 'text-purple-400' },
-];
-
-// ─── Build context string from config ────────────────────────────────────────
-
-function buildContext(cfg: AiConfig): string {
-  const lines: string[] = [];
-
-  if (cfg.assistantName)
-    lines.push(`Você se chama: ${cfg.assistantName}`);
-
-  if (cfg.approaches.length) {
-    const labels = cfg.approaches.map((v) => APPROACHES.find((a) => a.value === v)?.label ?? v);
-    lines.push(`Abordagens nutricionais que você domina e deve priorizar: ${labels.join(', ')}`);
-  }
-
-  if (cfg.patientProfiles.length) {
-    const labels = cfg.patientProfiles.map((v) => PATIENT_PROFILES.find((p) => p.value === v)?.label ?? v);
-    lines.push(`Perfil dos pacientes atendidos: ${labels.join(', ')}. Adapte sempre as respostas a esse público.`);
-  }
-
-  if (cfg.tone) {
-    const t = TONES.find((x) => x.value === cfg.tone);
-    lines.push(`Tom obrigatório de todas as suas respostas: ${t?.label} — ${t?.desc}. Mantenha esse tom em todas as mensagens, sem exceção.`);
-  }
-
-  if (cfg.focusAreas.length) {
-    const labels = cfg.focusAreas.map((v) => FOCUS_AREAS.find((f) => f.value === v)?.label ?? v);
-    lines.push(`Sempre priorize nas respostas: ${labels.join(', ')}`);
-  }
-
-  if (cfg.avoidAreas.length) {
-    const labels = cfg.avoidAreas.map((v) => AVOID_AREAS.find((a) => a.value === v)?.label ?? v);
-    lines.push(`Nunca faça nas respostas: ${labels.join(', ')}`);
-  }
-
-  if (cfg.extraNotes)
-    lines.push(`Instruções adicionais do nutricionista (SEGUIR OBRIGATORIAMENTE): ${cfg.extraNotes}`);
-
-  return lines.join('\n');
-}
-
-function isConfigured(cfg: AiConfig) {
-  return cfg.approaches.length > 0 || cfg.patientProfiles.length > 0 || cfg.tone !== '';
-}
-
-// ─── Multi-select pill ────────────────────────────────────────────────────────
-
-function Pill({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cn(
-        'px-3 py-1.5 rounded-xl text-xs font-medium border transition-all',
-        active
-          ? 'bg-primary/20 border-primary text-primary'
-          : 'bg-white/5 border-white/10 text-muted-foreground hover:border-white/30',
-      )}
-    >
-      {label}
-    </button>
-  );
-}
-
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
-export default function NutritionistAI() {
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: '0',
-      role: 'assistant',
-      content: 'Olá! Sou sua assistente de IA especializada em nutrição. Posso ajudar com:\n\n• Geração de planos alimentares personalizados\n• Cálculo de macronutrientes e calorias\n• Sugestões de substituições alimentares\n• Análise de dietas e ajustes\n• Cardápios para restrições alimentares\n\nSelecione um paciente no seletor acima para eu usar o contexto clínico dele nas respostas.\n\nComo posso ajudar você hoje?',
-      timestamp: new Date(),
-    },
-  ]);
-  const [input, setInput] = useState('');
-  const [trainingOpen, setTrainingOpen] = useState(false);
+export default function NutritionistAIToolbox() {
   const [selectedPatientId, setSelectedPatientId] = useState<string>('');
   const [patientSearch, setPatientSearch] = useState('');
   const [patientDropdownOpen, setPatientDropdownOpen] = useState(false);
   const patientDropdownRef = useRef<HTMLDivElement>(null);
-  const [config, setConfig] = useState<AiConfig>(() => {
-    if (typeof window === 'undefined') return EMPTY_CONFIG;
-    try {
-      const saved = localStorage.getItem('fitlynutri-ai-config');
-      return saved ? JSON.parse(saved) : EMPTY_CONFIG;
-    } catch {
-      return EMPTY_CONFIG;
-    }
-  });
-  const [draft, setDraft] = useState<AiConfig>(config);
+
+  // Active tool panel
+  const [activeTool, setActiveTool] = useState<ToolConfig | null>(null);
+  const [toolParams, setToolParams] = useState<Record<string, string>>({});
+  const [toolResult, setToolResult] = useState<any>(null);
+
+  // Mini-chat (secondary)
+  const [chatOpen, setChatOpen] = useState(false);
+  const [messages, setMessages] = useState<Message[]>([
+    {
+      id: '0',
+      role: 'assistant',
+      content: 'Olá! Use as ferramentas acima para gerar planos, cardápios e orientações. Se preferir, também posso responder perguntas rápidas aqui no chat.',
+      timestamp: new Date(),
+    },
+  ]);
+  const [input, setInput] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // Fetch patients for selector
+  // Fetch patients
   const { data: patients } = useQuery({
     queryKey: ['nutritionist-patients-ai'],
     queryFn: () => api.get('/nutritionists/me/patients').then((r) => r.data.data),
-  });
-
-  // Fetch AI context for selected patient
-  const { data: aiContext } = useQuery({
-    queryKey: ['patient-ai-context', selectedPatientId],
-    queryFn: () => api.get(`/nutritionists/me/patients/${selectedPatientId}/ai-context`).then((r) => r.data.data),
-    enabled: !!selectedPatientId,
   });
 
   const selectedPatient = patients?.find((p: any) => p.id === selectedPatientId);
@@ -215,35 +147,50 @@ export default function NutritionistAI() {
     return name.includes(patientSearch.toLowerCase());
   });
 
-  const buildHistory = (msgs: Message[]) =>
-    msgs.slice(1).map((m) => ({ role: m.role, content: m.content }));
+  // ── Tool execution ──────────────────────────────────────────────────────
 
-  const sendMutation = useMutation({
-    mutationFn: ({ message, history }: { message: string; history: any[] }) => {
-      // Merge trainer config context with patient clinical context
-      const trainerContext = isConfigured(config) ? buildContext(config) : '';
-      const patientContext = aiContext?.contextText || '';
-      const fullContext = [trainerContext, patientContext].filter(Boolean).join('\n\n---\n\n');
+  const toolMutation = useMutation({
+    mutationFn: ({ tool, patientId, params }: { tool: string; patientId?: string; params?: any }) =>
+      api.post('/ai/nutrition-tool', { tool, patientId, params }).then((r) => r.data.data),
+    onSuccess: (data) => setToolResult(data),
+  });
 
-      return api.post('/ai/assistant', {
-        message,
-        history,
-        context: fullContext || undefined,
-      }).then((r) => r.data.data);
-    },
-    onSuccess: (data) => {
+  const runTool = (tool: ToolConfig) => {
+    setActiveTool(tool);
+    setToolParams({});
+    setToolResult(null);
+  };
+
+  const submitTool = () => {
+    if (!activeTool) return;
+    const params: any = {};
+    activeTool.params?.forEach((p) => {
+      const val = toolParams[p.key];
+      if (val) params[p.key] = p.type === 'number' ? Number(val) : val;
+    });
+    toolMutation.mutate({
+      tool: activeTool.id,
+      patientId: activeTool.needsPatient ? selectedPatientId || undefined : undefined,
+      params,
+    });
+  };
+
+  const closeTool = () => {
+    setActiveTool(null);
+    setToolResult(null);
+    setToolParams({});
+  };
+
+  // ── Mini-chat ────────────────────────────────────────────────────────────
+
+  const chatMutation = useMutation({
+    mutationFn: ({ message, history }: { message: string; history: any[] }) =>
+      api.post('/ai/assistant', { message, history }).then((r) => r.data.data),
+    onSuccess: (data: any) => {
       setMessages((prev) => [...prev, {
         id: Date.now().toString(),
         role: 'assistant',
-        content: data.reply || data.response || String(data),
-        timestamp: new Date(),
-      }]);
-    },
-    onError: () => {
-      setMessages((prev) => [...prev, {
-        id: Date.now().toString(),
-        role: 'assistant',
-        content: 'Desculpe, ocorreu um erro. Por favor, tente novamente.',
+        content: data.reply || data.response || 'Resposta não disponível.',
         timestamp: new Date(),
       }]);
     },
@@ -253,78 +200,48 @@ export default function NutritionistAI() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  const handleSend = (text?: string) => {
+  const handleChatSend = (text?: string) => {
     const content = text || input.trim();
     if (!content) return;
     const userMsg: Message = { id: Date.now().toString(), role: 'user', content, timestamp: new Date() };
     setMessages((prev) => {
       const next = [...prev, userMsg];
-      sendMutation.mutate({ message: content, history: buildHistory(next) });
+      const history = next.slice(-15).map((m) => ({ role: m.role, content: m.content }));
+      chatMutation.mutate({ message: content, history });
       return next;
     });
     setInput('');
   };
 
-  const toggleMulti = (key: keyof AiConfig, value: string) => {
-    setDraft((prev) => {
-      const arr = prev[key] as string[];
-      return { ...prev, [key]: arr.includes(value) ? arr.filter((v) => v !== value) : [...arr, value] };
-    });
-  };
+  // ── Result renderers ─────────────────────────────────────────────────────
 
-  const saveConfig = () => {
-    setConfig(draft);
-    localStorage.setItem('fitlynutri-ai-config', JSON.stringify(draft));
-    setTrainingOpen(false);
-    setMessages([{
-      id: Date.now().toString(),
-      role: 'assistant',
-      content: `Configurações salvas! Agora estou preparado para atuar com foco em ${draft.approaches.length ? draft.approaches.join(', ') : 'nutrição geral'} e para pacientes com objetivo de ${draft.patientProfiles.length ? draft.patientProfiles.join(', ') : 'saúde geral'}. Como posso ajudar?`,
-      timestamp: new Date(),
-    }]);
-  };
+  const renderResult = () => {
+    if (!toolResult) return null;
+    const t = activeTool?.id;
 
-  const clearConfig = () => {
-    setDraft(EMPTY_CONFIG);
-    setConfig(EMPTY_CONFIG);
-    localStorage.removeItem('fitlynutri-ai-config');
-  };
+    if (t === 'meal_plan') return <MealPlanResult data={toolResult} />;
+    if (t === 'weekly_menu') return <WeeklyMenuResult data={toolResult} />;
+    if (t === 'food_substitution') return <SubstitutionResult data={toolResult} />;
+    if (t === 'diary_analysis') return <DiaryResult data={toolResult} />;
+    if (t === 'guidelines') return <GuidelinesResult data={toolResult} />;
 
-  const configured = isConfigured(config);
+    return <pre className="text-xs whitespace-pre-wrap">{JSON.stringify(toolResult, null, 2)}</pre>;
+  };
 
   return (
     <div className="flex flex-col h-[calc(100vh-8rem)] gap-4">
-
       {/* ── Header ── */}
       <div className="flex items-center gap-3">
-        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-600 to-indigo-600 flex items-center justify-center">
-          <Brain className="w-5 h-5 text-white" />
+        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-600 to-teal-600 flex items-center justify-center">
+          <Wand2 className="w-5 h-5 text-white" />
         </div>
         <div>
-          <h1 className="text-xl font-bold">IA Nutrição</h1>
+          <h1 className="text-xl font-bold">Ferramentas IA</h1>
           <p className="text-sm text-muted-foreground">
             {selectedPatient
-              ? `Contexto: ${selectedPatient.user?.profile?.firstName} ${selectedPatient.user?.profile?.lastName}`
-              : 'Assistente especializado em nutrição'}
+              ? `Paciente: ${selectedPatient.user?.profile?.firstName} ${selectedPatient.user?.profile?.lastName}`
+              : 'Selecione um paciente ou use ferramentas independentes'}
           </p>
-        </div>
-        <div className="ml-auto flex items-center gap-2">
-          {aiContext && (
-            <span className="flex items-center gap-1.5 text-xs text-purple-400 font-medium bg-purple-500/10 px-2.5 py-1 rounded-full">
-              <Brain className="w-3 h-3" />
-              IA contextual
-            </span>
-          )}
-          {configured && (
-            <span className="flex items-center gap-1.5 text-xs text-emerald-400 font-medium bg-emerald-500/10 px-2.5 py-1 rounded-full">
-              <CheckCircle2 className="w-3 h-3" />
-              IA treinada
-            </span>
-          )}
-          <div className="flex items-center gap-1.5 text-xs text-emerald-400 font-medium">
-            <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-            Online
-          </div>
         </div>
       </div>
 
@@ -341,7 +258,7 @@ export default function NutritionistAI() {
               <span className={selectedPatient ? 'font-medium' : 'text-muted-foreground'}>
                 {selectedPatient
                   ? `${selectedPatient.user?.profile?.firstName || ''} ${selectedPatient.user?.profile?.lastName || ''}`.trim()
-                  : 'Selecionar paciente (opcional — IA terá acesso ao histórico clínico)'}
+                  : 'Selecionar paciente (necessário para planos, cardápios e orientações)'}
               </span>
               <ChevronDown className={cn('w-4 h-4 text-muted-foreground transition-transform', patientDropdownOpen && 'rotate-180')} />
             </button>
@@ -370,23 +287,17 @@ export default function NutritionistAI() {
                     <button
                       type="button"
                       onClick={() => { setSelectedPatientId(''); setPatientDropdownOpen(false); setPatientSearch(''); }}
-                      className={cn(
-                        'w-full px-3 py-2 text-sm text-left hover:bg-accent transition-all flex items-center gap-2',
-                        !selectedPatientId && 'bg-primary/10',
-                      )}
+                      className={cn('w-full px-3 py-2 text-sm text-left hover:bg-accent transition-all flex items-center gap-2', !selectedPatientId && 'bg-primary/10')}
                     >
                       <Users className="w-3.5 h-3.5 text-muted-foreground" />
-                      <span className="text-muted-foreground">Nenhum (IA genérica)</span>
+                      <span className="text-muted-foreground">Nenhum (ferramentas sem contexto)</span>
                     </button>
                     {filteredPatients.map((p: any) => (
                       <button
                         key={p.id}
                         type="button"
                         onClick={() => { setSelectedPatientId(p.id); setPatientDropdownOpen(false); setPatientSearch(''); }}
-                        className={cn(
-                          'w-full px-3 py-2 text-sm text-left hover:bg-accent transition-all flex items-center gap-2',
-                          selectedPatientId === p.id && 'bg-primary/10',
-                        )}
+                        className={cn('w-full px-3 py-2 text-sm text-left hover:bg-accent transition-all flex items-center gap-2', selectedPatientId === p.id && 'bg-primary/10')}
                       >
                         <div className="w-6 h-6 rounded-full bg-gradient-to-br from-emerald-600 to-teal-600 flex items-center justify-center text-white text-[10px] font-bold flex-shrink-0">
                           {p.user?.profile?.firstName?.[0]}{p.user?.profile?.lastName?.[0]}
@@ -394,195 +305,183 @@ export default function NutritionistAI() {
                         <span className="truncate">{p.user?.profile?.firstName} {p.user?.profile?.lastName}</span>
                       </button>
                     ))}
-                    {filteredPatients.length === 0 && (
-                      <p className="px-3 py-2 text-xs text-muted-foreground">Nenhum paciente encontrado</p>
-                    )}
+                    {filteredPatients.length === 0 && <p className="px-3 py-2 text-xs text-muted-foreground">Nenhum paciente encontrado</p>}
                   </div>
                 </motion.div>
               )}
             </AnimatePresence>
           </div>
           {selectedPatientId && (
-            <button
-              type="button"
-              onClick={() => setSelectedPatientId('')}
-              className="text-xs text-muted-foreground hover:text-foreground transition-colors"
-              title="Remover paciente"
-            >
-              ✕
-            </button>
+            <button type="button" onClick={() => setSelectedPatientId('')} className="text-xs text-muted-foreground hover:text-foreground transition-colors" title="Remover paciente">✕</button>
           )}
         </div>
       </div>
 
-      {/* ── Training panel ── */}
-      <div className="glass rounded-2xl overflow-hidden">
-        <button
-          type="button"
-          onClick={() => { setDraft(config); setTrainingOpen((o) => !o); }}
-          className="w-full flex items-center gap-3 px-4 py-3 hover:bg-accent/50 transition-all"
-        >
-          <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-violet-600 to-fuchsia-600 flex items-center justify-center flex-shrink-0">
-            <Settings2 className="w-3.5 h-3.5 text-white" />
-          </div>
-          <div className="flex-1 text-left">
-            <p className="text-sm font-semibold">Treine seu Assistente IA Nutrição</p>
-            <p className="text-xs text-muted-foreground">
-              {configured ? 'Configuração salva — clique para editar' : 'Configure o perfil para respostas mais precisas'}
-            </p>
-          </div>
-          {trainingOpen ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
-        </button>
+      {/* ── Tool cards ── */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        {TOOLS.map((tool) => (
+          <button
+            key={tool.id}
+            type="button"
+            onClick={() => runTool(tool)}
+            disabled={tool.needsPatient && !selectedPatientId}
+            className={cn(
+              'relative text-left p-4 rounded-2xl border bg-gradient-to-br transition-all group',
+              tool.bgColor,
+              (tool.needsPatient && !selectedPatientId)
+                ? 'opacity-50 cursor-not-allowed'
+                : 'hover:scale-[1.02] hover:shadow-lg cursor-pointer',
+            )}
+          >
+            <div className="flex items-start gap-3">
+              <div className={cn('w-9 h-9 rounded-xl flex items-center justify-center bg-black/20 flex-shrink-0', tool.color)}>
+                <tool.icon className="w-4.5 h-4.5" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h3 className="text-sm font-semibold">{tool.label}</h3>
+                <p className="text-xs text-muted-foreground mt-0.5">{tool.description}</p>
+              </div>
+            </div>
+            {tool.needsPatient && !selectedPatientId && (
+              <span className="absolute top-2 right-2 text-[10px] bg-amber-500/20 text-amber-400 px-1.5 py-0.5 rounded-full">
+                Precisa paciente
+              </span>
+            )}
+          </button>
+        ))}
+      </div>
 
-        <AnimatePresence>
-          {trainingOpen && (
-            <motion.div
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: 'auto', opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              transition={{ duration: 0.25 }}
-              className="overflow-hidden"
-            >
-              <div className="px-4 pb-4 space-y-5 border-t border-white/5 pt-4">
-
-                {/* Nome do assistente */}
-                <div>
-                  <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2 block">
-                    Como seu assistente deve se apresentar?
-                  </label>
-                  <input
-                    type="text"
-                    value={draft.assistantName}
-                    onChange={(e) => setDraft((p) => ({ ...p, assistantName: e.target.value }))}
-                    placeholder='Ex: "Assistente da Dra. Ana, especialista em nutrição esportiva"'
-                    className="input-field text-sm w-full"
-                  />
-                </div>
-
-                {/* Abordagem */}
-                <div>
-                  <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2 block">
-                    Qual(is) abordagem(ns) nutricional você utiliza?
-                  </label>
-                  <div className="flex flex-wrap gap-2">
-                    {APPROACHES.map((a) => (
-                      <Pill
-                        key={a.value}
-                        label={a.label}
-                        active={draft.approaches.includes(a.value)}
-                        onClick={() => toggleMulti('approaches', a.value)}
-                      />
-                    ))}
+      {/* ── Tool modal/painel ── */}
+      <AnimatePresence>
+        {activeTool && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            className="glass rounded-2xl overflow-hidden"
+          >
+            <div className="p-4">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-3">
+                  <div className={cn('w-8 h-8 rounded-lg flex items-center justify-center bg-black/20', activeTool.color)}>
+                    <activeTool.icon className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-semibold">{activeTool.label}</h3>
+                    <p className="text-xs text-muted-foreground">{activeTool.description}</p>
                   </div>
                 </div>
+                <button onClick={closeTool} className="w-7 h-7 rounded-lg hover:bg-accent flex items-center justify-center transition-all">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
 
-                {/* Perfil de pacientes */}
-                <div>
-                  <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2 block">
-                    Qual o perfil principal dos seus pacientes?
-                  </label>
-                  <div className="flex flex-wrap gap-2">
-                    {PATIENT_PROFILES.map((p) => (
-                      <Pill
-                        key={p.value}
-                        label={p.label}
-                        active={draft.patientProfiles.includes(p.value)}
-                        onClick={() => toggleMulti('patientProfiles', p.value)}
-                      />
-                    ))}
-                  </div>
+              {/* Params */}
+              {activeTool.params && activeTool.params.length > 0 && !toolResult && (
+                <div className="space-y-3 mb-4">
+                  {activeTool.params.map((p) => (
+                    <div key={p.key}>
+                      <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5 block">
+                        {p.label}
+                      </label>
+                      {p.type === 'textarea' ? (
+                        <textarea
+                          value={toolParams[p.key] || ''}
+                          onChange={(e) => setToolParams((prev) => ({ ...prev, [p.key]: e.target.value }))}
+                          placeholder={p.placeholder}
+                          rows={4}
+                          className="input-field text-sm w-full resize-none"
+                        />
+                      ) : (
+                        <input
+                          type={p.type}
+                          value={toolParams[p.key] || ''}
+                          onChange={(e) => setToolParams((prev) => ({ ...prev, [p.key]: e.target.value }))}
+                          placeholder={p.placeholder}
+                          className="input-field text-sm w-full"
+                        />
+                      )}
+                    </div>
+                  ))}
                 </div>
+              )}
 
-                {/* Tom */}
-                <div>
-                  <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2 block">
-                    Qual tom de comunicação prefere?
-                  </label>
-                  <div className="grid grid-cols-2 gap-2">
-                    {TONES.map((t) => (
-                      <button
-                        key={t.value}
-                        type="button"
-                        onClick={() => setDraft((p) => ({ ...p, tone: p.tone === t.value ? '' : t.value }))}
-                        className={cn(
-                          'text-left p-3 rounded-xl border text-sm transition-all',
-                          draft.tone === t.value
-                            ? 'bg-primary/20 border-primary'
-                            : 'bg-white/5 border-white/10 hover:border-white/30',
-                        )}
-                      >
-                        <div className="font-medium text-xs">{t.label}</div>
-                        <div className="text-[11px] text-muted-foreground mt-0.5">{t.desc}</div>
-                      </button>
-                    ))}
-                  </div>
+              {/* Result */}
+              {toolResult && (
+                <div className="mb-4 max-h-[50vh] overflow-y-auto">
+                  {renderResult()}
                 </div>
+              )}
 
-                {/* Foco */}
-                <div>
-                  <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2 block">
-                    O que deve ser priorizado nas respostas?
-                  </label>
-                  <div className="flex flex-wrap gap-2">
-                    {FOCUS_AREAS.map((f) => (
-                      <Pill
-                        key={f.value}
-                        label={f.label}
-                        active={draft.focusAreas.includes(f.value)}
-                        onClick={() => toggleMulti('focusAreas', f.value)}
-                      />
-                    ))}
-                  </div>
-                </div>
-
-                {/* Evitar */}
-                <div>
-                  <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2 block">
-                    O que a IA deve evitar?
-                  </label>
-                  <div className="flex flex-wrap gap-2">
-                    {AVOID_AREAS.map((a) => (
-                      <Pill
-                        key={a.value}
-                        label={a.label}
-                        active={draft.avoidAreas.includes(a.value)}
-                        onClick={() => toggleMulti('avoidAreas', a.value)}
-                      />
-                    ))}
-                  </div>
-                </div>
-
-                {/* Observações livres */}
-                <div>
-                  <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2 block">
-                    Algo mais que a IA deve saber sobre sua prática?
-                  </label>
-                  <textarea
-                    value={draft.extraNotes}
-                    onChange={(e) => setDraft((p) => ({ ...p, extraNotes: e.target.value }))}
-                    placeholder="Ex: Meus pacientes são majoritariamente mulheres entre 25-45 anos. Prefiro sempre sugerir opções com ingredientes acessíveis e de baixo custo..."
-                    rows={3}
-                    className="input-field text-sm w-full resize-none"
-                  />
-                </div>
-
-                {/* Actions */}
-                <div className="flex items-center justify-between pt-1">
+              {/* Actions */}
+              <div className="flex items-center gap-2">
+                {!toolResult ? (
                   <button
                     type="button"
-                    onClick={clearConfig}
-                    className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-red-400 transition-colors"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                    Limpar configuração
-                  </button>
-                  <button
-                    type="button"
-                    onClick={saveConfig}
+                    onClick={submitTool}
+                    disabled={toolMutation.isPending || activeTool.params?.some((p) => p.required && !toolParams[p.key])}
                     className="btn-primary flex items-center gap-2 text-sm px-4 py-2"
                   >
-                    <Save className="w-3.5 h-3.5" />
-                    Salvar e treinar IA
+                    {toolMutation.isPending ? (
+                      <><Loader2 className="w-4 h-4 animate-spin" /> Gerando...</>
+                    ) : (
+                      <><Sparkles className="w-4 h-4" /> Gerar</>
+                    )}
+                  </button>
+                ) : (
+                  <>
+                    <button type="button" onClick={() => setToolResult(null)} className="btn-secondary flex items-center gap-2 text-sm px-3 py-2">
+                      <RefreshCw className="w-3.5 h-3.5" /> Refazer
+                    </button>
+                    <button type="button" onClick={() => navigator.clipboard.writeText(JSON.stringify(toolResult, null, 2))} className="btn-secondary flex items-center gap-2 text-sm px-3 py-2">
+                      <Copy className="w-3.5 h-3.5" /> Copiar JSON
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ── Mini chat (collapsible) ── */}
+      <div className="glass rounded-2xl overflow-hidden mt-auto">
+        <button
+          type="button"
+          onClick={() => setChatOpen(!chatOpen)}
+          className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-accent/50 transition-all"
+        >
+          <Sparkles className="w-4 h-4 text-amber-400" />
+          <span className="text-sm font-medium flex-1 text-left">Chat rápido</span>
+          <span className="text-xs text-muted-foreground">Perguntas pontuais</span>
+          <ChevronDown className={cn('w-4 h-4 text-muted-foreground transition-transform', chatOpen && 'rotate-180')} />
+        </button>
+        <AnimatePresence>
+          {chatOpen && (
+            <motion.div initial={{ height: 0 }} animate={{ height: 'auto' }} exit={{ height: 0 }} className="overflow-hidden">
+              <div className="border-t border-white/5 p-3">
+                <div className="max-h-48 overflow-y-auto space-y-3 mb-3">
+                  {messages.map((msg) => (
+                    <div key={msg.id} className={cn('flex gap-2', msg.role === 'user' && 'flex-row-reverse')}>
+                      <div className={cn('max-w-[85%] rounded-xl px-3 py-2 text-xs', msg.role === 'assistant' ? 'bg-white/5' : 'bg-primary/20')}>
+                        <p className="whitespace-pre-wrap">{msg.content}</p>
+                      </div>
+                    </div>
+                  ))}
+                  {chatMutation.isPending && <p className="text-xs text-muted-foreground animate-pulse">Pensando...</p>}
+                  <div ref={messagesEndRef} />
+                </div>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') handleChatSend(); }}
+                    placeholder="Pergunta rápida..."
+                    className="flex-1 bg-white/5 rounded-lg px-3 py-2 text-xs focus:outline-none"
+                  />
+                  <button onClick={() => handleChatSend()} disabled={!input.trim() || chatMutation.isPending} className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center flex-shrink-0 disabled:opacity-50">
+                    <Send className="w-3.5 h-3.5 text-white" />
                   </button>
                 </div>
               </div>
@@ -590,138 +489,175 @@ export default function NutritionistAI() {
           )}
         </AnimatePresence>
       </div>
+    </div>
+  );
+}
 
-      {/* ── Messages ── */}
-      <div className="flex-1 overflow-y-auto scrollbar-hide space-y-4 pr-1">
-        <AnimatePresence initial={false}>
-          {messages.map((msg) => (
-            <motion.div
-              key={msg.id}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              className={cn('flex gap-3', msg.role === 'user' && 'flex-row-reverse')}
-            >
-              <div className={cn(
-                'w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 mt-0.5',
-                msg.role === 'assistant'
-                  ? 'bg-gradient-to-br from-purple-600 to-indigo-600'
-                  : 'bg-gradient-to-br from-cyan-600 to-blue-600',
-              )}>
-                {msg.role === 'assistant'
-                  ? <Brain className="w-4 h-4 text-white" />
-                  : <User className="w-4 h-4 text-white" />
-                }
-              </div>
+// ─── Result sub-components ─────────────────────────────────────────────────
 
-              <div className={cn(
-                'max-w-[80%] rounded-2xl px-4 py-3 text-sm relative group',
-                msg.role === 'assistant'
-                  ? 'glass rounded-tl-sm'
-                  : 'bg-primary text-primary-foreground rounded-tr-sm',
-              )}>
-                <p className="whitespace-pre-wrap leading-relaxed">{msg.content}</p>
-                <div className={cn(
-                  'text-[10px] mt-2',
-                  msg.role === 'assistant' ? 'text-muted-foreground' : 'text-primary-foreground/70',
-                )}>
-                  {msg.timestamp.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-                </div>
-                {msg.role === 'assistant' && (
-                  <button
-                    onClick={() => navigator.clipboard.writeText(msg.content)}
-                    className="absolute top-2 right-2 w-6 h-6 rounded-lg opacity-0 group-hover:opacity-100 hover:bg-accent flex items-center justify-center transition-all"
-                    title="Copiar"
-                  >
-                    <Copy className="w-3 h-3" />
-                  </button>
-                )}
-              </div>
-            </motion.div>
-          ))}
-        </AnimatePresence>
-
-        {sendMutation.isPending && (
-          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="flex gap-3">
-            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-purple-600 to-indigo-600 flex items-center justify-center flex-shrink-0">
-              <Brain className="w-4 h-4 text-white" />
-            </div>
-            <div className="glass rounded-2xl rounded-tl-sm px-4 py-3">
-              <div className="flex gap-1.5 items-center h-4">
-                {[0, 1, 2].map((i) => (
-                  <motion.div
-                    key={i}
-                    animate={{ scale: [1, 1.3, 1], opacity: [0.5, 1, 0.5] }}
-                    transition={{ duration: 0.8, repeat: Infinity, delay: i * 0.2 }}
-                    className="w-1.5 h-1.5 rounded-full bg-muted-foreground"
-                  />
-                ))}
-              </div>
-            </div>
-          </motion.div>
-        )}
-
-        {messages.length === 1 && (
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} className="space-y-2">
-            <p className="text-xs text-muted-foreground text-center mb-3">Sugestões</p>
-            {SUGGESTIONS.map((s, i) => (
-              <button
-                key={i}
-                onClick={() => handleSend(s.label)}
-                className="w-full flex items-center gap-3 p-3 glass rounded-xl hover:bg-accent transition-all text-left group"
-              >
-                <s.icon className={`w-4 h-4 ${s.color} flex-shrink-0`} />
-                <span className="text-sm flex-1">{s.label}</span>
-                <ChevronRight className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
-              </button>
-            ))}
-          </motion.div>
-        )}
-
-        <div ref={messagesEndRef} />
+function MealPlanResult({ data }: { data: any }) {
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-2">
+        <ChefHat className="w-5 h-5 text-emerald-400" />
+        <h3 className="font-bold text-lg">{data.name || 'Plano Alimentar'}</h3>
       </div>
-
-      {/* ── Input ── */}
-      <div className="glass rounded-2xl p-2">
-        <div className="flex items-end gap-2">
-          <textarea
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); }
-            }}
-            placeholder={selectedPatient
-              ? `Pergunte sobre ${selectedPatient.user?.profile?.firstName}... (Enter para enviar)`
-              : 'Descreva o que precisa... (Enter para enviar)'}
-            rows={1}
-            className="flex-1 bg-transparent text-sm resize-none focus:outline-none py-2 px-2 max-h-32 overflow-y-auto scrollbar-hide"
-            style={{ fieldSizing: 'content' } as any}
-          />
-          <div className="flex items-center gap-1.5 pb-1">
-            <button
-              onClick={() => setMessages([messages[0]])}
-              className="w-8 h-8 rounded-xl hover:bg-accent flex items-center justify-center transition-all"
-              title="Nova conversa"
-            >
-              <RefreshCw className="w-3.5 h-3.5 text-muted-foreground" />
-            </button>
-            <button
-              onClick={() => handleSend()}
-              disabled={!input.trim() || sendMutation.isPending}
-              className={cn(
-                'w-9 h-9 rounded-xl flex items-center justify-center transition-all',
-                input.trim() && !sendMutation.isPending
-                  ? 'bg-primary hover:bg-primary/80'
-                  : 'bg-muted cursor-not-allowed',
-              )}
-            >
-              {sendMutation.isPending
-                ? <Sparkles className="w-4 h-4 text-muted-foreground animate-spin" />
-                : <Send className="w-4 h-4 text-white" />
-              }
-            </button>
+      {data.totalCalories && (
+        <p className="text-sm text-muted-foreground">
+          Total: <strong>{data.totalCalories} kcal</strong>
+          {data.macros && ` | Proteína: ${data.macros.protein}g | Carbs: ${data.macros.carbs}g | Gordura: ${data.macros.fat}g`}
+        </p>
+      )}
+      {data.meals?.map((meal: any, i: number) => (
+        <div key={i} className="glass rounded-xl p-3">
+          <div className="flex justify-between items-center mb-2">
+            <h4 className="font-semibold text-sm">{meal.name}</h4>
+            <span className="text-xs text-muted-foreground">{meal.time} · {meal.calories} kcal</span>
+          </div>
+          <div className="space-y-1">
+            {meal.foods?.map((food: any, j: number) => (
+              <div key={j} className="flex justify-between text-xs">
+                <span>{food.name} — {food.quantity}{food.unit}</span>
+                <span className="text-muted-foreground">{food.calories} kcal</span>
+              </div>
+            ))}
           </div>
         </div>
+      ))}
+      {data.tips?.length > 0 && (
+        <div className="bg-amber-500/10 rounded-xl p-3">
+          <p className="text-xs font-semibold text-amber-400 mb-1">💡 Dicas</p>
+          {data.tips.map((tip: string, i: number) => <p key={i} className="text-xs">• {tip}</p>)}
+        </div>
+      )}
+      {data.shoppingList?.length > 0 && (
+        <div className="bg-white/5 rounded-xl p-3">
+          <p className="text-xs font-semibold mb-1">🛒 Lista de compras</p>
+          <div className="flex flex-wrap gap-1">
+            {data.shoppingList.map((item: string, i: number) => (
+              <span key={i} className="text-[10px] bg-white/10 px-2 py-0.5 rounded-full">{item}</span>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function WeeklyMenuResult({ data }: { data: any }) {
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-2">
+        <Calendar className="w-5 h-5 text-purple-400" />
+        <h3 className="font-bold text-lg">{data.name || 'Cardápio Semanal'}</h3>
       </div>
+      <p className="text-sm text-muted-foreground">Meta diária: <strong>{data.dailyCalories || 'N/A'} kcal</strong></p>
+      <div className="space-y-3">
+        {data.days?.map((day: any, i: number) => (
+          <div key={i} className="glass rounded-xl p-3">
+            <h4 className="font-semibold text-sm mb-2">{day.day}</h4>
+            <div className="space-y-1.5">
+              {day.meals?.map((meal: any, j: number) => (
+                <div key={j} className="flex justify-between text-xs">
+                  <span className="font-medium">{meal.meal}</span>
+                  <span className="text-muted-foreground flex-1 ml-2 truncate">{meal.description}</span>
+                  <span className="ml-2">{meal.calories} kcal</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+      {data.shoppingList?.length > 0 && (
+        <div className="bg-white/5 rounded-xl p-3">
+          <p className="text-xs font-semibold mb-1">🛒 Lista de compras semanal</p>
+          <div className="flex flex-wrap gap-1">
+            {data.shoppingList.map((item: string, i: number) => <span key={i} className="text-[10px] bg-white/10 px-2 py-0.5 rounded-full">{item}</span>)}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SubstitutionResult({ data }: { data: any }) {
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-2">
+        <Shuffle className="w-5 h-5 text-orange-400" />
+        <h3 className="font-bold text-lg">Substituições para: {data.originalFood}</h3>
+      </div>
+      <p className="text-xs text-muted-foreground">Motivo: {data.reason}</p>
+      <div className="space-y-2">
+        {data.alternatives?.map((alt: any, i: number) => (
+          <div key={i} className="glass rounded-xl p-3">
+            <p className="font-semibold text-sm">{alt.name}</p>
+            <p className="text-xs text-muted-foreground mt-1">{alt.explanation}</p>
+            {alt.nutritionalNote && <p className="text-[11px] text-emerald-400 mt-1">📊 {alt.nutritionalNote}</p>}
+            {alt.preparation && <p className="text-[11px] text-amber-400 mt-0.5">🍳 {alt.preparation}</p>}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function DiaryResult({ data }: { data: any }) {
+  const priorityColors: Record<string, string> = { high: 'text-red-400', medium: 'text-amber-400', low: 'text-blue-400' };
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-2">
+        <ClipboardList className="w-5 h-5 text-cyan-400" />
+        <h3 className="font-bold text-lg">Análise do Diário Alimentar</h3>
+      </div>
+      <p className="text-sm">{data.summary}</p>
+      {data.estimatedCalories && <p className="text-xs text-muted-foreground">Estimativa: ~{data.estimatedCalories} kcal</p>}
+      {data.positives?.length > 0 && (
+        <div className="bg-emerald-500/10 rounded-xl p-3">
+          <p className="text-xs font-semibold text-emerald-400 mb-1">✅ Pontos fortes</p>
+          {data.positives.map((p: string, i: number) => <p key={i} className="text-xs">• {p}</p>)}
+        </div>
+      )}
+      {data.concerns?.length > 0 && (
+        <div className="bg-amber-500/10 rounded-xl p-3">
+          <p className="text-xs font-semibold text-amber-400 mb-1">⚠️ Pontos de atenção</p>
+          {data.concerns.map((c: string, i: number) => <p key={i} className="text-xs">• {c}</p>)}
+        </div>
+      )}
+      {data.recommendations?.length > 0 && (
+        <div className="space-y-2">
+          <p className="text-xs font-semibold">📋 Recomendações</p>
+          {data.recommendations.map((rec: any, i: number) => (
+            <div key={i} className="glass rounded-xl p-3">
+              <div className="flex items-center gap-2">
+                <span className={cn('text-xs font-semibold', priorityColors[rec.priority] || 'text-muted-foreground')}>{rec.title}</span>
+                <span className={cn('text-[10px] px-1.5 py-0.5 rounded-full', rec.priority === 'high' ? 'bg-red-500/20 text-red-400' : rec.priority === 'medium' ? 'bg-amber-500/20 text-amber-400' : 'bg-blue-500/20 text-blue-400')}>{rec.priority}</span>
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">{rec.detail}</p>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function GuidelinesResult({ data }: { data: any }) {
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-2">
+        <FileText className="w-5 h-5 text-pink-400" />
+        <h3 className="font-bold text-lg">{data.title || 'Orientações Nutricionais'}</h3>
+      </div>
+      <p className="text-sm font-medium">{data.greeting}</p>
+      {data.sections?.map((sec: any, i: number) => (
+        <div key={i} className="glass rounded-xl p-3">
+          <h4 className="font-semibold text-sm mb-1">{sec.heading}</h4>
+          <p className="text-xs text-muted-foreground whitespace-pre-wrap">{sec.body}</p>
+        </div>
+      ))}
+      <p className="text-xs font-medium">{data.closing}</p>
+      <p className="text-[10px] text-muted-foreground italic">{data.disclaimer}</p>
     </div>
   );
 }

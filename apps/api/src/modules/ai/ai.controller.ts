@@ -57,6 +57,15 @@ export class AiController {
     return this.aiService.chatWithAssistant(userId, body.message, body.history, body.context);
   }
 
+  @Post('nutrition-tool')
+  @ApiOperation({ summary: 'Ferramentas de IA para nutricionista (plano, cardápio, substituições)' })
+  nutritionTool(
+    @CurrentUser('id') userId: string,
+    @Body() body: { tool: string; patientId?: string; params?: any },
+  ) {
+    return this.aiService.nutritionTool(userId, body.tool, body.patientId, body.params);
+  }
+
   @Post('analyze-photo')
   @ApiOperation({ summary: 'Análise de foto de progresso por IA' })
   analyzePhoto(@Body() body: { photoUrl: string }) {
