@@ -33,6 +33,12 @@ export class NutritionistsController {
     return this.service.searchStudents(user.id, search || '');
   }
 
+  @Get('me/students/search-by-email')
+  @ApiOperation({ summary: 'Buscar aluno por email no tenant (para evitar duplicacao)' })
+  searchStudentByEmail(@CurrentUser() user: any, @Query('email') email: string) {
+    return this.service.searchStudentByEmail(user.id, email || '');
+  }
+
   @Post('me/patients/create')
   @ApiOperation({ summary: 'Criar novo paciente (cria conta de aluno)' })
   createPatientUser(@CurrentUser() user: any, @Body() body: any) {
@@ -68,7 +74,7 @@ export class NutritionistsController {
   }
 
   @Post('me/foods')
-  @ApiOperation({ summary: 'Adicionar alimento à base' })
+  @ApiOperation({ summary: 'Adicionar alimento a base' })
   addFood(@CurrentUser() user: any, @Body() body: any) {
     return this.service.addFood(user.id, body);
   }
@@ -92,7 +98,7 @@ export class NutritionistsController {
   }
 
   @Get('me/reports')
-  @ApiOperation({ summary: 'Relatórios dos últimos 30 dias' })
+  @ApiOperation({ summary: 'Relatorios dos ultimos 30 dias' })
   getReports(@CurrentUser() user: any) {
     return this.service.getReports(user.id);
   }
@@ -110,55 +116,55 @@ export class NutritionistsController {
   }
 
   @Get('me/patients/:studentId/nutritional-assessments')
-  @ApiOperation({ summary: 'Listar avaliações nutricionais do paciente' })
+  @ApiOperation({ summary: 'Listar avaliacoes nutricionais do paciente' })
   getNutritionalAssessments(@CurrentUser() user: any, @Param('studentId') studentId: string) {
     return this.service.getNutritionalAssessments(user.id, studentId);
   }
 
   @Post('me/patients/:studentId/nutritional-assessments')
-  @ApiOperation({ summary: 'Criar avaliação nutricional do paciente' })
+  @ApiOperation({ summary: 'Criar avaliacao nutricional do paciente' })
   createNutritionalAssessment(@CurrentUser() user: any, @Param('studentId') studentId: string, @Body() body: any) {
     return this.service.createNutritionalAssessment(user.id, studentId, body);
   }
 
   @Get('me/patients/:studentId/physical-assessments')
-  @ApiOperation({ summary: 'Listar avaliações antropométricas do paciente' })
+  @ApiOperation({ summary: 'Listar avaliacoes antropometricas do paciente' })
   getPhysicalAssessments(@CurrentUser() user: any, @Param('studentId') studentId: string) {
     return this.service.getPhysicalAssessments(user.id, studentId);
   }
 
   @Post('me/patients/:studentId/physical-assessments')
-  @ApiOperation({ summary: 'Criar avaliação antropométrica do paciente' })
+  @ApiOperation({ summary: 'Criar avaliacao antropometrica do paciente' })
   createPhysicalAssessment(@CurrentUser() user: any, @Param('studentId') studentId: string, @Body() body: any) {
     return this.service.createPhysicalAssessment(user.id, studentId, body);
   }
 
   @Get('me/patients/:studentId/clinical-notes')
-  @ApiOperation({ summary: 'Listar notas clínicas do paciente' })
+  @ApiOperation({ summary: 'Listar notas clinicas do paciente' })
   getClinicalNotes(@CurrentUser() user: any, @Param('studentId') studentId: string) {
     return this.service.getClinicalNotes(user.id, studentId);
   }
 
   @Post('me/patients/:studentId/clinical-notes')
-  @ApiOperation({ summary: 'Criar nota clínica' })
+  @ApiOperation({ summary: 'Criar nota clinica' })
   createClinicalNote(@CurrentUser() user: any, @Param('studentId') studentId: string, @Body() body: any) {
     return this.service.createClinicalNote(user.id, studentId, body);
   }
 
   @Patch('me/clinical-notes/:noteId')
-  @ApiOperation({ summary: 'Atualizar nota clínica' })
+  @ApiOperation({ summary: 'Atualizar nota clinica' })
   updateClinicalNote(@CurrentUser() user: any, @Param('noteId') noteId: string, @Body() body: any) {
     return this.service.updateClinicalNote(user.id, noteId, body);
   }
 
   @Delete('me/clinical-notes/:noteId')
-  @ApiOperation({ summary: 'Excluir nota clínica' })
+  @ApiOperation({ summary: 'Excluir nota clinica' })
   deleteClinicalNote(@CurrentUser() user: any, @Param('noteId') noteId: string) {
     return this.service.deleteClinicalNote(user.id, noteId);
   }
 
   @Get('me/patients/:studentId/diet-history')
-  @ApiOperation({ summary: 'Histórico de dietas do paciente' })
+  @ApiOperation({ summary: 'Historico de dietas do paciente' })
   getPatientDietHistory(@CurrentUser() user: any, @Param('studentId') studentId: string) {
     return this.service.getPatientDietHistory(user.id, studentId);
   }
@@ -212,19 +218,19 @@ export class NutritionistsController {
   }
 
   @Get('me/patients/:studentId/weight-log')
-  @ApiOperation({ summary: 'Histórico de peso diário do paciente' })
+  @ApiOperation({ summary: 'Historico de peso diario do paciente' })
   getDailyWeightLog(@CurrentUser() user: any, @Param('studentId') studentId: string) {
     return this.service.getDailyWeightLog(user.id, studentId);
   }
 
   @Post('me/patients/:studentId/weight-log')
-  @ApiOperation({ summary: 'Registrar peso diário do paciente' })
+  @ApiOperation({ summary: 'Registrar peso diario do paciente' })
   addDailyWeight(@CurrentUser() user: any, @Param('studentId') studentId: string, @Body() body: any) {
     return this.service.addDailyWeight(user.id, studentId, body);
   }
 
   @Get('me/patients/:studentId/evolution')
-  @ApiOperation({ summary: 'Evolução do paciente ao longo do tempo' })
+  @ApiOperation({ summary: 'Evolucao do paciente ao longo do tempo' })
   getPatientEvolution(@CurrentUser() user: any, @Param('studentId') studentId: string) {
     return this.service.getPatientEvolution(user.id, studentId);
   }
@@ -248,19 +254,19 @@ export class NutritionistsController {
   }
 
   @Get('me/patients/:studentId/supplementation-plans')
-  @ApiOperation({ summary: 'Listar planos de suplementação do paciente' })
+  @ApiOperation({ summary: 'Listar planos de suplementacao do paciente' })
   getSupplementationPlans(@CurrentUser() user: any, @Param('studentId') studentId: string) {
     return this.service.getSupplementationPlans(user.id, studentId);
   }
 
   @Post('me/patients/:studentId/supplementation-plans')
-  @ApiOperation({ summary: 'Criar plano de suplementação' })
+  @ApiOperation({ summary: 'Criar plano de suplementacao' })
   createSupplementationPlan(@CurrentUser() user: any, @Param('studentId') studentId: string, @Body() body: any) {
     return this.service.createSupplementationPlan(user.id, studentId, body);
   }
 
   @Patch('me/supplementation-plans/:planId')
-  @ApiOperation({ summary: 'Atualizar plano de suplementação' })
+  @ApiOperation({ summary: 'Atualizar plano de suplementacao' })
   updateSupplementationPlan(@CurrentUser() user: any, @Param('planId') planId: string, @Body() body: any) {
     return this.service.updateSupplementationPlan(user.id, planId, body);
   }
@@ -290,13 +296,13 @@ export class NutritionistsController {
   }
 
   @Get('me/patients/:studentId/ai-context')
-  @ApiOperation({ summary: 'Contexto clínico do paciente para IA' })
+  @ApiOperation({ summary: 'Contexto clinico do paciente para IA' })
   getPatientAiContext(@CurrentUser() user: any, @Param('studentId') studentId: string) {
     return this.service.getPatientAiContext(user.id, studentId);
   }
 
   @Post('me/calculate-tmb')
-  @ApiOperation({ summary: 'Calcular TMB, GET e distribuição de macronutrientes' })
+  @ApiOperation({ summary: 'Calcular TMB, GET e distribuicao de macronutrientes' })
   calculateTMB(@CurrentUser() user: any, @Body() body: {
     weight: number;
     height: number;

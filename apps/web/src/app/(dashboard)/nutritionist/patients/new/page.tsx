@@ -1,8 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { Users, ChevronLeft, Search, UserPlus, Mail, Phone, Copy, Check } from 'lucide-react';
+import { Users, ChevronLeft, Search, UserPlus, Mail, Phone, Copy, Check, Link2, AlertCircle } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -19,6 +19,10 @@ export default function NewPatientPage() {
   const [copied, setCopied] = useState(false);
   const [createdPatient, setCreatedPatient] = useState<any>(null);
 
+  // Auto-suggest: check email on create form
+  const [emailCheckEnabled, setEmailCheckEnabled] = useState(false);
+  const debounceRef = useRef<NodeJS.Timeout>();
+
   const [form, setForm] = useState({ firstName: '', lastName: '', email: '', phone: '' });
 
   const { data: results, isFetching } = useQuery({
@@ -26,6 +30,26 @@ export default function NewPatientPage() {
     queryFn: () => api.get(`/nutritionists/me/students/search?search=${search}`).then((r) => r.data.data),
     enabled: search.length >= 2,
   });
+
+  // Busca por email exato quando campo email preenchido no tab create
+  const { data: emailMatch, isFetching: emailChecking } = useQuery({
+    queryKey: ['email-check', form.email],
+    queryFn: () => api.get(`/nutritionists/me/students/search-by-email?email=${form.email}`).then((r) => r.data.data),
+    enabled: emailCheckEnabled && form.email.includes('@') && form.email.length > 5,
+  });
+
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      setEmailCheckEnabled(true);
+    }, 600);
+    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
+  }, [form.email]);
+
+  // Reset email check when tab changes
+  useEffect(() => {
+    setEmailCheckEnabled(false);
+  }, [tab]);
 
   const invalidateAndRedirect = () => {
     queryClient.invalidateQueries({ queryKey: ['nutritionist-patients-list'] });
@@ -58,6 +82,13 @@ export default function NewPatientPage() {
     if (!form.firstName || !form.email) { setError('Nome e e-mail são obrigatórios'); return; }
     setError('');
     createMutation.mutate({ ...form, monthlyFee: monthlyFee ? Number(monthlyFee) : undefined });
+  };
+
+  const quickLink = () => {
+    if (!emailMatch) return;
+    setTab('search');
+    setSelected(emailMatch);
+    setSearch(emailMatch.email);
   };
 
   const copyPassword = () => {
@@ -133,6 +164,34 @@ export default function NewPatientPage() {
 
       {tab === 'create' ? (
         <form onSubmit={handleCreate} className="space-y-6">
+          {/* Email match banner */}
+          {emailMatch && (
+            <motion.div
+              initial={{ opacity: 0, y: -8 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="glass rounded-xl p-4 border border-amber-500/30 bg-amber-500/5"
+            >
+              <div className="flex items-start gap-3">
+                <AlertCircle className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  <p className="text-sm font-semibold text-amber-400">Aluno já cadastrado</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Já existe um aluno com o email <strong>{emailMatch.email}</strong> no sistema ({emailMatch.profile?.firstName} {emailMatch.profile?.lastName}).
+                    Evite duplicar contas — vincule o aluno existente.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={quickLink}
+                    className="flex items-center gap-1.5 mt-2 text-xs font-semibold text-amber-400 hover:text-amber-300 transition-colors"
+                  >
+                    <Link2 className="w-3.5 h-3.5" />
+                    Vincular este aluno
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          )}
+
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="glass-card space-y-4">
             <h2 className="font-semibold flex items-center gap-2">
               <UserPlus className="w-4 h-4 text-emerald-400" />
@@ -152,7 +211,16 @@ export default function NewPatientPage() {
               <label className="text-sm font-medium mb-1.5 block">E-mail *</label>
               <div className="relative">
                 <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="paciente@email.com" className="input-field pl-9" />
+                <input
+                  type="email"
+                  value={form.email}
+                  onChange={(e) => setForm({ ...form, email: e.target.value })}
+                  placeholder="paciente@email.com"
+                  className="input-field pl-9"
+                />
+                {emailChecking && (
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground animate-pulse">verificando...</span>
+                )}
               </div>
             </div>
             <div>
@@ -183,6 +251,20 @@ export default function NewPatientPage() {
               <Users className="w-4 h-4 text-emerald-400" />
               Buscar paciente existente
             </h2>
+            {/* Pre-selected from email match */}
+            {selected && (
+              <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-3 flex items-center gap-3">
+                <div className="w-9 h-9 rounded-full bg-gradient-to-br from-emerald-600 to-teal-600 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+                  {selected.profile?.firstName?.[0]}{selected.profile?.lastName?.[0]}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-medium">{selected.profile?.firstName} {selected.profile?.lastName}</div>
+                  <div className="text-xs text-muted-foreground">{selected.email}</div>
+                </div>
+                <Link2 className="w-4 h-4 text-emerald-400" />
+              </div>
+            )}
+
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <input type="text" value={search} onChange={(e) => { setSearch(e.target.value); setSelected(null); }} placeholder="Buscar por nome ou e-mail..." className="input-field pl-9" />
@@ -213,8 +295,10 @@ export default function NewPatientPage() {
                 )}
               </div>
             )}
-            {search.length < 2 && <p className="text-xs text-muted-foreground">Digite pelo menos 2 caracteres para buscar</p>}
-            {selected && (
+            {search.length < 2 && !selected && (
+              <p className="text-xs text-muted-foreground">Digite pelo menos 2 caracteres para buscar</p>
+            )}
+            {(selected || search.length >= 2) && (
               <div>
                 <label className="text-sm font-medium mb-1.5 block">Mensalidade (R$)</label>
                 <input type="number" value={monthlyFee} onChange={(e) => setMonthlyFee(e.target.value)} placeholder="Ex: 200" className="input-field" min={0} />
@@ -225,7 +309,7 @@ export default function NewPatientPage() {
           <div className="flex gap-3">
             <Link href="/nutritionist/patients" className="btn-secondary flex-1 text-center">Cancelar</Link>
             <button type="submit" disabled={!selected || linkMutation.isPending} className="btn-primary flex-1 flex items-center justify-center gap-2 disabled:opacity-50">
-              <UserPlus className="w-4 h-4" />
+              <Link2 className="w-4 h-4" />
               {linkMutation.isPending ? 'Vinculando...' : 'Vincular paciente'}
             </button>
           </div>
