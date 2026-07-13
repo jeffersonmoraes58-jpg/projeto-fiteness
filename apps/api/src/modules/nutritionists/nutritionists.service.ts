@@ -230,6 +230,17 @@ export class NutritionistsService {
     }));
   }
 
+  async searchStudentByEmail(userId: string, email: string) {
+    const n = await this.getNutritionist(userId);
+    const q = email.trim().toLowerCase();
+    const user = await this.prisma.user.findFirst({
+      where: { tenantId: n.user.tenantId, email: { equals: q, mode: 'insensitive' }, role: 'STUDENT' },
+      include: { profile: true, student: true },
+    });
+    if (!user || !user.student) return null;
+    return { userId: user.id, studentId: user.student.id, email: user.email, profile: user.profile };
+  }
+
   async createPatientUser(userId: string, data: { firstName: string; lastName: string; email: string; phone?: string; monthlyFee?: number }) {
     const n = await this.getNutritionist(userId);
     const existing = await this.prisma.user.findFirst({ where: { tenantId: n.user.tenantId, email: data.email } });
