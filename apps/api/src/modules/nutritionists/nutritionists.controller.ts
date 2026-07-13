@@ -285,6 +285,12 @@ export class NutritionistsController {
     return this.service.update(user.id, body);
   }
 
+  @Get('me/patients/:studentId/ai-context')
+  @ApiOperation({ summary: 'Contexto clínico do paciente para IA' })
+  getPatientAiContext(@CurrentUser() user: any, @Param('studentId') studentId: string) {
+    return this.service.getPatientAiContext(user.id, studentId);
+  }
+
   @Post('me/calculate-tmb')
   @ApiOperation({ summary: 'Calcular TMB, GET e distribuição de macronutrientes' })
   calculateTMB(@CurrentUser() user: any, @Body() body: {

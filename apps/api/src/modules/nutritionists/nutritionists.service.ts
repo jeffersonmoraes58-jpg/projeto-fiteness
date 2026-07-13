@@ -759,6 +759,148 @@ export class NutritionistsService {
     };
   }
 
+  async getPatientAiContext(userId: string, studentId: string) {
+    const n = await this.getNutritionist(userId);
+    const relation = await this.prisma.nutritionistPatient.findFirst({
+      where: { nutritionistId: n.id, studentId },
+    });
+    if (!relation) throw new NotFoundException('Paciente não encontrado');
+
+    const [student, anamnesis, lastAssessment, activeDiet, activePlan, exams, goals, notes, physicalEval] = await Promise.all([
+      this.prisma.student.findUnique({
+        where: { id: studentId },
+        include: { user: { include: { profile: true } } },
+      }),
+      this.prisma.anamnesis.findUnique({ where: { studentId } }),
+      this.prisma.nutritionalAssessment.findFirst({
+        where: { studentId },
+        orderBy: { assessedAt: 'desc' },
+      }),
+      this.prisma.diet.findFirst({
+        where: { nutritionistId: n.id, status: 'ACTIVE' },
+        include: { meals: { include: { foods: true }, orderBy: { order: 'asc' } }, plans: { where: { studentId, isActive: true }, take: 1 } },
+      }),
+      this.prisma.dietPlan.findFirst({
+        where: { studentId, isActive: true },
+        include: { diet: true },
+      }),
+      this.prisma.patientExam.findMany({
+        where: { studentId, nutritionistId: n.id },
+        orderBy: { examDate: 'desc' },
+        take: 5,
+      }),
+      this.prisma.goal.findMany({
+        where: { studentId },
+        orderBy: [{ isCompleted: 'asc' }, { createdAt: 'desc' }],
+        take: 5,
+      }),
+      this.prisma.clinicalNote.findMany({
+        where: { studentId, nutritionistId: n.id },
+        orderBy: [{ isPinned: 'desc' }, { createdAt: 'desc' }],
+        take: 5,
+      }),
+      this.prisma.physicalAssessment.findFirst({
+        where: { studentId },
+        orderBy: { assessedAt: 'desc' },
+      }),
+    ]);
+
+    const profile = student?.user?.profile;
+    const patientName = `${profile?.firstName || ''} ${profile?.lastName || ''}`.trim() || 'Paciente';
+
+    // Build a structured context text for the AI
+    const parts: string[] = [`### PACIENTE: ${patientName}`, `ID: ${studentId}`];
+
+    if (student?.goalType) {
+      const goalLabels: Record<string, string> = {
+        LOSE_WEIGHT: 'Perda de peso', GAIN_MUSCLE: 'Ganho muscular',
+        MAINTAIN_WEIGHT: 'Manutenção', IMPROVE_ENDURANCE: 'Resistência',
+        INCREASE_FLEXIBILITY: 'Flexibilidade', ATHLETIC_PERFORMANCE: 'Performance atlética',
+        REHABILITATION: 'Reabilitação',
+      };
+      parts.push(`Objetivo: ${goalLabels[student.goalType] || student.goalType}`);
+    }
+
+    if (anamnesis) {
+      parts.push('\n### ANAMNESE');
+      if (anamnesis.mainGoal) parts.push(`Meta principal: ${anamnesis.mainGoal}`);
+      if (anamnesis.practicesExercise !== null) parts.push(`Pratica exercício: ${anamnesis.practicesExercise ? 'Sim' : 'Não'}`);
+      if (anamnesis.exerciseFrequency) parts.push(`Frequência: ${anamnesis.exerciseFrequency}`);
+      if (anamnesis.previousInjuries) parts.push(`Lesões prévias: ${anamnesis.previousInjuries}`);
+      if (anamnesis.surgeries) parts.push(`Cirurgias: ${anamnesis.surgeries}`);
+      if (anamnesis.cardiovascularIssues) parts.push('Problemas cardiovasculares: Sim');
+      if (anamnesis.diabetes) parts.push('Diabetes: Sim');
+      if (anamnesis.sleepHours != null) parts.push(`Horas de sono: ${anamnesis.sleepHours}h`);
+      if (anamnesis.stressLevel != null) parts.push(`Nível de estresse (1-10): ${anamnesis.stressLevel}`);
+      if (anamnesis.observations) parts.push(`Observações: ${anamnesis.observations}`);
+    }
+
+    if (lastAssessment) {
+      parts.push('\n### ÚLTIMA AVALIAÇÃO NUTRICIONAL');
+      parts.push(`Data: ${new Date(lastAssessment.assessedAt).toLocaleDateString('pt-BR')}`);
+      if (lastAssessment.weight) parts.push(`Peso: ${lastAssessment.weight}kg`);
+      if (lastAssessment.height) parts.push(`Altura: ${lastAssessment.height}m`);
+      if (lastAssessment.bmi) parts.push(`IMC: ${lastAssessment.bmi}`);
+      if (lastAssessment.tmb) parts.push(`TMB: ${lastAssessment.tmb}kcal`);
+      if (lastAssessment.get) parts.push(`GET: ${lastAssessment.get}kcal`);
+      if (lastAssessment.proteinTarget) parts.push(`Meta proteína: ${lastAssessment.proteinTarget}g`);
+      if (lastAssessment.carbsTarget) parts.push(`Meta carboidratos: ${lastAssessment.carbsTarget}g`);
+      if (lastAssessment.fatTarget) parts.push(`Meta gorduras: ${lastAssessment.fatTarget}g`);
+      if (lastAssessment.dietaryRestrictions?.length) parts.push(`Restrições: ${(lastAssessment.dietaryRestrictions as string[]).join(', ')}`);
+      if (lastAssessment.observations) parts.push(`Observações: ${lastAssessment.observations}`);
+    }
+
+    if (physicalEval) {
+      parts.push('\n### ÚLTIMA AVALIAÇÃO ANTROPOMÉTRICA');
+      if (physicalEval.bodyFatPercent) parts.push(`% Gordura: ${physicalEval.bodyFatPercent}%`);
+      if (physicalEval.muscleMassKg) parts.push(`Massa muscular: ${physicalEval.muscleMassKg}kg`);
+      if (physicalEval.waistCm) parts.push(`Cintura: ${physicalEval.waistCm}cm`);
+      if (physicalEval.hipCm) parts.push(`Quadril: ${physicalEval.hipCm}cm`);
+      if (physicalEval.abdomenCm) parts.push(`Abdômen: ${physicalEval.abdomenCm}cm`);
+    }
+
+    if (activeDiet || activePlan?.diet) {
+      const diet = activeDiet || activePlan?.diet;
+      parts.push('\n### DIETA ATIVA');
+      parts.push(`Nome: ${diet!.name}`);
+      if (diet!.totalCalories) parts.push(`Calorias totais: ${diet!.totalCalories}kcal`);
+      if (diet!.totalProtein) parts.push(`Proteína: ${diet!.totalProtein}g`);
+      if (diet!.totalCarbs) parts.push(`Carboidratos: ${diet!.totalCarbs}g`);
+      if (diet!.totalFat) parts.push(`Gorduras: ${diet!.totalFat}g`);
+    }
+
+    if (exams.length > 0) {
+      parts.push('\n### EXAMES RECENTES');
+      for (const exam of exams) {
+        parts.push(`- ${exam.title} (${new Date(exam.examDate).toLocaleDateString('pt-BR')})${exam.notes ? `: ${exam.notes}` : ''}`);
+      }
+    }
+
+    if (goals.length > 0) {
+      parts.push('\n### METAS');
+      for (const g of goals) {
+        const status = g.isCompleted ? '✅' : '⏳';
+        const progress = g.targetValue ? ` (${g.currentValue || 0}/${g.targetValue}${g.unit || ''})` : '';
+        parts.push(`- ${status} ${g.title}${progress}`);
+      }
+    }
+
+    if (notes.length > 0) {
+      parts.push('\n### NOTAS CLÍNICAS RECENTES');
+      for (const note of notes) {
+        const pin = note.isPinned ? '📌 ' : '';
+        parts.push(`- [${note.category}] ${pin}${note.title || note.content?.slice(0, 100)}`);
+      }
+    }
+
+    return {
+      studentId,
+      patientName,
+      contextText: parts.join('\n'),
+      patient: { id: studentId, name: patientName, goalType: student?.goalType },
+    };
+  }
+
   async updateSupplementationPlan(userId: string, planId: string, data: any) {
     const n = await this.getNutritionist(userId);
     const plan = await this.prisma.supplementationPlan.findFirst({
