@@ -932,7 +932,7 @@ REGRAS ABSOLUTAS:
       }),
       this.prisma.nutritionalAssessment.findFirst({ where: { studentId: pId }, orderBy: { assessedAt: 'desc' } }),
       this.prisma.anamnesis.findFirst({ where: { studentId: pId }, orderBy: { updatedAt: 'desc' } }),
-      this.prisma.diet.findMany({ where: { nutritionistId: nId, studentId: pId }, take: 3, orderBy: { createdAt: 'desc' }, select: { name: true, status: true, totalCalories: true } }),
+      this.prisma.dietPlan.findMany({ where: { studentId: pId }, take: 3, orderBy: { createdAt: 'desc' }, select: { diet: { select: { name: true, status: true, totalCalories: true } } } }),
       this.prisma.patientExam.findMany({ where: { studentId: pId }, take: 5, orderBy: { examDate: 'desc' }, select: { title: true, notes: true, examDate: true } }),
       this.prisma.goal.findMany({ where: { studentId: pId, isCompleted: false }, take: 5, orderBy: { createdAt: 'desc' }, select: { title: true, targetValue: true, currentValue: true, unit: true } }),
     ]);
@@ -951,7 +951,7 @@ REGRAS ABSOLUTAS:
       lines.push(`Lesões: ${anam.previousInjuries || 'Nenhuma'} | Cardio: ${anam.cardiovascularIssues ? 'Sim' : 'Não'}`);
       lines.push(`Sono: ${anam.sleepHours || 'N/A'}h | Estresse: ${anam.stressLevel || 'N/A'}/10`);
     }
-    if (diets.length) lines.push('Dietas:\n' + diets.map(d => `- ${d.name} (${d.status}, ${d.totalCalories || '?'} kcal)`).join('\n'));
+    if (diets.length) lines.push('Dietas:\n' + diets.map(d => `- ${d.diet?.name} (${d.diet?.status}, ${d.diet?.totalCalories || '?'} kcal)`).join('\n'));
     if (exams.length) lines.push('Exames:\n' + exams.map(e => `- ${e.title}: ${e.notes || 'N/A'} (${new Date(e.examDate).toLocaleDateString('pt-BR')})`).join('\n'));
     if (goals.length) lines.push('Metas:\n' + goals.map(g => `- ${g.title}: ${g.currentValue || 0}${g.unit || ''} / ${g.targetValue}${g.unit || ''}`).join('\n'));
     return lines.join('\n\n');
