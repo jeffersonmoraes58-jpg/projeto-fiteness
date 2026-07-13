@@ -251,7 +251,7 @@ export async function exportPatientReport(data: PatientData) {
       if (diet) {
         doc.setFont('helvetica', 'normal');
         doc.setFontSize(9);
-        const info = [];
+        const info: string[] = [];
         if (diet.totalCalories) info.push(`${diet.totalCalories}kcal`);
         if (diet.totalProtein) info.push(`P: ${diet.totalProtein}g`);
         if (diet.totalCarbs) info.push(`C: ${diet.totalCarbs}g`);
