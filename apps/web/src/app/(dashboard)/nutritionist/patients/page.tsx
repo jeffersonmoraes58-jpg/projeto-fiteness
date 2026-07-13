@@ -5,6 +5,7 @@ import { motion } from 'framer-motion';
 import {
   Search, Plus, Filter, Users, Apple, TrendingUp,
   ChevronRight, MoreVertical, MessageCircle, Calendar,
+  FileText, ClipboardCheck,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -27,6 +28,7 @@ const GOAL_LABELS: Record<string, string> = {
 export default function NutritionistPatients() {
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState('Todos');
+  const [menuPatientId, setMenuPatientId] = useState<string | null>(null);
 
   const { data: patients, isLoading } = useQuery({
     queryKey: ['nutritionist-patients-list'],
@@ -172,6 +174,7 @@ const COLORS = ['from-emerald-600 to-teal-600', 'from-cyan-600 to-blue-600', 'fr
 
 function PatientCard({ patient, index }: { patient: any; index: number }) {
   const router = useRouter();
+  const [menuOpen, setMenuOpen] = useState(false);
   const initials = `${patient.user?.profile?.firstName?.[0] || ''}${patient.user?.profile?.lastName?.[0] || ''}`;
   const color = COLORS[index % COLORS.length];
 
@@ -208,9 +211,24 @@ function PatientCard({ patient, index }: { patient: any; index: number }) {
             </div>
           </div>
         </div>
-        <button className="w-7 h-7 rounded-lg hover:bg-accent flex items-center justify-center transition-all">
-          <MoreVertical className="w-4 h-4 text-muted-foreground" />
-        </button>
+        <div className="relative">
+          <button onClick={() => setMenuOpen(!menuOpen)} className="w-7 h-7 rounded-lg hover:bg-accent flex items-center justify-center transition-all">
+            <MoreVertical className="w-4 h-4 text-muted-foreground" />
+          </button>
+          {menuOpen && (
+            <div className="absolute right-0 top-8 bg-card border border-border rounded-xl shadow-xl z-10 py-1 w-44">
+              <Link href={`/nutritionist/patients/${patient.id}`} className="flex items-center gap-2 px-3 py-2 text-sm hover:bg-accent transition-all">
+                <FileText className="w-3.5 h-3.5" /> Ver prontuário
+              </Link>
+              <Link href={`/nutritionist/patients/${patient.id}?tab=avaliacoes`} className="flex items-center gap-2 px-3 py-2 text-sm hover:bg-accent transition-all">
+                <ClipboardCheck className="w-3.5 h-3.5" /> Avaliações
+              </Link>
+              <button onClick={handleStartChat} className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-accent transition-all">
+                <MessageCircle className="w-3.5 h-3.5" /> Enviar mensagem
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Diet compliance */}
@@ -265,8 +283,9 @@ function PatientCard({ patient, index }: { patient: any; index: number }) {
             <MessageCircle className="w-3.5 h-3.5 text-muted-foreground" />
           </button>
           <Link
-            href={`/nutritionist/schedule`}
+            href={`/nutritionist/patients/${patient.id}?tab=consultas`}
             className="w-7 h-7 rounded-lg hover:bg-accent flex items-center justify-center transition-all"
+            title="Consultas do paciente"
           >
             <Calendar className="w-3.5 h-3.5 text-muted-foreground" />
           </Link>

@@ -1,0 +1,1 @@
+ALTER TABLE tenant_subscriptions ADD COLUMN IF NOT EXISTS "lastExpiringNotificationAt" timestamptz;
