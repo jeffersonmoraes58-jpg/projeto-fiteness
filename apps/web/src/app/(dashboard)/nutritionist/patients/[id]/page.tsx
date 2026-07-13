@@ -139,6 +139,25 @@ export default function NutritionistPatientDetailPage() {
 
   const initials = `${patient.user?.profile?.firstName?.[0] || ''}${patient.user?.profile?.lastName?.[0] || ''}`;
 
+  const handleExportPdf = async () => {
+    const name = `${patient.user?.profile?.firstName || ''} ${patient.user?.profile?.lastName || ''}`.trim();
+    toast.promise(
+      exportPatientReport({
+        name,
+        goalType: patient.goalType,
+        anamnesis,
+        nutritionalAssessments: evolution?.nutritional,
+        physicalAssessments: evolution?.physical,
+        dietHistory: Array.isArray(dietHistory) ? dietHistory : [],
+      }),
+      {
+        loading: 'Gerando PDF...',
+        success: 'Relatório baixado com sucesso!',
+        error: 'Erro ao gerar PDF',
+      },
+    );
+  };
+
   return (
     <div className="max-w-2xl mx-auto space-y-6">
       {/* Header */}
@@ -147,6 +166,14 @@ export default function NutritionistPatientDetailPage() {
           <ChevronLeft className="w-4 h-4" />
         </Link>
         <h1 className="text-2xl font-bold">Perfil do Paciente</h1>
+        <button
+          onClick={handleExportPdf}
+          className="ml-auto flex items-center gap-1.5 btn-secondary text-xs py-1.5 px-3"
+          title="Exportar relatório em PDF"
+        >
+          <Download className="w-3.5 h-3.5" />
+          Exportar PDF
+        </button>
       </div>
 
       {/* Profile card */}
