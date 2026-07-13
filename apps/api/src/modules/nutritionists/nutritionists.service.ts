@@ -27,12 +27,26 @@ export class NutritionistsService {
       this.prisma.nutritionalConsultation.count({
         where: { nutritionistId: n.id, scheduledAt: { gte: todayStart } },
       }),
-      this.prisma.nutritionalConsultation.findMany({
-        where: { nutritionistId: n.id, scheduledAt: { gte: now } },
-        orderBy: { scheduledAt: 'asc' },
-        take: 5,
-        include: { student: { include: { user: { include: { profile: true } } } } },
-      }),
+      (async () => {
+        const consultations = await this.prisma.nutritionalConsultation.findMany({
+          where: { nutritionistId: n.id, scheduledAt: { gte: now } },
+          orderBy: { scheduledAt: 'asc' },
+          take: 5,
+        });
+        // Enriquecer com dados do estudante (NutritionalConsultation não tem relação ORM com Student)
+        const studentIds = [...new Set(consultations.map((c) => c.studentId))];
+        const students = studentIds.length > 0
+          ? await this.prisma.student.findMany({
+              where: { id: { in: studentIds } },
+              include: { user: { include: { profile: true } } },
+            })
+          : [];
+        const studentMap = new Map(students.map((s) => [s.id, s]));
+        return consultations.map((c) => ({
+          ...c,
+          student: studentMap.get(c.studentId) || null,
+        }));
+      })(),
       (async () => {
         const relations = await this.prisma.nutritionistPatient.findMany({
           where: { nutritionistId: n.id, isActive: true },
