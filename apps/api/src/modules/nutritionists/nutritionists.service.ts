@@ -17,22 +17,106 @@ export class NutritionistsService {
 
   async getDashboard(userId: string) {
     const n = await this.getNutritionist(userId);
-    const [totalPatients, activeDiets, todayConsultations, upcoming] = await Promise.all([
+    const now = new Date();
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const sevenDaysAgo = new Date(todayStart.getTime() - 7 * 86400000);
+
+    const [totalPatients, activeDiets, todayConsultations, upcoming, recentPatients, complianceData] = await Promise.all([
       this.prisma.nutritionistPatient.count({ where: { nutritionistId: n.id, isActive: true } }),
       this.prisma.diet.count({ where: { nutritionistId: n.id, status: 'ACTIVE' } }),
       this.prisma.nutritionalConsultation.count({
-        where: {
-          nutritionistId: n.id,
-          scheduledAt: { gte: new Date(new Date().setHours(0, 0, 0, 0)) },
-        },
+        where: { nutritionistId: n.id, scheduledAt: { gte: todayStart } },
       }),
       this.prisma.nutritionalConsultation.findMany({
-        where: { nutritionistId: n.id, scheduledAt: { gte: new Date() } },
+        where: { nutritionistId: n.id, scheduledAt: { gte: now } },
         orderBy: { scheduledAt: 'asc' },
         take: 5,
       }),
+      (async () => {
+        const relations = await this.prisma.nutritionistPatient.findMany({
+          where: { nutritionistId: n.id, isActive: true },
+          include: {
+            student: {
+              include: { user: { include: { profile: true } } },
+            },
+          },
+          take: 6,
+          orderBy: { startedAt: 'desc' },
+        });
+        return relations.map((r) => ({
+          id: r.student.id,
+          userId: r.student.userId,
+          isActive: r.isActive,
+          monthlyFee: r.monthlyFee,
+          startedAt: r.startedAt,
+          goalType: r.student.goalType || null,
+          user: {
+            email: r.student.user?.email || '',
+            profile: {
+              firstName: r.student.user?.profile?.firstName || '',
+              lastName: r.student.user?.profile?.lastName || '',
+              phone: r.student.user?.profile?.phone || null,
+              avatarUrl: r.student.user?.profile?.avatarUrl || null,
+            },
+          },
+        }));
+      })(),
+      (async () => {
+        // Calcular adesão dos últimos 7 dias com base em meal logs vs refeições planejadas
+        const activePlans = await this.prisma.dietPlan.findMany({
+          where: {
+            student: { nutritionists: { some: { nutritionistId: n.id } } },
+            isActive: true,
+          },
+          include: { diet: { include: { meals: true } } },
+        });
+
+        const planIds = activePlans.map((p) => p.id);
+        const totalPlannedMealsPerDay = activePlans.reduce((sum, plan) => sum + plan.diet.meals.length, 0);
+
+        const byDay: Record<string, { planned: number; logged: number }> = {};
+        for (let i = 6; i >= 0; i--) {
+          const d = new Date(todayStart.getTime() - i * 86400000);
+          const key = d.toISOString().slice(0, 10);
+          byDay[key] = { planned: totalPlannedMealsPerDay, logged: 0 };
+        }
+
+        const dailyLogs = await this.prisma.mealLog.findMany({
+          where: {
+            dietPlanId: { in: planIds },
+            loggedAt: { gte: sevenDaysAgo },
+          },
+          select: { loggedAt: true },
+        });
+
+        for (const log of dailyLogs) {
+          const key = log.loggedAt.toISOString().slice(0, 10);
+          if (byDay[key]) {
+            byDay[key].logged++;
+          }
+        }
+
+        const weeklyCompliance = Object.values(byDay).map((d) =>
+          d.planned > 0 ? Math.round((d.logged / d.planned) * 100) : 0,
+        );
+        const avgCompliance = weeklyCompliance.length > 0
+          ? Math.round(weeklyCompliance.reduce((a, b) => a + b, 0) / weeklyCompliance.length)
+          : 0;
+        return { weeklyCompliance, avgCompliance };
+      })(),
     ]);
-    return { nutritionist: n, stats: { totalPatients, activeDiets, todayConsultations }, upcoming };
+    return {
+      nutritionist: n,
+      stats: {
+        patients: totalPatients,
+        diets: activeDiets,
+        consultationsToday: todayConsultations,
+        avgCompliance: complianceData.avgCompliance,
+        weeklyCompliance: complianceData.weeklyCompliance,
+      },
+      recentPatients,
+      todayConsultations: upcoming,
+    };
   }
 
   async getPatients(userId: string, search?: string) {
@@ -43,6 +127,7 @@ export class NutritionistsService {
     });
     const results = relations.map((r) => ({
       id: r.student.id,
+      userId: r.student.userId,
       isActive: r.isActive,
       monthlyFee: r.monthlyFee,
       startedAt: r.startedAt,

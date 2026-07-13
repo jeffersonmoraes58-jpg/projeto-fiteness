@@ -99,6 +99,48 @@ export class DietsService {
     });
   }
 
+  async duplicate(userId: string, id: string) {
+    const n = await this.getNutritionist(userId);
+    const diet = await this.prisma.diet.findUnique({
+      where: { id },
+      include: { meals: { include: { foods: true }, orderBy: { order: 'asc' } } },
+    });
+    if (!diet || diet.nutritionistId !== n.id) throw new ForbiddenException();
+    const { id: _id, nutritionistId: _nid, createdAt: _c, updatedAt: _u, ...data } = diet;
+    return this.prisma.diet.create({
+      data: {
+        nutritionistId: n.id,
+        ...data,
+        name: `${diet.name} (cópia)`,
+        meals: {
+          create: diet.meals.map((m) => ({
+            name: m.name,
+            type: m.type,
+            order: m.order,
+            time: m.time,
+            calories: m.calories,
+            protein: m.protein,
+            carbs: m.carbs,
+            fat: m.fat,
+            notes: m.notes,
+            foods: m.foods.length > 0 ? {
+              create: m.foods.map((f) => ({
+                foodId: f.foodId,
+                quantity: f.quantity,
+                unit: f.unit,
+                calories: f.calories,
+                protein: f.protein,
+                carbs: f.carbs,
+                fat: f.fat,
+              })),
+            } : undefined,
+          })),
+        },
+      },
+      include: { meals: { include: { foods: true } } },
+    });
+  }
+
   async removePlan(planId: string) {
     await this.prisma.dietPlan.delete({ where: { id: planId } });
     return { message: 'Plano de dieta removido com sucesso' };

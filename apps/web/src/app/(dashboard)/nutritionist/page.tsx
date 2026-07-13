@@ -21,20 +21,14 @@ const statCards = [
 export default function NutritionistDashboard() {
   const { user } = useAuthStore();
 
-  const { data: stats } = useQuery({
-    queryKey: ['nutritionist-stats'],
+  const { data: dashboard } = useQuery({
+    queryKey: ['nutritionist-dashboard'],
     queryFn: () => api.get('/nutritionists/me/dashboard').then((r) => r.data.data),
   });
 
-  const { data: patients } = useQuery({
-    queryKey: ['nutritionist-patients'],
-    queryFn: () => api.get('/nutritionists/me/patients').then((r) => r.data.data),
-  });
-
-  const { data: consultations } = useQuery({
-    queryKey: ['nutritionist-consultations-today'],
-    queryFn: () => api.get('/nutritionists/me/consultations').then((r) => r.data.data),
-  });
+  const stats = dashboard?.stats;
+  const patients = dashboard?.recentPatients || [];
+  const consultations = dashboard?.todayConsultations || [];
 
   const firstName = user?.profile?.firstName || 'Nutricionista';
 
@@ -74,12 +68,9 @@ export default function NutritionistDashboard() {
               <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${card.color} flex items-center justify-center`}>
                 <card.icon className="w-5 h-5 text-white" />
               </div>
-              <span className="text-xs text-emerald-500 flex items-center gap-1">
-                <ArrowUpRight className="w-3 h-3" />+8%
-              </span>
             </div>
             <div className="text-2xl font-bold">
-              {stats?.[card.key] ?? '—'}{card.suffix || ''}
+              {stats ? (stats[card.key] ?? '—') : '—'}{card.suffix || ''}
             </div>
             <div className="text-xs text-muted-foreground mt-1">{card.label}</div>
           </motion.div>
@@ -97,9 +88,15 @@ export default function NutritionistDashboard() {
               </Link>
             </div>
             <div className="space-y-2">
-              {(patients?.slice(0, 6) || [...Array(5)]).map((p: any, i: number) => (
-                <PatientRow key={i} patient={p} index={i} />
-              ))}
+              {patients.length > 0 ? (
+                patients.slice(0, 6).map((p: any, i: number) => (
+                  <PatientRow key={p.id || i} patient={p} index={i} />
+                ))
+              ) : (
+                [...Array(5)].map((_, i) => (
+                  <PatientRow key={i} patient={null} index={i} />
+                ))
+              )}
             </div>
           </div>
         </div>
@@ -115,18 +112,20 @@ export default function NutritionistDashboard() {
               </Link>
             </div>
             <div className="space-y-2">
-              {consultations?.length > 0 ? (
+              {consultations.length > 0 ? (
                 consultations.slice(0, 4).map((c: any, i: number) => (
-                  <div key={i} className="flex items-center gap-3 p-3 rounded-xl hover:bg-accent transition-all">
+                  <div key={c.id || i} className="flex items-center gap-3 p-3 rounded-xl hover:bg-accent transition-all">
                     <div className="w-9 h-9 rounded-xl bg-cyan-600/10 flex items-center justify-center flex-shrink-0">
                       <Clock className="w-4 h-4 text-cyan-400" />
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="text-sm font-medium truncate">
-                        {c.student?.user?.profile?.firstName} {c.student?.user?.profile?.lastName}
+                        Consulta {c.id ? `#${c.id.slice(-4)}` : ''}
                       </div>
                       <div className="text-xs text-muted-foreground">
-                        {new Date(c.scheduledAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                        {c.scheduledAt
+                          ? new Date(c.scheduledAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+                          : '—'}
                       </div>
                     </div>
                     <CheckCircle2 className="w-4 h-4 text-muted-foreground/30" />
@@ -263,27 +262,35 @@ function WhatsAppIcon({ className }: { className?: string }) {
 
 function ComplianceChart({ stats }: { stats: any }) {
   const days = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
-  const values = stats?.weeklyCompliance || [72, 85, 68, 90, 78, 88, 65];
+  const values = stats?.weeklyCompliance || [];
+  const hasData = values.length > 0;
   const max = 100;
 
   return (
     <div className="flex items-end gap-3 h-32">
-      {days.map((day, i) => (
-        <div key={day} className="flex-1 flex flex-col items-center gap-2">
-          <div className="flex-1 w-full flex items-end">
-            <motion.div
-              initial={{ height: 0 }}
-              animate={{ height: `${(values[i] / max) * 100}%` }}
-              transition={{ duration: 0.5, delay: i * 0.08 }}
-              className={`w-full rounded-t-md ${
-                values[i] >= 80 ? 'bg-gradient-to-t from-emerald-600 to-teal-500' : 'bg-gradient-to-t from-orange-600 to-amber-500'
-              } opacity-80 hover:opacity-100 transition-opacity`}
-            />
+      {days.map((day, i) => {
+        const value = hasData ? values[i] : 0;
+        return (
+          <div key={day} className="flex-1 flex flex-col items-center gap-2">
+            <div className="flex-1 w-full flex items-end">
+              {hasData ? (
+                <motion.div
+                  initial={{ height: 0 }}
+                  animate={{ height: `${(value / max) * 100}%` }}
+                  transition={{ duration: 0.5, delay: i * 0.08 }}
+                  className={`w-full rounded-t-md ${
+                    value >= 80 ? 'bg-gradient-to-t from-emerald-600 to-teal-500' : 'bg-gradient-to-t from-orange-600 to-amber-500'
+                  } opacity-80 hover:opacity-100 transition-opacity`}
+                />
+              ) : (
+                <div className="w-full h-full bg-white/5 rounded-t-md" />
+              )}
+            </div>
+            <div className="text-xs text-muted-foreground">{day}</div>
+            <div className="text-xs font-medium">{hasData ? `${value}%` : '—'}</div>
           </div>
-          <div className="text-xs text-muted-foreground">{day}</div>
-          <div className="text-xs font-medium">{values[i]}%</div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }

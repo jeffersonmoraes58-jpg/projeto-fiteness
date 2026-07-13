@@ -13,11 +13,17 @@ const MAX_SIZE_200MB = 200 * 1024 * 1024;
 const MAX_SIZE_100MB = 100 * 1024 * 1024;
 const MAX_SIZE_500MB = 500 * 1024 * 1024;
 const ALLOWED_TYPES = /^image\/(jpeg|png|webp|gif)$/;
+const ALLOWED_DOC_TYPES = /^image\/(jpeg|png|webp|gif)$|^application\/pdf$/;
 const ALLOWED_VIDEO_TYPES = /^video\/(mp4|webm|ogg|quicktime|x-msvideo|x-matroska)$/;
 
 function fileFilter(_req: any, file: Express.Multer.File, cb: any) {
   if (ALLOWED_TYPES.test(file.mimetype)) cb(null, true);
   else cb(new BadRequestException('Apenas imagens são permitidas (jpeg, png, webp, gif)'), false);
+}
+
+function docFilter(_req: any, file: Express.Multer.File, cb: any) {
+  if (ALLOWED_DOC_TYPES.test(file.mimetype)) cb(null, true);
+  else cb(new BadRequestException('Apenas imagens (jpeg, png, webp, gif) e PDF são permitidos'), false);
 }
 
 function videoFilter(_req: any, file: Express.Multer.File, cb: any) {
@@ -30,6 +36,7 @@ function allowAllFilter(_req: any, _file: Express.Multer.File, cb: any) {
 }
 
 const upload = { storage: memoryStorage(), limits: { fileSize: MAX_SIZE }, fileFilter };
+const uploadDoc = { storage: memoryStorage(), limits: { fileSize: MAX_SIZE }, fileFilter: docFilter };
 const uploadVideo = { storage: memoryStorage(), limits: { fileSize: MAX_SIZE_500MB }, fileFilter: videoFilter };
 const uploadLessonContent = { storage: memoryStorage(), limits: { fileSize: MAX_SIZE_200MB }, fileFilter: allowAllFilter };
 const uploadLessonAttachment = { storage: memoryStorage(), limits: { fileSize: MAX_SIZE_100MB }, fileFilter: allowAllFilter };
@@ -62,7 +69,7 @@ export class UploadsController {
   @Post('document')
   @ApiConsumes('multipart/form-data')
   @ApiBody({ schema: { type: 'object', properties: { file: { type: 'string', format: 'binary' } } } })
-  @UseInterceptors(FileInterceptor('file', upload))
+  @UseInterceptors(FileInterceptor('file', uploadDoc))
   async uploadDocument(@UploadedFile() file: Express.Multer.File) {
     if (!file) throw new BadRequestException('Arquivo obrigatório');
     return this.service.uploadFile(file.buffer, file.originalname, 'documents');

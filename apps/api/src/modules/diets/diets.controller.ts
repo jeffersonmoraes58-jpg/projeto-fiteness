@@ -47,6 +47,12 @@ export class DietsController {
     return this.service.assignToStudent(user.id, id, body.studentUserId);
   }
 
+  @Post(':id/duplicate')
+  @ApiOperation({ summary: 'Duplicar dieta' })
+  duplicate(@CurrentUser() user: any, @Param('id') id: string) {
+    return this.service.duplicate(user.id, id);
+  }
+
   @Delete('plans/:planId')
   @ApiOperation({ summary: 'Remover plano de dieta do paciente' })
   removePlan(@Param('planId') planId: string) {
