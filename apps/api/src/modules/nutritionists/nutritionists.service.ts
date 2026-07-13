@@ -31,6 +31,7 @@ export class NutritionistsService {
         where: { nutritionistId: n.id, scheduledAt: { gte: now } },
         orderBy: { scheduledAt: 'asc' },
         take: 5,
+        include: { student: { include: { user: { include: { profile: true } } } } },
       }),
       (async () => {
         const relations = await this.prisma.nutritionistPatient.findMany({
@@ -119,29 +120,70 @@ export class NutritionistsService {
     };
   }
 
-  async getPatients(userId: string, search?: string) {
+  async getPatients(userId: string, search?: string, includeInactive = false) {
     const n = await this.getNutritionist(userId);
+    const where: any = { nutritionistId: n.id };
+    if (!includeInactive) where.isActive = true;
+
     const relations = await this.prisma.nutritionistPatient.findMany({
-      where: { nutritionistId: n.id, isActive: true },
+      where,
       include: { student: { include: { user: { include: { profile: true } } } } },
     });
-    const results = relations.map((r) => ({
-      id: r.student.id,
-      userId: r.student.userId,
-      isActive: r.isActive,
-      monthlyFee: r.monthlyFee,
-      startedAt: r.startedAt,
-      goalType: r.student.goalType || null,
-      user: {
-        email: r.student.user?.email || '',
-        profile: {
-          firstName: r.student.user?.profile?.firstName || '',
-          lastName: r.student.user?.profile?.lastName || '',
-          phone: r.student.user?.profile?.phone || null,
-          avatarUrl: r.student.user?.profile?.avatarUrl || null,
+
+    // Buscar meal logs dos últimos 7 dias para calcular adesão individual
+    const studentIds = relations.map((r) => r.student.id);
+    const sevenDaysAgo = new Date(Date.now() - 7 * 86400000);
+
+    const dietPlans = await this.prisma.dietPlan.findMany({
+      where: { studentId: { in: studentIds }, isActive: true },
+      include: { diet: { include: { meals: true } } },
+    });
+
+    const planIds = dietPlans.map((p) => p.id);
+    const mealLogs = await this.prisma.mealLog.findMany({
+      where: { dietPlanId: { in: planIds }, loggedAt: { gte: sevenDaysAgo } },
+      select: { dietPlanId: true, loggedAt: true },
+    });
+
+    // Calcular adesão por estudante
+    const logsByStudent: Record<string, { planned: number; logged: number }> = {};
+    for (const plan of dietPlans) {
+      const sid = plan.studentId;
+      if (!logsByStudent[sid]) logsByStudent[sid] = { planned: 0, logged: 0 };
+      logsByStudent[sid].planned += plan.diet.meals.length * 7;
+    }
+    for (const log of mealLogs) {
+      const plan = dietPlans.find((p) => p.id === log.dietPlanId);
+      if (plan && logsByStudent[plan.studentId]) {
+        logsByStudent[plan.studentId].logged++;
+      }
+    }
+
+    const results = relations.map((r) => {
+      const stats = logsByStudent[r.student.id];
+      const dietCompliance = stats && stats.planned > 0
+        ? Math.round((stats.logged / stats.planned) * 100)
+        : 0;
+      return {
+        id: r.student.id,
+        userId: r.student.userId,
+        isActive: r.isActive,
+        monthlyFee: r.monthlyFee,
+        startedAt: r.startedAt,
+        goalType: r.student.goalType || null,
+        dietCompliance,
+        user: {
+          email: r.student.user?.email || '',
+          profile: {
+            firstName: r.student.user?.profile?.firstName || '',
+            lastName: r.student.user?.profile?.lastName || '',
+            phone: r.student.user?.profile?.phone || null,
+            avatarUrl: r.student.user?.profile?.avatarUrl || null,
+          },
         },
-      },
-    }));
+      };
+    });
+
     if (!search) return results;
     const q = search.toLowerCase();
     return results.filter((s) => {

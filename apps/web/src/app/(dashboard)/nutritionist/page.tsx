@@ -146,24 +146,33 @@ export default function NutritionistDashboard() {
             </div>
             <div className="space-y-2">
               {consultations.length > 0 ? (
-                consultations.slice(0, 4).map((c: any, i: number) => (
-                  <div key={c.id || i} className="flex items-center gap-3 p-3 rounded-xl hover:bg-accent transition-all">
-                    <div className="w-9 h-9 rounded-xl bg-cyan-600/10 flex items-center justify-center flex-shrink-0">
-                      <Clock className="w-4 h-4 text-cyan-400" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="text-sm font-medium truncate">
-                        Consulta {c.id ? `#${c.id.slice(-4)}` : ''}
+                consultations.slice(0, 4).map((c: any, i: number) => {
+                  const patientName = c.student?.user?.profile
+                    ? `${c.student.user.profile.firstName || ''} ${c.student.user.profile.lastName || ''}`.trim()
+                    : '';
+                  return (
+                    <Link
+                      key={c.id || i}
+                      href={c.student ? `/nutritionist/patients/${c.student.id}?tab=consultas` : '#'}
+                      className="flex items-center gap-3 p-3 rounded-xl hover:bg-accent transition-all"
+                    >
+                      <div className="w-9 h-9 rounded-full bg-gradient-to-br from-cyan-600 to-teal-600 flex items-center justify-center flex-shrink-0 text-white text-xs font-bold">
+                        {patientName ? `${patientName[0]}${patientName.split(' ').pop()?.[0] || ''}`.toUpperCase() : '?'}
                       </div>
-                      <div className="text-xs text-muted-foreground">
-                        {c.scheduledAt
-                          ? new Date(c.scheduledAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
-                          : '—'}
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-medium truncate">
+                          {patientName || 'Paciente'}
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          {c.scheduledAt
+                            ? new Date(c.scheduledAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+                            : '—'}
+                        </div>
                       </div>
-                    </div>
-                    <CheckCircle2 className="w-4 h-4 text-muted-foreground/30" />
-                  </div>
-                ))
+                      <CheckCircle2 className="w-4 h-4 text-muted-foreground/30" />
+                    </Link>
+                  );
+                })
               ) : (
                 <p className="text-sm text-muted-foreground text-center py-4">Sem consultas hoje</p>
               )}
@@ -194,17 +203,17 @@ export default function NutritionistDashboard() {
             </div>
           </div>
 
-          {/* AI tip */}
+          {/* AI assistant card */}
           <div className="glass-card bg-gradient-to-br from-emerald-600/10 to-teal-600/10 border border-emerald-600/20">
             <div className="flex items-center gap-2 mb-3">
-              <Star className="w-4 h-4 text-yellow-400" />
-              <span className="text-sm font-semibold">Sugestão da IA</span>
+              <Brain className="w-4 h-4 text-purple-400" />
+              <span className="text-sm font-semibold">Assistente IA Nutrição</span>
             </div>
             <p className="text-sm text-muted-foreground mb-3">
-              2 pacientes com objetivo de perda de peso estão acima da meta calórica nos últimos 3 dias.
+              Use o assistente de IA para gerar planos alimentares, calcular macros e analisar dietas com contexto clínico dos seus pacientes.
             </p>
-            <Link href="/nutritionist/patients" className="text-xs text-primary hover:underline">
-              Ver pacientes →
+            <Link href="/nutritionist/ai" className="text-xs text-primary hover:underline">
+              Abrir IA Nutrição →
             </Link>
           </div>
         </div>

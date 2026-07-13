@@ -32,7 +32,7 @@ export default function NutritionistPatients() {
 
   const { data: patients, isLoading } = useQuery({
     queryKey: ['nutritionist-patients-list'],
-    queryFn: () => api.get('/nutritionists/me/patients').then((r) => r.data.data),
+    queryFn: () => api.get('/nutritionists/me/patients?includeInactive=true').then((r) => r.data.data),
     staleTime: 0,
   });
 
@@ -97,7 +97,7 @@ export default function NutritionistPatients() {
         {[
           { label: 'Total', value: patients?.length ?? 0, icon: Users, color: 'from-emerald-600 to-teal-600' },
           { label: 'Com dieta ativa', value: patients?.filter((p: any) => p.isActive).length ?? 0, icon: Apple, color: 'from-green-600 to-emerald-600' },
-          { label: 'Adesão média', value: '78%', icon: TrendingUp, color: 'from-cyan-600 to-blue-600' },
+          { label: 'Adesão média', value: `${Math.round(((patients || []).reduce((sum: number, p: any) => sum + (p.dietCompliance ?? 0), 0) / ((patients || []).length || 1)))}%`, icon: TrendingUp, color: 'from-cyan-600 to-blue-600' },
         ].map((s, i) => (
           <motion.div
             key={s.label}

@@ -19,8 +19,12 @@ export class NutritionistsController {
 
   @Get('me/patients')
   @ApiOperation({ summary: 'Listar pacientes' })
-  getPatients(@CurrentUser() user: any, @Query('search') search?: string) {
-    return this.service.getPatients(user.id, search);
+  getPatients(
+    @CurrentUser() user: any,
+    @Query('search') search?: string,
+    @Query('includeInactive') includeInactive?: string,
+  ) {
+    return this.service.getPatients(user.id, search, includeInactive === 'true');
   }
 
   @Get('me/students/search')
