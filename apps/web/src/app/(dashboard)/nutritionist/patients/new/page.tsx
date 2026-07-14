@@ -42,14 +42,15 @@ export default function NewPatientPage() {
 
   useEffect(() => { setEmailCheckEnabled(false); }, [tab]);
 
-  const invalidateAndRedirect = () => {
-    queryClient.invalidateQueries({ queryKey: ['nutritionist-patients-list'] });
+  const goToList = async () => {
+    await queryClient.invalidateQueries({ queryKey: ['nutritionist-patients-list'] });
+    await queryClient.refetchQueries({ queryKey: ['nutritionist-patient-ai'] });
     router.push('/nutritionist/patients');
   };
 
   const linkMutation = useMutation({
     mutationFn: (data: any) => api.post('/nutritionists/me/patients', data),
-    onSuccess: invalidateAndRedirect,
+    onSuccess: () => { goToList(); },
     onError: (e: any) => setError(e.response?.data?.message || 'Erro ao vincular paciente'),
   });
 
@@ -59,7 +60,6 @@ export default function NewPatientPage() {
     onError: (e: any) => setError(e.response?.data?.message || 'Erro ao criar paciente'),
   });
 
-  // FIX: usa selected.userId (do searchStudentByEmail) ou selected.id (do searchStudents)
   const handleLink = (e: React.FormEvent) => {
     e.preventDefault();
     if (!selected) { setError('Selecione um paciente'); return; }
@@ -95,7 +95,7 @@ export default function NewPatientPage() {
             <div className="flex justify-between text-sm"><span className="text-muted-foreground">E-mail</span><span className="font-medium">{createdPatient.email}</span></div>
             <div className="flex justify-between items-center text-sm"><span className="text-muted-foreground">Senha temporaria</span><div className="flex items-center gap-2"><span className="font-mono font-medium">{createdPatient.tempPassword}</span><button onClick={copyPassword} className="w-7 h-7 rounded-lg hover:bg-accent flex items-center justify-center transition-all">{copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5 text-muted-foreground" />}</button></div></div>
           </div>
-          <button onClick={invalidateAndRedirect} className="btn-primary w-full">Ver lista de pacientes</button>
+          <button onClick={goToList} className="btn-primary w-full">Ver lista de pacientes</button>
         </div>
       </div>
     );
