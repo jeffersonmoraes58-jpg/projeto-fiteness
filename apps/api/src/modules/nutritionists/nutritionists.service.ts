@@ -154,17 +154,19 @@ export class NutritionistsService {
     });
 
     const planIds = dietPlans.map((p) => p.id);
-    const mealLogs = await this.prisma.mealLog.findMany({
-      where: { dietPlanId: { in: planIds }, loggedAt: { gte: sevenDaysAgo } },
-      select: { dietPlanId: true, loggedAt: true },
-    });
+    const mealLogs = planIds.length > 0
+      ? await this.prisma.mealLog.findMany({
+          where: { dietPlanId: { in: planIds }, loggedAt: { gte: sevenDaysAgo } },
+          select: { dietPlanId: true, loggedAt: true },
+        })
+      : [];
 
     // Calcular adesão por estudante
     const logsByStudent: Record<string, { planned: number; logged: number }> = {};
     for (const plan of dietPlans) {
       const sid = plan.studentId;
       if (!logsByStudent[sid]) logsByStudent[sid] = { planned: 0, logged: 0 };
-      logsByStudent[sid].planned += plan.diet.meals.length * 7;
+      logsByStudent[sid].planned += (plan.diet?.meals?.length ?? 0) * 7;
     }
     for (const log of mealLogs) {
       const plan = dietPlans.find((p) => p.id === log.dietPlanId);

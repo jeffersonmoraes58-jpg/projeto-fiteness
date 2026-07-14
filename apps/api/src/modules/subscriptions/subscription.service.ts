@@ -106,7 +106,7 @@ export class SubscriptionService {
         },
       });
 
-      for (const sub of subs) {
+      for (const sub of subs as any[]) {
         const admin = sub.tenant.users[0];
         if (!admin?.email) continue;
 
