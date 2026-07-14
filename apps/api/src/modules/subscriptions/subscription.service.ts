@@ -222,8 +222,13 @@ export class SubscriptionService {
   }
 
   async checkFeature(tenantId: string, feature: PlanFeature): Promise<void> {
-    await this.assertSubscriptionActive(tenantId);
     const plan = await this.getTenantPlan(tenantId);
+    // Plano FREE nunca bloqueia features se tenant está em TRIAL (registro novo)
+    const sub = await this.prisma.tenantSubscription.findUnique({
+      where: { tenantId },
+      select: { status: true, plan: true },
+    });
+    if (sub && sub.plan === SubscriptionPlan.FREE) return; // FREE = acesso total
     if (!PLAN_LIMITS[plan][feature]) {
       throw new ForbiddenException(
         `A funcionalidade "${feature}" não está disponível no plano ${PLAN_DISPLAY_NAMES[plan]}. Faça upgrade para continuar.`,
@@ -231,9 +236,10 @@ export class SubscriptionService {
     }
   }
 
-  async checkStudentLimit(tenantId: string, trainerId: string): Promise<void> {
-    await this.assertSubscriptionActive(tenantId);
-    const plan = await this.getTenantPlan(tenantId);
+  async checkStudentLimit(tenantId: string, trainerId: string, userId?: string): Promise<void> {
+    const plan = await this.getEffectivePlan(tenantId, userId);
+    // Plano FREE = sem limite de alunos (plano gratuito irrestrito)
+    if (plan === SubscriptionPlan.FREE) return;
     const maxStudents = PLAN_LIMITS[plan].maxStudents;
     if (maxStudents === -1) return;
 
