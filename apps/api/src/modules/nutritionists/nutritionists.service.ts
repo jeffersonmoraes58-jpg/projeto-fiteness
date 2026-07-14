@@ -207,11 +207,13 @@ export class NutritionistsService {
   }
 
   async searchStudents(userId: string, search: string) {
-    await this.getNutritionist(userId);
+    const n = await this.getNutritionist(userId);
     const q = search.trim();
     const students = await this.prisma.student.findMany({
       where: {
         user: {
+          tenantId: n.user.tenantId,
+          role: 'STUDENT',
           OR: [
             { email: { contains: q, mode: 'insensitive' } },
             { profile: { firstName: { contains: q, mode: 'insensitive' } } },

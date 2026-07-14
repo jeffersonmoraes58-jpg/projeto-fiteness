@@ -36,7 +36,7 @@ export default function NewPatientPage() {
 
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => setEmailCheckEnabled(true), 600);
+    debounceRef.current = setTimeout(() => setEmailCheckEnabled(true), 300);
     return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
   }, [form.email]);
 
