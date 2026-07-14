@@ -84,9 +84,9 @@ export default function NewPatientPage() {
 
   const quickLink = () => {
     if (!emailMatch) return;
-    setTab('search');
-    setSelected(emailMatch);
-    setSearch(emailMatch.email);
+    const uid = emailMatch.userId || emailMatch.id;
+    if (!uid) return;
+    linkMutation.mutate({ studentUserId: uid, monthlyFee: monthlyFee ? Number(monthlyFee) : undefined });
   };
 
   const copyPassword = () => { navigator.clipboard.writeText(createdPatient.tempPassword); setCopied(true); setTimeout(() => setCopied(false), 2000); };
