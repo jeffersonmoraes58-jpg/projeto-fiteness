@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { ChevronLeft, Search, UserPlus, UserCheck, Info, MessageCircle, Mail, Copy, Check, CheckCircle2 } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { ChevronLeft, Search, UserPlus, UserCheck, Info, MessageCircle, Mail, Copy, Check, CheckCircle2, AlertCircle, Link2 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useMutation, useQuery } from '@tanstack/react-query';
@@ -64,7 +64,7 @@ function FormField({ label, required, children, hint, error }: {
 interface CreatedStudent {
   name: string;
   email: string;
-  password: string; // empty string when linked (existing account)
+  password: string;
   whatsapp: string;
   anamnese: string;
   emailSent: boolean;
@@ -97,12 +97,36 @@ export default function NewStudentPage() {
   const [selected, setSelected] = useState<any>(null);
   const [searchFee, setSearchFee] = useState('');
 
+  // Email check on create form
+  const [emailCheckEnabled, setEmailCheckEnabled] = useState(false);
+  const debounceRef = useRef<NodeJS.Timeout>();
+
   const { data: results, isFetching } = useQuery({
     queryKey: ['user-search', search],
     queryFn: () =>
       api.get(`/admin/users?search=${encodeURIComponent(search)}&role=STUDENT`).then((r) => r.data.data?.users || []),
     enabled: mode === 'search' && search.length >= 2,
   });
+
+  // Busca proativa por email no form de criacao
+  const { data: emailMatch } = useQuery({
+    queryKey: ['trainer-email-check', email],
+    queryFn: () => api.get(`/trainers/me/students/search-by-email?email=${email}`).then((r) => r.data.data),
+    enabled: emailCheckEnabled && email.includes('@') && email.length > 5,
+  });
+
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => setEmailCheckEnabled(true), 600);
+    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
+  }, [email]);
+
+  const quickLinkFromEmail = () => {
+    if (!emailMatch) return;
+    setMode('search');
+    setSelected(emailMatch);
+    setSearch(emailMatch.email);
+  };
 
   const linkMutation = useMutation({
     mutationFn: (data: any) => api.post('/trainers/me/students', data),
@@ -138,7 +162,6 @@ export default function NewStudentPage() {
         if (!newUserId) throw new Error('Usuário criado mas ID não retornado');
         userId = newUserId;
       } catch (registerError: any) {
-        // Email already exists — find and link the existing account
         const status = registerError?.response?.status;
         if (status === 409 || status === 400 || status === 422) {
           const searchRes = await api.get(`/admin/users?search=${encodeURIComponent(data.email)}&role=STUDENT`);
@@ -201,8 +224,10 @@ export default function NewStudentPage() {
   const handleLink = (e: React.FormEvent) => {
     e.preventDefault();
     if (!selected) { setError('Selecione um aluno'); return; }
+    const uid = selected.userId || selected.id;
+    if (!uid) { setError('Erro: ID do aluno não encontrado'); return; }
     setError('');
-    linkMutation.mutate({ studentUserId: selected.id, monthlyFee: searchFee ? Number(searchFee) : undefined });
+    linkMutation.mutate({ studentUserId: uid, monthlyFee: searchFee ? Number(searchFee) : undefined });
   };
 
   const copyCredentials = () => {
@@ -237,7 +262,6 @@ export default function NewStudentPage() {
     return (
       <div className="max-w-xl mx-auto space-y-6">
         <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="space-y-6">
-          {/* Success header */}
           <div className="text-center py-4">
             <div className="w-16 h-16 rounded-full bg-emerald-500/20 flex items-center justify-center mx-auto mb-4">
               <CheckCircle2 className="w-8 h-8 text-emerald-400" />
@@ -250,75 +274,24 @@ export default function NewStudentPage() {
             </p>
           </div>
 
-          {/* Credentials card — only shown for newly created accounts */}
-          {created.password && <div className="glass-card space-y-4">
-            <div className="flex items-center justify-between">
-              <h2 className="font-semibold text-sm">Dados de acesso gerados</h2>
-              <button
-                onClick={copyCredentials}
-                className="flex items-center gap-1.5 text-xs text-primary hover:text-primary/80 transition-colors"
-              >
-                {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-                {copied ? 'Copiado!' : 'Copiar'}
-              </button>
-            </div>
-
-            <div className="space-y-3">
-              <div className="bg-muted/50 rounded-xl px-4 py-3">
-                <div className="text-xs text-muted-foreground mb-1">E-mail (login)</div>
-                <div className="text-sm font-medium">{created.email}</div>
+          <div className="glass-card space-y-4">
+            {created.password ? (
+              <>
+                <div className="glass rounded-xl p-4 space-y-3">
+                  <div className="flex justify-between text-sm"><span className="text-muted-foreground">E-mail</span><span className="font-medium">{created.email}</span></div>
+                  <div className="flex justify-between items-center text-sm"><span className="text-muted-foreground">Senha temporária</span><div className="flex items-center gap-2"><span className="font-mono font-medium">{created.password}</span><button onClick={copyCredentials} className="w-7 h-7 rounded-lg hover:bg-accent flex items-center justify-center transition-all">{copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5 text-muted-foreground" />}</button></div></div>
+                </div>
+                {created.whatsapp && (
+                  <a href={whatsappLink(created)} target="_blank" rel="noopener noreferrer" className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-sm font-medium hover:bg-emerald-500/20 transition-all"><MessageCircle className="w-4 h-4" />Enviar credenciais via WhatsApp</a>
+                )}
+              </>
+            ) : (
+              <div className="glass rounded-xl p-4 bg-amber-500/5 border border-amber-500/30">
+                <p className="text-sm text-amber-400">Este aluno já possuía cadastro. O vínculo foi criado sem alterar a senha existente.</p>
               </div>
-              <div className="bg-muted/50 rounded-xl px-4 py-3">
-                <div className="text-xs text-muted-foreground mb-1">Senha temporária</div>
-                <div className="text-lg font-bold tracking-widest font-mono text-primary">{created.password}</div>
-              </div>
-            </div>
-
-            {/* Email status */}
-            <div className={cn(
-              'flex items-center gap-2 text-xs px-3 py-2 rounded-lg',
-              created.emailSent ? 'bg-emerald-500/10 text-emerald-400' : 'bg-yellow-500/10 text-yellow-400',
-            )}>
-              <Mail className="w-3.5 h-3.5 flex-shrink-0" />
-              {created.emailSent
-                ? `E-mail enviado para ${created.email}`
-                : 'E-mail não enviado (configure o SMTP nas configurações)'}
-            </div>
-          </div>}
-
-          {/* Action buttons */}
-          <div className="space-y-3">
-            {created.whatsapp && (
-              <a
-                href={whatsappLink(created)}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center justify-center gap-2 w-full py-3 rounded-2xl bg-[#25D366] hover:bg-[#20bd5a] text-white font-semibold text-sm transition-all"
-              >
-                <MessageCircle className="w-4 h-4" />
-                Enviar dados pelo WhatsApp
-              </a>
             )}
-
-            <button
-              onClick={() => router.push('/trainer/students')}
-              className="btn-secondary w-full text-sm py-3"
-            >
-              Ver lista de alunos
-            </button>
-
-            <button
-              onClick={() => {
-                setCreated(null);
-                setNomeCompleto(''); setEmail(''); setGrupo('Online');
-                setDataNascimento(''); setWhatsapp(''); setGenero('Masculino');
-                setEnviarAcesso('Sim'); setEnviarAnamnese('Não'); setAnamnese('');
-                setBloquearInadimplentes('Não'); setMensalidade('');
-              }}
-              className="text-xs text-muted-foreground hover:text-foreground transition-colors w-full text-center"
-            >
-              Cadastrar outro aluno
-            </button>
+            <button onClick={() => router.push('/trainer/students')} className="btn-secondary w-full text-sm py-3">Ver lista de alunos</button>
+            <button onClick={() => { setCreated(null); setNomeCompleto(''); setEmail(''); setGrupo('Online'); setDataNascimento(''); setWhatsapp(''); setGenero('Masculino'); setEnviarAcesso('Sim'); setEnviarAnamnese('Não'); setAnamnese(''); setBloquearInadimplentes('Não'); setMensalidade(''); }} className="text-xs text-muted-foreground hover:text-foreground transition-colors w-full text-center">Cadastrar outro aluno</button>
           </div>
         </motion.div>
       </div>
@@ -329,32 +302,14 @@ export default function NewStudentPage() {
     <div className="max-w-xl mx-auto space-y-6">
       <div className="flex items-center gap-3">
         <Link href="/trainer/students" className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors">
-          <ChevronLeft className="w-4 h-4" />
-          Voltar
+          <ChevronLeft className="w-4 h-4" />Voltar
         </Link>
       </div>
       <h1 className="text-2xl font-bold">Adicionar novo aluno</h1>
 
-      {/* Mode tabs */}
       <div className="glass rounded-2xl p-1 flex gap-1">
-        <button
-          type="button"
-          onClick={() => { setMode('create'); setError(''); }}
-          className={cn('flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-medium transition-all',
-            mode === 'create' ? 'bg-primary text-primary-foreground' : 'hover:bg-accent text-muted-foreground')}
-        >
-          <UserPlus className="w-4 h-4" />
-          Criar novo
-        </button>
-        <button
-          type="button"
-          onClick={() => { setMode('search'); setError(''); }}
-          className={cn('flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-medium transition-all',
-            mode === 'search' ? 'bg-primary text-primary-foreground' : 'hover:bg-accent text-muted-foreground')}
-        >
-          <Search className="w-4 h-4" />
-          Buscar existente
-        </button>
+        <button type="button" onClick={() => { setMode('create'); setError(''); }} className={cn('flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-medium transition-all', mode === 'create' ? 'bg-primary text-primary-foreground' : 'hover:bg-accent text-muted-foreground')}><UserPlus className="w-4 h-4" />Criar novo</button>
+        <button type="button" onClick={() => { setMode('search'); setError(''); }} className={cn('flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-medium transition-all', mode === 'search' ? 'bg-primary text-primary-foreground' : 'hover:bg-accent text-muted-foreground')}><Search className="w-4 h-4" />Buscar existente</button>
       </div>
 
       <AnimatePresence mode="wait">
@@ -369,6 +324,25 @@ export default function NewStudentPage() {
                 <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="aluno@email.com" className="input-field" required />
               </FormField>
 
+              {/* Email match banner */}
+              {emailMatch && (
+                <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} className="glass rounded-xl p-4 border border-amber-500/30 bg-amber-500/5">
+                  <div className="flex items-start gap-3">
+                    <AlertCircle className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
+                    <div className="flex-1">
+                      <p className="text-sm font-semibold text-amber-400">Aluno já cadastrado</p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Já existe um aluno com o email <strong>{emailMatch.email}</strong> no sistema ({emailMatch.profile?.firstName} {emailMatch.profile?.lastName}).
+                        Evite duplicar contas — vincule o aluno existente.
+                      </p>
+                      <button type="button" onClick={quickLinkFromEmail} className="flex items-center gap-1.5 mt-2 text-xs font-semibold text-amber-400 hover:text-amber-300 transition-colors">
+                        <Link2 className="w-3.5 h-3.5" />Vincular este aluno
+                      </button>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+
               <FormField label="Selecione um grupo">
                 <select value={grupo} onChange={(e) => setGrupo(e.target.value)} className="input-field bg-background">
                   {GRUPOS.map((g) => <option key={g} value={g}>{g}</option>)}
@@ -381,17 +355,8 @@ export default function NewStudentPage() {
 
               <FormField label="WhatsApp">
                 <div className="flex items-center input-field !p-0 overflow-hidden">
-                  <div className="flex items-center gap-1.5 px-3 py-2.5 border-r border-border text-sm text-muted-foreground flex-shrink-0 bg-muted/50 select-none">
-                    <span>🇧🇷</span>
-                    <span>+55</span>
-                  </div>
-                  <input
-                    type="tel"
-                    value={whatsapp}
-                    onChange={(e) => setWhatsapp(e.target.value)}
-                    placeholder="(11) 99999-9999"
-                    className="flex-1 bg-transparent px-3 py-2.5 text-sm outline-none"
-                  />
+                  <div className="flex items-center gap-1.5 px-3 py-2.5 border-r border-border text-sm text-muted-foreground flex-shrink-0 bg-muted/50 select-none"><span>🇧🇷</span><span>+55</span></div>
+                  <input type="tel" value={whatsapp} onChange={(e) => setWhatsapp(e.target.value)} placeholder="(11) 99999-9999" className="flex-1 bg-transparent px-3 py-2.5 text-sm outline-none" />
                 </div>
               </FormField>
 
@@ -407,15 +372,13 @@ export default function NewStudentPage() {
 
               <FormField label="Enviar informações de acesso ao aluno">
                 <select value={enviarAcesso} onChange={(e) => setEnviarAcesso(e.target.value)} className="input-field bg-background">
-                  <option value="Sim">Sim</option>
-                  <option value="Não">Não</option>
+                  <option value="Sim">Sim</option><option value="Não">Não</option>
                 </select>
               </FormField>
 
               <FormField label="Enviar anamnese">
                 <select value={enviarAnamnese} onChange={(e) => { setEnviarAnamnese(e.target.value); setAnamnese(''); setAnamneseError(false); }} className="input-field bg-background">
-                  <option value="Sim">Sim</option>
-                  <option value="Não">Não</option>
+                  <option value="Sim">Sim</option><option value="Não">Não</option>
                 </select>
               </FormField>
 
@@ -423,11 +386,7 @@ export default function NewStudentPage() {
                 {enviarAnamnese === 'Sim' && (
                   <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
                     <FormField label="Escolha a anamnese" required error={anamneseError ? 'Esse campo é obrigatório' : undefined}>
-                      <select
-                        value={anamnese}
-                        onChange={(e) => { setAnamnese(e.target.value); setAnamneseError(false); }}
-                        className={cn('input-field bg-background', anamneseError && 'border-red-500/50')}
-                      >
+                      <select value={anamnese} onChange={(e) => { setAnamnese(e.target.value); setAnamneseError(false); }} className={cn('input-field bg-background', anamneseError && 'border-red-500/50')}>
                         <option value="">Selecione</option>
                         {ANAMNESE_OPTIONS.map((a) => <option key={a.value} value={a.value}>{a.label}</option>)}
                       </select>
@@ -436,13 +395,9 @@ export default function NewStudentPage() {
                 )}
               </AnimatePresence>
 
-              <FormField
-                label="Bloquear acesso de inadimplentes"
-                hint="Esse bloqueio irá acontecer apenas se você utilizar o app para receber desse aluno"
-              >
+              <FormField label="Bloquear acesso de inadimplentes" hint="Esse bloqueio irá acontecer apenas se você utilizar o app para receber desse aluno">
                 <select value={bloquearInadimplentes} onChange={(e) => setBloquearInadimplentes(e.target.value)} className="input-field bg-background">
-                  <option value="Sim">Sim</option>
-                  <option value="Não">Não</option>
+                  <option value="Sim">Sim</option><option value="Não">Não</option>
                 </select>
               </FormField>
             </div>
@@ -471,7 +426,7 @@ export default function NewStudentPage() {
                     results.map((u: any) => (
                       <button key={u.id} type="button" onClick={() => setSelected(u)}
                         className={cn('w-full flex items-center gap-3 p-3 rounded-xl transition-all text-left',
-                          selected?.id === u.id ? 'bg-primary/10 border border-primary/30' : 'hover:bg-accent')}>
+                          (selected?.id === u.id || selected?.userId === u.id) ? 'bg-primary/10 border border-primary/30' : 'hover:bg-accent')}>
                         <div className="w-9 h-9 rounded-full bg-gradient-to-br from-cyan-600 to-blue-600 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
                           {u.profile?.firstName?.[0]}{u.profile?.lastName?.[0]}
                         </div>
@@ -479,7 +434,7 @@ export default function NewStudentPage() {
                           <div className="text-sm font-medium">{u.profile?.firstName} {u.profile?.lastName}</div>
                           <div className="text-xs text-muted-foreground">{u.email}</div>
                         </div>
-                        {selected?.id === u.id && <UserCheck className="w-4 h-4 text-primary" />}
+                        {(selected?.id === u.id || selected?.userId === u.id) && <UserCheck className="w-4 h-4 text-primary" />}
                       </button>
                     ))
                   ) : (
