@@ -55,7 +55,15 @@ export default function NewPatientPage() {
 
   const createMutation = useMutation({
     mutationFn: (data: any) => api.post('/nutritionists/me/patients/create', data),
-    onSuccess: (res) => { queryClient.invalidateQueries({ queryKey: ['nutritionist-patients-list'] }); setCreatedPatient(res.data.data); },
+    onSuccess: (res) => {
+      queryClient.invalidateQueries({ queryKey: ['nutritionist-patients-list'] });
+      const data = res.data.data;
+      if (data.alreadyExisted) {
+        goToList();
+      } else {
+        setCreatedPatient(data);
+      }
+    },
     onError: (e: any) => setError(e.response?.data?.message || 'Erro ao criar paciente'),
   });
 

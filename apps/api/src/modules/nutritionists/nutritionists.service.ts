@@ -209,10 +209,10 @@ export class NutritionistsService {
   async searchStudents(userId: string, search: string) {
     const n = await this.getNutritionist(userId);
     const q = search.trim();
+    // Busca global (cross-tenant) — alunos sao universais no sistema
     const students = await this.prisma.student.findMany({
       where: {
         user: {
-          tenantId: n.user.tenantId,
           role: 'STUDENT',
           OR: [
             { email: { contains: q, mode: 'insensitive' } },
@@ -233,10 +233,10 @@ export class NutritionistsService {
   }
 
   async searchStudentByEmail(userId: string, email: string) {
-    const n = await this.getNutritionist(userId);
     const q = email.trim().toLowerCase();
+    // Busca global (cross-tenant) — alunos sao universais
     const user = await this.prisma.user.findFirst({
-      where: { tenantId: n.user.tenantId, email: { equals: q, mode: 'insensitive' }, role: 'STUDENT' },
+      where: { email: { equals: q, mode: 'insensitive' }, role: 'STUDENT' },
       include: { profile: true, student: true },
     });
     if (!user || !user.student) return null;
@@ -245,8 +245,24 @@ export class NutritionistsService {
 
   async createPatientUser(userId: string, data: { firstName: string; lastName: string; email: string; phone?: string; monthlyFee?: number }) {
     const n = await this.getNutritionist(userId);
-    const existing = await this.prisma.user.findFirst({ where: { tenantId: n.user.tenantId, email: data.email } });
-    if (existing) throw new ConflictException('Já existe um usuário com este e-mail');
+    // Verifica duplicata GLOBALMENTE (cross-tenant) — aluno pode ter sido criado por outro profissional
+    const existing = await this.prisma.user.findFirst({
+      where: { email: data.email, role: 'STUDENT' },
+      include: { profile: true },
+    });
+    if (existing) {
+      // Se o aluno ja existe em outro tenant, vincula em vez de criar novo
+      const student = await this.prisma.student.findUnique({ where: { userId: existing.id } });
+      if (student) {
+        await this.prisma.nutritionistPatient.upsert({
+          where: { nutritionistId_studentId: { nutritionistId: n.id, studentId: student.id } },
+          update: { isActive: true, monthlyFee: data.monthlyFee },
+          create: { nutritionistId: n.id, studentId: student.id, monthlyFee: data.monthlyFee, isActive: true },
+        });
+        return { ...existing, profile: existing.profile, tempPassword: null, alreadyExisted: true };
+      }
+      throw new ConflictException('Já existe um usuário com este e-mail');
+    }
     const tempPassword = `Fit@${Math.random().toString(36).slice(-6).toUpperCase()}1`;
     const hashed = await bcrypt.hash(tempPassword, 12);
     const newUser = await this.prisma.$transaction(async (tx) => {
