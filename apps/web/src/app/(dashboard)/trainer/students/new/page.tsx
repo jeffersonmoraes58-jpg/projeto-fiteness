@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { ChevronLeft, Search, UserPlus, UserCheck, Info, MessageCircle, Mail, Copy, Check, CheckCircle2, AlertCircle, Link2 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -72,6 +72,7 @@ interface CreatedStudent {
 
 export default function NewStudentPage() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const { user } = useAuthStore();
   const [mode, setMode] = useState<Mode>('create');
   const [error, setError] = useState('');
@@ -130,7 +131,10 @@ export default function NewStudentPage() {
 
   const linkMutation = useMutation({
     mutationFn: (data: any) => api.post('/trainers/me/students', data),
-    onSuccess: () => router.push('/trainer/students'),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['trainer-students-list'] });
+      router.push('/trainer/students');
+    },
     onError: (e: any) => setError(e.response?.data?.message || e.message || 'Erro ao adicionar aluno'),
   });
 
@@ -180,6 +184,8 @@ export default function NewStudentPage() {
         monthlyFee: data.mensalidade ? Number(data.mensalidade) : undefined,
         goalType: data.grupo,
       });
+
+      queryClient.invalidateQueries({ queryKey: ['trainer-students-list'] });
 
       if (!linked && data.enviarAcesso === 'Sim' && tempPassword) {
         try {
