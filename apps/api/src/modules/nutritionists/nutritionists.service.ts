@@ -247,19 +247,22 @@ export class NutritionistsService {
     if (existing) throw new ConflictException('Já existe um usuário com este e-mail');
     const tempPassword = `Fit@${Math.random().toString(36).slice(-6).toUpperCase()}1`;
     const hashed = await bcrypt.hash(tempPassword, 12);
-    const newUser = await this.prisma.user.create({
-      data: {
-        tenantId: n.user.tenantId,
-        email: data.email,
-        password: hashed,
-        role: 'STUDENT',
-        profile: { create: { firstName: data.firstName, lastName: data.lastName, phone: data.phone } },
-        student: { create: {} },
-      },
-      include: { profile: true, student: true },
-    });
-    await this.prisma.nutritionistPatient.create({
-      data: { nutritionistId: n.id, studentId: newUser.student!.id, isActive: true, monthlyFee: data.monthlyFee },
+    const newUser = await this.prisma.$transaction(async (tx) => {
+      const user = await tx.user.create({
+        data: {
+          tenantId: n.user.tenantId,
+          email: data.email,
+          password: hashed,
+          role: 'STUDENT',
+          profile: { create: { firstName: data.firstName, lastName: data.lastName, phone: data.phone } },
+          student: { create: {} },
+        },
+        include: { profile: true, student: true },
+      });
+      await tx.nutritionistPatient.create({
+        data: { nutritionistId: n.id, studentId: user.student!.id, isActive: true, monthlyFee: data.monthlyFee },
+      });
+      return user;
     });
     return { ...newUser, tempPassword };
   }
