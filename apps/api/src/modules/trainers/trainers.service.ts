@@ -163,8 +163,12 @@ export class TrainersService {
 
   async addStudent(userId: string, studentUserId: string, monthlyFee?: number) {
     const trainer = await this.getTrainer(userId);
-    const student = await this.prisma.student.findUnique({ where: { userId: studentUserId } });
+    const student = await this.prisma.student.findUnique({
+      where: { userId: studentUserId },
+      include: { user: true },
+    });
     if (!student) throw new NotFoundException('Aluno não encontrado');
+    if (!student.user) throw new NotFoundException('Usuário vinculado ao aluno não encontrado — o cadastro está incompleto');
 
     const existing = await this.prisma.trainerStudent.findUnique({
       where: { trainerId_studentId: { trainerId: trainer.id, studentId: student.id } },
