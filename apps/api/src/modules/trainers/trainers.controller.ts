@@ -17,13 +17,13 @@ export class TrainersController {
     return this.service.getDashboard(user.id);
   }
 
-  @Get('me/students')
-    @Get('me/students/search-by-email')
+  @Get('me/students/search-by-email')
   @ApiOperation({ summary: 'Buscar aluno por email no tenant (para evitar duplicacao)' })
   searchStudentByEmail(@CurrentUser() user: any, @Query('email') email: string) {
     return this.service.searchStudentByEmail(user.id, email || '');
   }
 
+  @Get('me/students')
   @ApiOperation({ summary: 'Listar alunos do trainer' })
   getStudents(@CurrentUser() user: any, @Query('search') search?: string) {
     return this.service.getStudents(user.id, search);
