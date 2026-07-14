@@ -44,7 +44,6 @@ export default function NewPatientPage() {
 
   const goToList = async () => {
     await queryClient.invalidateQueries({ queryKey: ['nutritionist-patients-list'] });
-    await queryClient.refetchQueries({ queryKey: ['nutritionist-patient-ai'] });
     router.push('/nutritionist/patients');
   };
 
