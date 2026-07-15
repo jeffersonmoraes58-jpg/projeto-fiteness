@@ -96,7 +96,7 @@ export function DashboardSidebar() {
   const pathname = usePathname();
   const { user, logout } = useAuthStore();
   const { displayName, upgradePrice, upgradePlan, isMaxPlan } = useSubscription();
-  const showPlanBadge = user?.role !== 'ADMIN';
+  const showPlanBadge = user?.role !== 'ADMIN' && user?.role !== 'STUDENT';
 
   const { data: unreadCount = 0 } = useQuery<number>({
     queryKey: ['chat-unread-count'],
