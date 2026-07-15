@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Dumbbell, Plus, Search, Copy, Archive, MoreVertical,
@@ -180,14 +180,10 @@ const WORKOUT_TEMPLATES: WorkoutTemplate[] = [
 
 const CATEGORIES = ['Todos', 'Hipertrofia', 'Emagrecimento'];
 
-const AI_SUGGESTIONS = [
-  'Treino ABC hipertrofia para intermediário, 60 min',
-  'Full body para iniciante 3x por semana, 45 min',
-  'HIIT emagrecimento avançado, 40 min',
-  'Treino de pernas glúteos feminino, 60 min',
-  'Upper/Lower força para avançado',
-  'Treino funcional para idosos, baixo impacto',
-];
+const AI_OBJECTIVES = ['Hipertrofia', 'Emagrecimento', 'Força', 'Resistência', 'Funcional', 'Reabilitação'];
+const AI_LEVELS = ['Iniciante', 'Intermediário', 'Avançado'];
+const AI_FOCUSES = ['Full Body', 'Superiores', 'Inferiores', 'Peito/Bíceps', 'Costas/Tríceps', 'Pernas/Glúteos', 'Ombros/Core'];
+const AI_DURATIONS = ['30', '45', '60', '75', '90'];
 
 export default function TrainerWorkouts() {
   const [search, setSearch] = useState('');
@@ -199,7 +195,21 @@ export default function TrainerWorkouts() {
   const [aiModal, setAiModal] = useState(false);
   const [aiDescription, setAiDescription] = useState('');
   const [aiResult, setAiResult] = useState<any>(null);
+  const [aiObjective, setAiObjective] = useState('');
+  const [aiLevel, setAiLevel] = useState('');
+  const [aiFocus, setAiFocus] = useState('');
+  const [aiDuration, setAiDuration] = useState('');
   const queryClient = useQueryClient();
+
+  const composedDescription = useMemo(() => {
+    const parts: string[] = [];
+    if (aiObjective) parts.push(aiObjective);
+    if (aiLevel) parts.push(aiLevel);
+    if (aiFocus) parts.push(`foco em ${aiFocus}`);
+    if (aiDuration) parts.push(`${aiDuration} minutos`);
+    if (aiDescription.trim()) parts.push(aiDescription.trim());
+    return parts.join(', ');
+  }, [aiObjective, aiLevel, aiFocus, aiDuration, aiDescription]);
   const router = useRouter();
 
   const { data: workouts, isLoading } = useQuery({
@@ -317,7 +327,7 @@ export default function TrainerWorkouts() {
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
           <button
-            onClick={() => { setAiModal(true); setAiResult(null); setAiDescription(''); }}
+            onClick={() => { setAiModal(true); setAiResult(null); setAiDescription(''); setAiObjective(''); setAiLevel(''); setAiFocus(''); setAiDuration(''); }}
             className="flex items-center gap-1.5 text-xs sm:text-sm py-2 px-3 sm:px-4 rounded-xl border border-violet-500/40 bg-violet-500/10 hover:bg-violet-500/20 text-violet-400 font-medium transition-all"
           >
             <Wand2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
@@ -538,32 +548,111 @@ export default function TrainerWorkouts() {
                 )}
               </div>
 
-              <div className="p-4 space-y-3">
+              <div className="p-4 space-y-3 overflow-y-auto max-h-[70vh]">
                 {!aiResult ? (
                   <>
-                    <textarea
-                      value={aiDescription}
-                      onChange={(e) => setAiDescription(e.target.value)}
-                      placeholder="Objetivo, grupos musculares, nível, tempo, equipamentos..."
-                      rows={3}
-                      disabled={generateAiMutation.isPending}
-                      className="input-field resize-none w-full text-sm"
-                    />
-
-                    <div className="space-y-1.5">
-                      <p className="text-xs text-muted-foreground font-medium">Sugestões rápidas:</p>
-                      <div className="flex gap-1.5 overflow-x-auto scrollbar-hide pb-0.5">
-                        {AI_SUGGESTIONS.map((s) => (
-                          <button
-                            key={s}
-                            onClick={() => setAiDescription(s)}
-                            disabled={generateAiMutation.isPending}
-                            className="text-xs px-2.5 py-1 rounded-full glass border border-border hover:border-violet-500/40 hover:text-violet-400 transition-all text-muted-foreground flex-shrink-0"
-                          >
-                            {s}
-                          </button>
-                        ))}
+                    {/* Structured chip selectors */}
+                    <div className="space-y-2.5">
+                      <div className="space-y-1">
+                        <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Objetivo</p>
+                        <div className="flex gap-1.5 flex-wrap">
+                          {AI_OBJECTIVES.map((o) => (
+                            <button
+                              key={o}
+                              disabled={generateAiMutation.isPending}
+                              onClick={() => setAiObjective(aiObjective === o ? '' : o)}
+                              className={cn(
+                                'text-xs px-2.5 py-1 rounded-full border transition-all flex-shrink-0',
+                                aiObjective === o
+                                  ? 'bg-violet-600 text-white border-violet-600'
+                                  : 'glass border-border/60 hover:border-violet-500/40 text-muted-foreground',
+                              )}
+                            >
+                              {o}
+                            </button>
+                          ))}
+                        </div>
                       </div>
+
+                      <div className="flex gap-4">
+                        <div className="space-y-1 flex-1 min-w-0">
+                          <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Nível</p>
+                          <div className="flex gap-1.5 flex-wrap">
+                            {AI_LEVELS.map((l) => (
+                              <button
+                                key={l}
+                                disabled={generateAiMutation.isPending}
+                                onClick={() => setAiLevel(aiLevel === l ? '' : l)}
+                                className={cn(
+                                  'text-xs px-2.5 py-1 rounded-full border transition-all flex-shrink-0',
+                                  aiLevel === l
+                                    ? 'bg-violet-600 text-white border-violet-600'
+                                    : 'glass border-border/60 hover:border-violet-500/40 text-muted-foreground',
+                                )}
+                              >
+                                {l}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                        <div className="space-y-1">
+                          <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Duração</p>
+                          <div className="flex gap-1.5 flex-wrap justify-end">
+                            {AI_DURATIONS.map((d) => (
+                              <button
+                                key={d}
+                                disabled={generateAiMutation.isPending}
+                                onClick={() => setAiDuration(aiDuration === d ? '' : d)}
+                                className={cn(
+                                  'text-xs px-2 py-1 rounded-full border transition-all flex-shrink-0',
+                                  aiDuration === d
+                                    ? 'bg-violet-600 text-white border-violet-600'
+                                    : 'glass border-border/60 hover:border-violet-500/40 text-muted-foreground',
+                                )}
+                              >
+                                {d}m
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="space-y-1">
+                        <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Foco muscular</p>
+                        <div className="flex gap-1.5 overflow-x-auto scrollbar-hide pb-0.5">
+                          {AI_FOCUSES.map((f) => (
+                            <button
+                              key={f}
+                              disabled={generateAiMutation.isPending}
+                              onClick={() => setAiFocus(aiFocus === f ? '' : f)}
+                              className={cn(
+                                'text-xs px-2.5 py-1 rounded-full border transition-all flex-shrink-0',
+                                aiFocus === f
+                                  ? 'bg-violet-600 text-white border-violet-600'
+                                  : 'glass border-border/60 hover:border-violet-500/40 text-muted-foreground',
+                              )}
+                            >
+                              {f}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="border-t border-border/40 pt-2.5">
+                      <textarea
+                        value={aiDescription}
+                        onChange={(e) => setAiDescription(e.target.value)}
+                        placeholder="Detalhes adicionais (equipamentos, restrições, observações...)"
+                        rows={2}
+                        disabled={generateAiMutation.isPending}
+                        className="input-field resize-none w-full text-sm"
+                      />
+                      {composedDescription && (
+                        <p className="text-[10px] text-violet-400/70 mt-1 truncate">
+                          Prompt: {composedDescription}
+                        </p>
+                      )}
                     </div>
 
                     {generateAiMutation.isPending && (
@@ -573,7 +662,7 @@ export default function TrainerWorkouts() {
                           <div className="absolute inset-2 rounded-full border-2 border-purple-500/20 border-t-purple-500 animate-spin" style={{ animationDirection: 'reverse', animationDuration: '0.8s' }} />
                           <Wand2 className="absolute inset-0 m-auto w-3.5 h-3.5 text-violet-400" />
                         </div>
-                        <p className="text-sm text-muted-foreground animate-pulse">Gerando treino personalizado...</p>
+                        <p className="text-sm text-muted-foreground animate-pulse">Gerando treino com IA especialista...</p>
                       </div>
                     )}
 
@@ -586,8 +675,8 @@ export default function TrainerWorkouts() {
                         Cancelar
                       </button>
                       <button
-                        disabled={!aiDescription.trim() || generateAiMutation.isPending}
-                        onClick={() => generateAiMutation.mutate(aiDescription.trim())}
+                        disabled={!composedDescription.trim() || generateAiMutation.isPending}
+                        onClick={() => generateAiMutation.mutate(composedDescription.trim())}
                         className="flex-1 text-sm py-2.5 bg-gradient-to-r from-violet-600 to-purple-600 text-white rounded-xl font-semibold hover:opacity-90 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
                       >
                         <Wand2 className="w-4 h-4" />
@@ -602,18 +691,38 @@ export default function TrainerWorkouts() {
                       <div>
                         <p className="font-semibold text-sm text-emerald-400">{aiResult.name}</p>
                         <p className="text-xs text-muted-foreground mt-0.5">
-                          {aiResult.exercisesAdded} exercício{aiResult.exercisesAdded !== 1 ? 's' : ''} · Salvo como rascunho
+                          {aiResult.exercisesAdded}/{aiResult.exercisesTotal || aiResult.exercisesAdded} exercícios vinculados · Rascunho
                         </p>
                       </div>
                     </div>
 
+                    {aiResult.exercises?.length > 0 && (
+                      <div className="space-y-1">
+                        <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Exercícios criados</p>
+                        <div className="max-h-36 overflow-y-auto space-y-0.5 pr-1">
+                          {aiResult.exercises.map((ex: any, i: number) => (
+                            <div key={i} className="flex items-center gap-2 text-xs py-0.5">
+                              <span className="text-muted-foreground w-4 text-right flex-shrink-0 font-mono text-[10px]">{i + 1}</span>
+                              <span className="flex-1 truncate">{ex.name}</span>
+                              {ex.technique && (
+                                <span className="text-[9px] px-1.5 py-0.5 rounded bg-violet-500/10 text-violet-400 flex-shrink-0 font-medium">
+                                  {ex.technique === 'superset' ? 'bi-set' : 'drop'}
+                                </span>
+                              )}
+                              <span className="text-muted-foreground flex-shrink-0 text-[11px]">{ex.sets}×{ex.reps}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
                     {aiResult.tips?.length > 0 && (
                       <div className="space-y-1.5">
-                        <p className="text-xs font-medium text-muted-foreground">Dicas da IA:</p>
+                        <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Dicas técnicas</p>
                         <ul className="space-y-1">
                           {aiResult.tips.map((tip: string, i: number) => (
                             <li key={i} className="text-xs text-muted-foreground flex items-start gap-1.5">
-                              <span className="text-violet-400 mt-0.5">•</span>{tip}
+                              <span className="text-violet-400 mt-0.5 flex-shrink-0">•</span>{tip}
                             </li>
                           ))}
                         </ul>
@@ -622,7 +731,7 @@ export default function TrainerWorkouts() {
 
                     <div className="flex gap-2">
                       <button
-                        onClick={() => { setAiResult(null); setAiDescription(''); }}
+                        onClick={() => { setAiResult(null); setAiDescription(''); setAiObjective(''); setAiLevel(''); setAiFocus(''); setAiDuration(''); }}
                         className="btn-secondary flex-1 text-sm py-2.5"
                       >
                         Gerar outro

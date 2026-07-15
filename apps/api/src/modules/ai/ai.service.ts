@@ -22,14 +22,17 @@ export class AiService {
     return this.config.get('ANTHROPIC_MODEL', 'claude-haiku-4-5-20251001');
   }
 
-  private async complete(prompt: string, maxTokens = 1500): Promise<string> {
-    const response = await this.anthropic.messages.create({
-      model: this.model,
+  private async complete(prompt: string, maxTokens = 1500, model?: string): Promise<string> {
+    const useModel = model ?? this.model;
+    const isOpus47 = useModel === 'claude-opus-4-7';
+    const response = await (this.anthropic.messages.create as any)({
+      model: useModel,
       max_tokens: maxTokens,
+      ...(isOpus47 && { thinking: { type: 'adaptive' } }),
       messages: [{ role: 'user', content: prompt }],
     });
-    const block = response.content[0];
-    return block.type === 'text' ? block.text : '';
+    const textBlock = response.content?.find((b: any) => b.type === 'text');
+    return textBlock?.text ?? '';
   }
 
   private extractJson(text: string): string {
@@ -48,72 +51,142 @@ export class AiService {
 
     const exercises = await this.prisma.exercise.findMany({
       where: { OR: [{ isPublic: true }, { trainerId: trainer.id }] },
-      select: { id: true, name: true, category: true },
-      take: 60,
+      select: { id: true, name: true, category: true, muscleGroups: true, gifUrl: true, videoUrl: true },
+      take: 100,
       orderBy: { name: 'asc' },
     });
 
-    const exerciseList = exercises.map((e) => e.name).join(', ');
+    const isCloudinary = (url?: string | null) => !!url && url.includes('cloudinary.com');
+    const scoreEx = (e: (typeof exercises)[0]) =>
+      isCloudinary(e.gifUrl) ? 3 : isCloudinary(e.videoUrl) ? 2 : e.gifUrl ? 1 : 0;
 
-    const prompt = `Você é um personal trainer de elite especializado em prescrição de treinos. Crie um treino baseado na descrição abaixo.
+    const exerciseList = exercises
+      .map((e) => {
+        const cat = e.category || (e.muscleGroups?.length ? e.muscleGroups[0] : 'GERAL');
+        const media = e.gifUrl ? ' ✅GIF' : e.videoUrl ? ' ✅VID' : '';
+        return `"${e.name}" [${cat}]${media}`;
+      })
+      .join('\n');
 
-## DESCRIÇÃO DO TRAINER
+    const prompt = `Você é um PERSONAL TRAINER EXPERT com PhD em Ciências do Exercício e 20 anos de experiência internacional. Crie um treino COMPLETO e PROFISSIONAL baseado na solicitação abaixo.
+
+## SOLICITAÇÃO DO PERSONAL TRAINER
 "${description}"
 
-## EXERCÍCIOS DISPONÍVEIS NO SISTEMA (use APENAS nomes exatos desta lista)
+## EXERCÍCIOS DISPONÍVEIS NO SISTEMA
+Use APENAS nomes EXATOS desta lista. Priorize exercícios com ✅GIF ou ✅VID.
+
 ${exerciseList}
 
-## DIRETRIZES DE CRIAÇÃO
-1. Interprete a descrição para extrair: objetivo principal, grupo muscular alvo, nível do aluno, frequência semanal, restrições (se houver)
-2. Se a descrição não especificar algo, use valores padrão sensatos (nível intermediário, hipertrofia, 60 min)
-3. Monte um treino COMPLETO e COESO, seguindo a ordem correta de exercícios:
-   - Aquecimento específico (se houver exercícios adequados na lista)
-   - Exercícios multiarticulares pesados primeiro (agachamento, supino, levantamento, remada)
-   - Exercícios auxiliares multiarticulares (puxadas, desenvolvimento, passada)
-   - Exercícios isoladores (rosca, extensão, elevação lateral)
-   - Finalizadores / core
-4. Volume adequado ao nível:
-   - Iniciante: 3 séries, 12-15 reps, descanso 60-90s
-   - Intermediário: 3-4 séries, 8-12 reps, descanso 60-90s  
-   - Avançado: 4-5 séries, 6-12 reps (variado), descanso 90-120s
-5. Inclua 6 a 9 exercícios (nem menos, nem mais)
-6. As tags devem refletir o tipo de treino (ex: "hipertrofia", "força", "superiores", "pernas", "empurrar", "puxar")
-7. Inclua 3-5 dicas técnicas relevantes para este treino específico
+## DIRETRIZES CIENTÍFICAS DE PRESCRIÇÃO
 
-## FORMATO DE RESPOSTA (APENAS JSON válido, sem texto extra, sem markdown):
-{"name":"Nome do Treino","description":"Breve descrição do objetivo e metodologia","level":2,"duration":60,"tags":["hipertrofia","superiores"],"exercises":[{"name":"Nome Exato do Exercício","sets":3,"reps":"10-12","restSeconds":90,"notes":"Manter escápulas retraídas"},...],"tips":["Dica 1","Dica 2","Dica 3"]}
+### ORDEM DOS EXERCÍCIOS (OBRIGATÓRIO)
+1. Multiarticulares pesados (agachamento, supino, levantamento terra, remada, puxada)
+2. Auxiliares multiarticulares (hack squat, supino inclinado, remada unilateral, desenvolvimento)
+3. Isoladores (rosca, extensão, elevação lateral, crucifixo, fly)
+4. Core / finalizadores (prancha, crunch, panturrilha)
 
-IMPORTANTE: Responda APENAS o JSON. Nada de explicações, markdown ou texto extra.`;
+### VOLUME E INTENSIDADE POR OBJETIVO
+- Hipertrofia: 3-4 séries, 8-12 reps, 60-90s descanso
+- Força: 4-5 séries, 4-6 reps, 2-5min descanso
+- Emagrecimento/HIIT: 3-4 séries, 15-20 reps, 30-60s descanso, compostos priorizados
+- Resistência muscular: 3-4 séries, 15-25 reps, 30-45s descanso
+- Iniciante: -1 série do padrão, use reps no limite superior, cargas moderadas
+- Avançado: volume máximo, técnicas avançadas quando adequado
 
-    const content = (await this.complete(prompt, 3000)).replace(/```json|```/g, '').trim();
-    const generated = JSON.parse(content);
+### QUANTIDADE DE EXERCÍCIOS
+- Full body: 6-9 exercícios
+- Grupos musculares específicos (ABC, push/pull/legs): 5-8 exercícios
+- Mínimo 5, máximo 10
+
+### TÉCNICAS AVANÇADAS (apenas para intermediários/avançados)
+- Superset: par de exercícios com descanso apenas após o par — use "technique":"superset" e "supersetGroup":"A" para indicar qual par
+- Drop set: redução de carga e continuação até falha — use "technique":"dropset"
+- Normal (maioria): "technique":"normal"
+
+## FORMATO DE RESPOSTA (APENAS JSON puro, sem markdown, sem texto extra):
+{"name":"Nome do Treino","description":"Objetivo e metodologia em 1-2 frases","level":2,"duration":60,"tags":["hipertrofia","peito"],"exercises":[{"name":"Nome Exato","sets":4,"reps":"8-10","restSeconds":90,"weight":null,"technique":"normal","supersetGroup":null,"notes":"Retrair escápulas, cotovelos a 45°"}],"tips":["Dica técnica específica 1","Dica técnica específica 2","Dica técnica específica 3"]}
+
+REGRAS ABSOLUTAS:
+- Responda APENAS o JSON puro. Zero texto extra, zero markdown.
+- Use os nomes de exercícios EXATAMENTE como estão na lista acima
+- level: 1=Iniciante 2=Básico 3=Intermediário 4=Avançado 5=Elite
+- reps pode ser string: "8-10", "12", "até a falha", "30s"
+- weight: null se não especificado
+- technique: "normal", "superset" ou "dropset"
+- supersetGroup: null ou letra ("A", "B") para identificar o par de superset
+- notes: dica de execução técnica e específica para este exercício
+- tips: 3-5 dicas TÉCNICAS e ESPECÍFICAS para este treino`;
+
+    const raw = await this.complete(prompt, 4096, 'claude-opus-4-7');
+    const generated = JSON.parse(this.extractJson(raw));
 
     const workout = await this.prisma.workout.create({
       data: {
         name: generated.name || 'Treino gerado por IA',
         description: generated.description,
-        level: Math.min(Math.max(generated.level || 1, 1), 5),
-        duration: generated.duration || 60,
+        level: Math.min(Math.max(Number(generated.level) || 1, 1), 5),
+        duration: Number(generated.duration) || 60,
         tags: generated.tags || [],
         status: 'DRAFT',
         trainerId: trainer.id,
       },
     });
 
-    const exerciseMap = new Map(exercises.map((e) => [e.name.toLowerCase().trim(), e.id]));
+    const findBestMatch = (name: string): string | null => {
+      const nl = name.toLowerCase().trim();
+      const exactPool = exercises.filter((e) => e.name.toLowerCase().trim() === nl);
+      if (exactPool.length > 0) return exactPool.sort((a, b) => scoreEx(b) - scoreEx(a))[0].id;
+      const partialPool = exercises.filter(
+        (e) => e.name.toLowerCase().includes(nl) || nl.includes(e.name.toLowerCase()),
+      );
+      if (partialPool.length > 0) return partialPool.sort((a, b) => scoreEx(b) - scoreEx(a))[0].id;
+      const firstWord = nl.split(/\s+/)[0];
+      if (firstWord && firstWord.length > 3) {
+        const fwPool = exercises.filter((e) => e.name.toLowerCase().includes(firstWord));
+        if (fwPool.length > 0) return fwPool.sort((a, b) => scoreEx(b) - scoreEx(a))[0].id;
+      }
+      return null;
+    };
+
+    const supersetGroupMap = new Map<string, string>();
+    const addedExercises: Array<{ name: string; sets: number; reps: string; technique: string | null }> = [];
 
     const workoutExercises = (generated.exercises || [])
       .map((ex: any, idx: number) => {
-        const exerciseId = exerciseMap.get((ex.name || '').toLowerCase().trim());
+        const exerciseId = findBestMatch(ex.name || '');
         if (!exerciseId) return null;
+
+        const technique = (ex.technique || 'normal').toLowerCase();
+        const isSuperSet = technique === 'superset';
+        const isDropSet = technique === 'dropset';
+        let superSetGroupId: string | null = null;
+        if (isSuperSet && ex.supersetGroup) {
+          if (!supersetGroupMap.has(ex.supersetGroup)) {
+            supersetGroupMap.set(ex.supersetGroup, `sg-${Math.random().toString(36).slice(2, 8)}`);
+          }
+          superSetGroupId = supersetGroupMap.get(ex.supersetGroup) || null;
+        }
+
+        addedExercises.push({
+          name: ex.name,
+          sets: Number(ex.sets) || 3,
+          reps: String(ex.reps || '10'),
+          technique: isSuperSet ? 'superset' : isDropSet ? 'dropset' : null,
+        });
+
         return {
           workoutId: workout.id,
           exerciseId,
           sets: Number(ex.sets) || 3,
           reps: String(ex.reps || '10'),
           restSeconds: Number(ex.restSeconds) || 60,
+          weight: ex.weight != null ? Number(ex.weight) : null,
           order: idx,
           notes: ex.notes || null,
+          isSuperSet,
+          isDropSet,
+          superSetGroupId,
         };
       })
       .filter(Boolean);
@@ -126,7 +199,9 @@ IMPORTANTE: Responda APENAS o JSON. Nada de explicações, markdown ou texto ext
       workoutId: workout.id,
       name: workout.name,
       exercisesAdded: workoutExercises.length,
+      exercisesTotal: (generated.exercises || []).length,
       tips: generated.tips || [],
+      exercises: addedExercises,
     };
   }
 
