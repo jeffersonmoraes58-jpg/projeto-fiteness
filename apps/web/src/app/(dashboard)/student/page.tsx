@@ -317,8 +317,14 @@ export default function StudentDashboard() {
                   <span className="text-xs font-medium">{a.label}</span>
                 </Link>
               ))}
+              <div className="col-span-2 flex flex-col items-center gap-1 p-3 rounded-xl bg-white/5 text-muted-foreground cursor-not-allowed text-center border border-dashed border-border/50">
+                <Apple className="w-5 h-5 text-muted-foreground/50" />
+                <span className="text-xs font-medium">Nutricionista</span>
+                <span className="text-[10px] text-muted-foreground/50">Em breve disponível</span>
+              </div>
             </div>
           </motion.div>
+
         </div>
       </div>
 

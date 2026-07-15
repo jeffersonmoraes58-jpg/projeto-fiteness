@@ -2,7 +2,8 @@
 
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Dumbbell, Apple, Users, Check, ArrowRight, Info } from 'lucide-react';
+import { Dumbbell, Apple, Users, Check, ArrowRight, Info, Clock } from 'lucide-react';
+
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 
@@ -189,12 +190,18 @@ export function LandingRoles() {
                     Peça o link diretamente ao seu profissional.
                   </span>
                 </div>
+              ) : role.id === 'nutritionist' ? (
+                <button disabled className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-white/5 text-muted-foreground text-sm font-medium border border-border/50 cursor-not-allowed">
+                  <Clock className="w-4 h-4" />
+                  Em breve disponível
+                </button>
               ) : (
                 <Link href="/register" className="btn-primary inline-flex items-center gap-2">
                   Criar conta como {role.label}
                   <ArrowRight className="w-4 h-4" />
                 </Link>
               )}
+
             </div>
 
             {/* Right: preview card */}
