@@ -2,7 +2,8 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, Users, Dumbbell, MessageCircle, Settings, Apple, Activity, BarChart3 } from 'lucide-react';
+import { Home, Users, Dumbbell, MessageCircle, Settings, Apple, Activity, BarChart3, Clock } from 'lucide-react';
+
 import { useQuery } from '@tanstack/react-query';
 import { useAuthStore } from '@/store/auth';
 import { api } from '@/lib/api';
@@ -26,10 +27,11 @@ const navByRole: Record<string, { icon: any; label: string; href: string; isChat
   STUDENT: [
     { icon: Home, label: 'Início', href: '/student' },
     { icon: Dumbbell, label: 'Treino', href: '/student/workout' },
-    { icon: Apple, label: 'Dieta', href: '/student/diet' },
+    { icon: Clock, label: 'Dieta', href: '/student/diet' },
     { icon: Activity, label: 'Evolução', href: '/student/progress' },
     { icon: MessageCircle, label: 'Chat', href: '/student/chat', isChat: true },
   ],
+
   ADMIN: [
     { icon: Home, label: 'Início', href: '/admin' },
     { icon: Users, label: 'Usuários', href: '/admin/users' },

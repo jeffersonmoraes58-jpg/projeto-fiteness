@@ -8,8 +8,9 @@ import {
   Dumbbell, Users, Apple, BarChart3, MessageCircle, Bell,
   Settings, LogOut, ChevronLeft, Trophy,
   Calendar, CreditCard, Brain, Home, Utensils, Wand2,
-  Activity, Target, Star, Building2, Shield, Zap,
+  Activity, Target, Star, Building2, Shield, Zap, Clock,
 } from 'lucide-react';
+
 import { useQuery } from '@tanstack/react-query';
 import { useAuthStore } from '@/store/auth';
 import { api } from '@/lib/api';
@@ -55,7 +56,7 @@ const navByRole: Record<string, NavItem[]> = {
   STUDENT: [
     { icon: Home, label: 'Início', href: '/student' },
     { icon: Dumbbell, label: 'Meu Treino', href: '/student/workout' },
-    { icon: Apple, label: 'Minha Dieta', href: '/student/diet' },
+    { icon: Clock, label: 'Minha Dieta', href: '#', disabled: true },
     { icon: Activity, label: 'Evolução', href: '/student/progress' },
     { icon: Calendar, label: 'Agenda', href: '/student/schedule' },
     { icon: Target, label: 'Metas', href: '/student/goals' },
@@ -65,6 +66,7 @@ const navByRole: Record<string, NavItem[]> = {
     { icon: CreditCard, label: 'Pagamentos', href: '/student/billing' },
     { icon: Settings, label: 'Perfil', href: '/student/profile' },
   ],
+
   ADMIN: [
     { icon: Home, label: 'Dashboard', href: '/admin' },
     { icon: Building2, label: 'Academias', href: '/admin/tenants' },
@@ -84,7 +86,9 @@ interface NavItem {
   href: string;
   badge?: number;
   isChat?: boolean;
+  disabled?: boolean;
 }
+
 
 export function DashboardSidebar() {
   const [collapsed, setCollapsed] = useState(false);
@@ -134,6 +138,35 @@ export function DashboardSidebar() {
         {navItems.map((item) => {
           const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
           const badge = item.isChat ? unreadCount : (item.badge ?? 0);
+          if (item.disabled) {
+            return (
+              <div
+                key={item.href}
+                className={cn(
+                  'sidebar-link opacity-50 cursor-not-allowed',
+                  collapsed && 'justify-center px-3',
+                )}
+                title="Em breve disponível"
+              >
+                <item.icon className="w-5 h-5 flex-shrink-0" />
+                <AnimatePresence>
+                  {!collapsed && (
+                    <motion.span
+                      initial={{ opacity: 0, width: 0 }}
+                      animate={{ opacity: 1, width: 'auto' }}
+                      exit={{ opacity: 0, width: 0 }}
+                      className="overflow-hidden whitespace-nowrap flex-1"
+                    >
+                      {item.label}
+                    </motion.span>
+                  )}
+                </AnimatePresence>
+                {!collapsed && (
+                  <span className="ml-auto text-[10px] text-muted-foreground/50">Em breve</span>
+                )}
+              </div>
+            );
+          }
           return (
             <Link
               key={item.href}
@@ -169,6 +202,7 @@ export function DashboardSidebar() {
             </Link>
           );
         })}
+
       </nav>
 
       {/* Plan badge + upgrade */}

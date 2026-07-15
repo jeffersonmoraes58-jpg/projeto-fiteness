@@ -9,8 +9,9 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import {
   Eye, EyeOff, Dumbbell, Loader2, Apple,
-  Shield, ChevronRight, ChevronLeft, Check, Lock,
+  Shield, ChevronRight, ChevronLeft, Check, Lock, Clock,
 } from 'lucide-react';
+
 import { useAuthStore } from '@/store/auth';
 import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
@@ -199,25 +200,43 @@ function RegisterPageContent() {
                 <p className="text-muted-foreground text-sm mb-6">Escolha o perfil que melhor descreve você</p>
 
                 <div className="grid grid-cols-2 gap-3 mb-6">
-                  {ROLES.map((r) => (
-                    <button
-                      key={r.value}
-                      onClick={() => handleRoleSelect(r.value)}
-                      className={cn(
-                        'p-4 rounded-2xl border-2 text-left transition-all hover:bg-accent',
-                        selectedRole === r.value
-                          ? 'border-primary bg-primary/5'
-                          : 'border-border bg-card',
-                      )}
-                    >
-                      <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${r.color} flex items-center justify-center mb-3`}>
-                        <r.icon className="w-5 h-5 text-white" />
+                  {ROLES.map((r) =>
+                    r.value === 'NUTRITIONIST' ? (
+                      <div
+                        key={r.value}
+                        className="p-4 rounded-2xl border-2 border-border bg-card opacity-50 cursor-not-allowed relative overflow-hidden"
+                        title="Em breve disponível"
+                      >
+                        <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${r.color} flex items-center justify-center mb-3`}>
+                          <Clock className="w-5 h-5 text-white" />
+                        </div>
+                        <div className="font-semibold text-sm">{r.label}</div>
+                        <div className="text-xs text-muted-foreground mt-1 leading-tight">{r.description}</div>
+                        <div className="absolute top-2 right-2 text-[9px] font-medium text-muted-foreground/60 bg-background/80 px-1.5 py-0.5 rounded-full border border-border/50">
+                          Em breve
+                        </div>
                       </div>
-                      <div className="font-semibold text-sm">{r.label}</div>
-                      <div className="text-xs text-muted-foreground mt-1 leading-tight">{r.description}</div>
-                    </button>
-                  ))}
+                    ) : (
+                      <button
+                        key={r.value}
+                        onClick={() => handleRoleSelect(r.value)}
+                        className={cn(
+                          'p-4 rounded-2xl border-2 text-left transition-all hover:bg-accent',
+                          selectedRole === r.value
+                            ? 'border-primary bg-primary/5'
+                            : 'border-border bg-card',
+                        )}
+                      >
+                        <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${r.color} flex items-center justify-center mb-3`}>
+                          <r.icon className="w-5 h-5 text-white" />
+                        </div>
+                        <div className="font-semibold text-sm">{r.label}</div>
+                        <div className="text-xs text-muted-foreground mt-1 leading-tight">{r.description}</div>
+                      </button>
+                    )
+                  )}
                 </div>
+
 
                 <button
                   onClick={() => { if (selectedRole) setStep(2); }}

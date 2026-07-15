@@ -197,25 +197,21 @@ export default function StudentDashboard() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.5 }}
-            className="glass-card"
+            className="glass-card opacity-60"
           >
             <div className="flex items-center justify-between mb-4">
               <h2 className="font-semibold flex items-center gap-2">
-                <Apple className="w-5 h-5 text-emerald-400" />
-                Nutrição Hoje
+                <Clock className="w-5 h-5 text-muted-foreground" />
+                Nutrição
               </h2>
-              <Link href="/student/diet" className="text-xs text-primary hover:underline">
-                Ver dieta
-              </Link>
+              <span className="text-xs text-muted-foreground/50">Em breve</span>
             </div>
-            <MacroRing
-              calories={todayDiet?.diet?.calories ?? 0}
-              goal={todayDiet?.diet?.caloriesGoal ?? 2200}
-              protein={todayDiet?.diet?.protein ?? 0}
-              carbs={todayDiet?.diet?.carbs ?? 0}
-              fat={todayDiet?.diet?.fat ?? 0}
-            />
+            <div className="flex flex-col items-center justify-center py-6 text-center">
+              <Apple className="w-10 h-10 text-muted-foreground/30 mb-3" />
+              <p className="text-sm text-muted-foreground/50">Acompanhamento nutricional em breve</p>
+            </div>
           </motion.div>
+
 
           {/* Goals */}
           <motion.div
