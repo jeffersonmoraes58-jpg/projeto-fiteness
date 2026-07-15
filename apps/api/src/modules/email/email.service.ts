@@ -1,9 +1,116 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import * as nodemailer from 'nodemailer';
 
 @Injectable()
 export class EmailService {
-  constructor(private config: ConfigService) {}
+  private readonly logger = new Logger(EmailService.name);
+  private transporter: nodemailer.Transporter | null = null;
+
+  constructor(private config: ConfigService) {
+    this.initTransporter();
+  }
+
+  /**
+   * Inicializa o transporte SMTP com Nodemailer se as credenciais estiverem configuradas.
+   */
+  private initTransporter() {
+    const host = this.config.get('SMTP_HOST');
+    const port = this.config.get('SMTP_PORT');
+    const user = this.config.get('SMTP_USER');
+    const pass = this.config.get('SMTP_PASS');
+
+    if (host && user && pass) {
+      this.transporter = nodemailer.createTransport({
+        host,
+        port: port ? parseInt(port, 10) : 587,
+        secure: port === '465',
+        auth: { user, pass },
+      });
+      this.logger.log(`[EMAIL] Nodemailer SMTP transporter initialized: ${host}:${port}`);
+    } else {
+      this.logger.warn('[EMAIL] SMTP not configured — Nodemailer fallback unavailable');
+    }
+  }
+
+  /**
+   * Método central de envio: tenta Resend primeiro; se não configurado, usa Nodemailer.
+   */
+  private async sendMail(options: {
+    to: string;
+    subject: string;
+    html: string;
+  }): Promise<{ sent: boolean; error?: string; provider?: string }> {
+    const apiKey = this.config.get('RESEND_API_KEY');
+
+    // Tenta Resend
+    if (apiKey) {
+      const fromEmail = this.config.get('RESEND_FROM', 'onboarding@resend.dev');
+      const from = fromEmail.includes('@') && !fromEmail.includes('<')
+        ? `Fitlynutri <${fromEmail}>`
+        : fromEmail;
+
+      try {
+        const res = await fetch('https://api.resend.com/emails', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${apiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ from, to: [options.to], subject: options.subject, html: options.html }),
+        });
+        const json = (await res.json()) as any;
+        if (!res.ok) {
+          this.logger.error(`[EMAIL] Resend error:`, json);
+          // Fallback para Nodemailer se Resend falhar
+          return this.sendMailViaNodemailer(options);
+        }
+        this.logger.log(`[EMAIL] Sent via Resend to ${options.to} — id: ${json.id}`);
+        return { sent: true, provider: 'resend' };
+      } catch (err: any) {
+        this.logger.error(`[EMAIL] Resend exception:`, err.message);
+        return this.sendMailViaNodemailer(options);
+      }
+    }
+
+    // Sem Resend — tenta Nodemailer
+    return this.sendMailViaNodemailer(options);
+  }
+
+  /**
+   * Envia email via Nodemailer (SMTP).
+   */
+  private async sendMailViaNodemailer(options: {
+    to: string;
+    subject: string;
+    html: string;
+  }): Promise<{ sent: boolean; error?: string; provider?: string }> {
+    if (!this.transporter) {
+      this.logger.log(`[EMAIL] No mail transport configured — would send to ${options.to}`);
+      return { sent: false, error: 'Nenhum serviço de email configurado (SMTP ou Resend)' };
+    }
+
+    const fromEmail = this.config.get('SMTP_FROM', 'noreply@fitlynutri.com.br');
+    const from = fromEmail.includes('@') && !fromEmail.includes('<')
+      ? `Fitlynutri <${fromEmail}>`
+      : fromEmail;
+
+    try {
+      const info = await this.transporter.sendMail({
+        from,
+        to: options.to,
+        subject: options.subject,
+        html: options.html,
+      });
+      this.logger.log(`[EMAIL] Sent via Nodemailer to ${options.to} — id: ${info.messageId}`);
+      return { sent: true, provider: 'nodemailer' };
+    } catch (err: any) {
+      this.logger.error(`[EMAIL] Nodemailer error:`, err.message);
+      return { sent: false, error: err.message };
+    }
+  }
+
+  // ─── MÉTODOS PÚBLICOS ──────────────────────────────────────────────────────
 
   /**
    * Envia email de boas-vindas para qualquer novo usuário cadastrado via /auth/register.
@@ -14,16 +121,8 @@ export class EmailService {
     role: string;
     tenantName?: string;
   }): Promise<{ sent: boolean; error?: string }> {
-    const apiKey = this.config.get('RESEND_API_KEY');
-    if (!apiKey) {
-      console.log(`[EMAIL] RESEND_API_KEY not set — would send to ${data.to}`);
-      return { sent: false, error: 'RESEND_API_KEY não configurado' };
-    }
-
     const frontendUrl = this.config.get('FRONTEND_URL', 'https://fitlynutri.com.br');
     const loginUrl = `${frontendUrl}/login`;
-    const fromEmail = this.config.get('RESEND_FROM', 'onboarding@resend.dev');
-    const from = fromEmail.includes('@') && !fromEmail.includes('<') ? `Fitlynutri <${fromEmail}>` : fromEmail;
 
     const roleLabel: Record<string, string> = {
       ADMIN: 'Proprietário(a)',
@@ -33,7 +132,6 @@ export class EmailService {
       STUDENT: 'Aluno(a)',
     };
     const roleName = roleLabel[data.role] || 'Usuário(a)';
-    const planName = data.tenantName || 'Fitlynutri';
 
     const html = `
 <!DOCTYPE html>
@@ -78,30 +176,16 @@ export class EmailService {
 </body>
 </html>`;
 
-    try {
-      const res = await fetch('https://api.resend.com/emails', {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          from,
-          to: [data.to],
-          subject: `Bem-vindo(a) ao Fitlynutri, ${data.firstName}! 🎉`,
-          html,
-        }),
-      });
-      const json = await res.json() as any;
-      if (!res.ok) {
-        console.error('[EMAIL] Resend error:', json);
-        return { sent: false, error: json?.message || 'Erro ao enviar' };
-      }
-      console.log(`[EMAIL] Welcome sent to ${data.to} via Resend — id: ${json.id}`);
-      return { sent: true };
-    } catch (err: any) {
-      console.error('[EMAIL] Resend exception:', err.message);
-      return { sent: false, error: err.message };
-    }
+    return this.sendMail({
+      to: data.to,
+      subject: `Bem-vindo(a) ao Fitlynutri, ${data.firstName}! 🎉`,
+      html,
+    });
   }
 
+  /**
+   * Envia email com dados de acesso quando um trainer cadastra um aluno.
+   */
   async sendStudentWelcome(data: {
     to: string;
     studentName: string;
@@ -110,19 +194,11 @@ export class EmailService {
     anamneseType?: string;
     studentUserId?: string;
   }): Promise<{ sent: boolean; error?: string }> {
-    const apiKey = this.config.get('RESEND_API_KEY');
-    if (!apiKey) {
-      console.log(`[EMAIL] RESEND_API_KEY not set — would send to ${data.to}`);
-      return { sent: false, error: 'RESEND_API_KEY não configurado' };
-    }
-
     const frontendUrl = this.config.get('FRONTEND_URL', 'https://fitlynutri.com.br');
     const loginUrl = `${frontendUrl}/login`;
     const anamneseUrl = data.studentUserId
       ? `${frontendUrl}/anamnese/${data.studentUserId}?type=${encodeURIComponent(data.anamneseType || '')}`
       : `${frontendUrl}/student/progress`;
-    const fromEmail = this.config.get('RESEND_FROM', 'onboarding@resend.dev');
-    const from = fromEmail.includes('@') && !fromEmail.includes('<') ? `Fitlynutri <${fromEmail}>` : fromEmail;
 
     const html = `
 <!DOCTYPE html>
@@ -177,28 +253,11 @@ export class EmailService {
 </body>
 </html>`;
 
-    try {
-      const res = await fetch('https://api.resend.com/emails', {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          from,
-          to: [data.to],
-          subject: 'Bem-vindo(a) ao Fitlynutri — Seus dados de acesso',
-          html,
-        }),
-      });
-      const json = await res.json() as any;
-      if (!res.ok) {
-        console.error('[EMAIL] Resend error:', json);
-        return { sent: false, error: json?.message || 'Erro ao enviar' };
-      }
-      console.log(`[EMAIL] Sent to ${data.to} via Resend — id: ${json.id}`);
-      return { sent: true };
-    } catch (err: any) {
-      console.error('[EMAIL] Resend exception:', err.message);
-      return { sent: false, error: err.message };
-    }
+    return this.sendMail({
+      to: data.to,
+      subject: 'Bem-vindo(a) ao Fitlynutri — Seus dados de acesso',
+      html,
+    });
   }
 
   /**
@@ -210,16 +269,8 @@ export class EmailService {
     trainerName: string;
     studentUserId: string;
   }): Promise<{ sent: boolean; error?: string }> {
-    const apiKey = this.config.get('RESEND_API_KEY');
-    if (!apiKey) {
-      console.log(`[EMAIL] RESEND_API_KEY not set — would send to ${data.to}`);
-      return { sent: false, error: 'RESEND_API_KEY não configurado' };
-    }
-
     const frontendUrl = this.config.get('FRONTEND_URL', 'https://fitlynutri.com.br');
     const anamneseUrl = `${frontendUrl}/anamnese/${data.studentUserId}`;
-    const fromEmail = this.config.get('RESEND_FROM', 'onboarding@resend.dev');
-    const from = fromEmail.includes('@') && !fromEmail.includes('<') ? `Fitlynutri <${fromEmail}>` : fromEmail;
 
     const html = `
 <!DOCTYPE html>
@@ -259,28 +310,11 @@ export class EmailService {
 </body>
 </html>`;
 
-    try {
-      const res = await fetch('https://api.resend.com/emails', {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          from,
-          to: [data.to],
-          subject: `${data.trainerName} solicitou sua anamnese — Fitlynutri`,
-          html,
-        }),
-      });
-      const json = await res.json() as any;
-      if (!res.ok) {
-        console.error('[EMAIL] Resend error:', json);
-        return { sent: false, error: json?.message || 'Erro ao enviar' };
-      }
-      console.log(`[EMAIL] Anamnese link sent to ${data.to} via Resend — id: ${json.id}`);
-      return { sent: true };
-    } catch (err: any) {
-      console.error('[EMAIL] Resend exception:', err.message);
-      return { sent: false, error: err.message };
-    }
+    return this.sendMail({
+      to: data.to,
+      subject: `${data.trainerName} solicitou sua anamnese — Fitlynutri`,
+      html,
+    });
   }
 
   /**
@@ -295,21 +329,15 @@ export class EmailService {
     daysLeft: number;
     tenantId: string;
   }): Promise<{ sent: boolean; error?: string }> {
-    const apiKey = this.config.get('RESEND_API_KEY');
-    if (!apiKey) {
-      console.log(`[EMAIL] RESEND_API_KEY not set — would send to ${data.to}`);
-      return { sent: false, error: 'RESEND_API_KEY não configurado' };
-    }
-
     const frontendUrl = this.config.get('FRONTEND_URL', 'https://fitlynutri.com.br');
     const billingUrl = `${frontendUrl}/admin/subscriptions`;
-    const fromEmail = this.config.get('RESEND_FROM', 'onboarding@resend.dev');
-    const from = fromEmail.includes('@') && !fromEmail.includes('<') ? `Fitlynutri <${fromEmail}>` : fromEmail;
 
     const urgency =
-      data.daysLeft <= 1 ? '⚠️ Sua assinatura expira amanhã!'
-      : data.daysLeft <= 3 ? '🔔 Sua assinatura expira em breve!'
-      : '📅 Sua assinatura está próxima da renovação';
+      data.daysLeft <= 1
+        ? '⚠️ Sua assinatura expira amanhã!'
+        : data.daysLeft <= 3
+          ? '🔔 Sua assinatura expira em breve!'
+          : '📅 Sua assinatura está próxima da renovação';
 
     const html = `
 <!DOCTYPE html>
@@ -323,9 +351,7 @@ export class EmailService {
     </div>
     <div style="padding:32px 24px">
       <p style="color:#e2e8f0;font-size:16px;margin:0 0 8px">Olá, <strong>${data.adminName}</strong>!</p>
-      <p style="color:#94a3b8;font-size:14px;margin:0 0 24px">
-        ${urgency}
-      </p>
+      <p style="color:#94a3b8;font-size:14px;margin:0 0 24px">${urgency}</p>
       <div style="background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.3);border-radius:12px;padding:20px;margin-bottom:24px">
         <div style="margin-bottom:8px">
           <div style="color:#94a3b8;font-size:11px;text-transform:uppercase;letter-spacing:1px;margin-bottom:2px">Plano</div>
@@ -356,28 +382,11 @@ export class EmailService {
 </body>
 </html>`;
 
-    try {
-      const res = await fetch('https://api.resend.com/emails', {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          from,
-          to: [data.to],
-          subject: `Sua assinatura expira em ${data.daysLeft} dia${data.daysLeft !== 1 ? 's' : ''} — Fitlynutri`,
-          html,
-        }),
-      });
-      const json = await res.json() as any;
-      if (!res.ok) {
-        console.error('[EMAIL] Resend error:', json);
-        return { sent: false, error: json?.message || 'Erro ao enviar' };
-      }
-      console.log(`[EMAIL] Expiring subscription notice sent to ${data.to} (${data.daysLeft}d left) — id: ${json.id}`);
-      return { sent: true };
-    } catch (err: any) {
-      console.error('[EMAIL] Resend exception:', err.message);
-      return { sent: false, error: err.message };
-    }
+    return this.sendMail({
+      to: data.to,
+      subject: `Sua assinatura expira em ${data.daysLeft} dia${data.daysLeft !== 1 ? 's' : ''} — Fitlynutri`,
+      html,
+    });
   }
 
   /**
@@ -389,16 +398,8 @@ export class EmailService {
     workoutName: string;
     trainerName: string;
   }): Promise<{ sent: boolean; error?: string }> {
-    const apiKey = this.config.get('RESEND_API_KEY');
-    if (!apiKey) {
-      console.log(`[EMAIL] RESEND_API_KEY not set — would send workout reminder to ${data.to}`);
-      return { sent: false, error: 'RESEND_API_KEY não configurado' };
-    }
-
     const frontendUrl = this.config.get('FRONTEND_URL', 'https://fitlynutri.com.br');
     const workoutUrl = `${frontendUrl}/student/workout`;
-    const fromEmail = this.config.get('RESEND_FROM', 'onboarding@resend.dev');
-    const from = fromEmail.includes('@') && !fromEmail.includes('<') ? `Fitlynutri <${fromEmail}>` : fromEmail;
 
     const html = `
 <!DOCTYPE html>
@@ -435,28 +436,11 @@ export class EmailService {
 </body>
 </html>`;
 
-    try {
-      const res = await fetch('https://api.resend.com/emails', {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          from,
-          to: [data.to],
-          subject: `💪 Hora do treino: ${data.workoutName} — Fitlynutri`,
-          html,
-        }),
-      });
-      const json = await res.json() as any;
-      if (!res.ok) {
-        console.error('[EMAIL] Resend error:', json);
-        return { sent: false, error: json?.message || 'Erro ao enviar' };
-      }
-      console.log(`[EMAIL] Workout reminder sent to ${data.to} — id: ${json.id}`);
-      return { sent: true };
-    } catch (err: any) {
-      console.error('[EMAIL] Resend exception:', err.message);
-      return { sent: false, error: err.message };
-    }
+    return this.sendMail({
+      to: data.to,
+      subject: `💪 Hora do treino: ${data.workoutName} — Fitlynutri`,
+      html,
+    });
   }
 
   /**
@@ -469,16 +453,8 @@ export class EmailService {
     lastTrainDate: string;
     daysInactive: number;
   }): Promise<{ sent: boolean; error?: string }> {
-    const apiKey = this.config.get('RESEND_API_KEY');
-    if (!apiKey) {
-      console.log(`[EMAIL] RESEND_API_KEY not set — would send inactivity alert to ${data.to}`);
-      return { sent: false, error: 'RESEND_API_KEY não configurado' };
-    }
-
     const frontendUrl = this.config.get('FRONTEND_URL', 'https://fitlynutri.com.br');
     const studentsUrl = `${frontendUrl}/trainer/students`;
-    const fromEmail = this.config.get('RESEND_FROM', 'onboarding@resend.dev');
-    const from = fromEmail.includes('@') && !fromEmail.includes('<') ? `Fitlynutri <${fromEmail}>` : fromEmail;
 
     const html = `
 <!DOCTYPE html>
@@ -525,27 +501,10 @@ export class EmailService {
 </body>
 </html>`;
 
-    try {
-      const res = await fetch('https://api.resend.com/emails', {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          from,
-          to: [data.to],
-          subject: `⚠️ ${data.studentName} está há ${data.daysInactive} dias sem treinar — Fitlynutri`,
-          html,
-        }),
-      });
-      const json = await res.json() as any;
-      if (!res.ok) {
-        console.error('[EMAIL] Resend error:', json);
-        return { sent: false, error: json?.message || 'Erro ao enviar' };
-      }
-      console.log(`[EMAIL] Inactivity alert sent to ${data.to} — id: ${json.id}`);
-      return { sent: true };
-    } catch (err: any) {
-      console.error('[EMAIL] Resend exception:', err.message);
-      return { sent: false, error: err.message };
-    }
+    return this.sendMail({
+      to: data.to,
+      subject: `⚠️ ${data.studentName} está há ${data.daysInactive} dias sem treinar — Fitlynutri`,
+      html,
+    });
   }
 }
