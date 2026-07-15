@@ -7,6 +7,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
+import toast from 'react-hot-toast';
 
 export default function NewPatientPage() {
   const router = useRouter();
@@ -42,14 +43,17 @@ export default function NewPatientPage() {
 
   useEffect(() => { setEmailCheckEnabled(false); }, [tab]);
 
-  const goToList = async () => {
-    await queryClient.invalidateQueries({ queryKey: ['nutritionist-patients-list'] });
+  const goToList = () => {
+    queryClient.removeQueries({ queryKey: ['nutritionist-patients-list'] });
     router.push('/nutritionist/patients');
   };
 
   const linkMutation = useMutation({
     mutationFn: (data: any) => api.post('/nutritionists/me/patients', data),
-    onSuccess: () => { goToList(); },
+    onSuccess: () => {
+      toast.success('Paciente vinculado com sucesso!');
+      goToList();
+    },
     onError: (e: any) => setError(e.response?.data?.message || 'Erro ao vincular paciente'),
   });
 
@@ -141,7 +145,7 @@ export default function NewPatientPage() {
                 <div className="flex-1">
                   <p className="text-sm font-semibold text-amber-400">Aluno ja cadastrado</p>
                   <p className="text-xs text-muted-foreground mt-1">Ja existe um aluno com o email <strong>{emailMatch.email}</strong> no sistema ({emailMatch.profile?.firstName} {emailMatch.profile?.lastName}). Evite duplicar contas — vincule o aluno existente.</p>
-                  <button type="button" onClick={quickLink} className="flex items-center gap-1.5 mt-2 text-xs font-semibold text-amber-400 hover:text-amber-300 transition-colors"><Link2 className="w-3.5 h-3.5" />Vincular este aluno</button>
+                  <button type="button" onClick={quickLink} disabled={linkMutation.isPending} className="flex items-center gap-1.5 mt-2 text-xs font-semibold text-amber-400 hover:text-amber-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"><Link2 className="w-3.5 h-3.5" />{linkMutation.isPending ? 'Vinculando...' : 'Vincular este aluno'}</button>
                 </div>
               </div>
             </motion.div>
