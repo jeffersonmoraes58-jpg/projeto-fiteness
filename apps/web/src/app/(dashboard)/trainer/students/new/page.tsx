@@ -130,7 +130,6 @@ export default function NewStudentPage() {
     linkMutation.mutate({
       studentUserId: uid,
       monthlyFee: mensalidade ? Number(mensalidade) : undefined,
-      goalType: grupo,
     });
   };
 
@@ -187,7 +186,6 @@ export default function NewStudentPage() {
       await api.post('/trainers/me/students', {
         studentUserId: userId,
         monthlyFee: data.mensalidade ? Number(data.mensalidade) : undefined,
-        goalType: data.grupo,
       });
 
       queryClient.invalidateQueries({ queryKey: ['trainer-students-list'] });
@@ -238,7 +236,7 @@ export default function NewStudentPage() {
     const uid = selected.userId || selected.id;
     if (!uid) { setError('Erro: ID do aluno não encontrado'); return; }
     setError('');
-    linkMutation.mutate({ studentUserId: uid, monthlyFee: searchFee ? Number(searchFee) : undefined, goalType: grupo });
+    linkMutation.mutate({ studentUserId: uid, monthlyFee: searchFee ? Number(searchFee) : undefined });
   };
 
   const copyCredentials = () => {

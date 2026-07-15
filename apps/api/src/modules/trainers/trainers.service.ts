@@ -221,7 +221,7 @@ export class TrainersService {
     return { message: 'Aluno removido' };
   }
 
-  async addStudent(userId: string, studentUserId: string, monthlyFee?: number, goalType?: string) {
+  async addStudent(userId: string, studentUserId: string, monthlyFee?: number) {
     const trainer = await this.getTrainer(userId);
     const student = await this.prisma.student.findUnique({
       where: { userId: studentUserId },
@@ -237,19 +237,11 @@ export class TrainersService {
       await this.subscriptionService.checkStudentLimit(trainer.user.tenantId, trainer.id);
     }
 
-    await Promise.all([
-      this.prisma.trainerStudent.upsert({
-        where: { trainerId_studentId: { trainerId: trainer.id, studentId: student.id } },
-        update: { isActive: true, monthlyFee },
-        create: { trainerId: trainer.id, studentId: student.id, monthlyFee, isActive: true },
-      }),
-      goalType ? this.prisma.student.update({
-        where: { id: student.id },
-        data: { goalType: goalType as any },
-      }) : null,
-    ]);
-
-    return { message: 'Aluno adicionado', studentId: student.id };
+    return this.prisma.trainerStudent.upsert({
+      where: { trainerId_studentId: { trainerId: trainer.id, studentId: student.id } },
+      update: { isActive: true, monthlyFee },
+      create: { trainerId: trainer.id, studentId: student.id, monthlyFee, isActive: true },
+    });
   }
 
   async getAppointments(userId: string) {

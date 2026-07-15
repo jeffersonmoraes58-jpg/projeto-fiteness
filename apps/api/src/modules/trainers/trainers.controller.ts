@@ -37,8 +37,8 @@ export class TrainersController {
 
   @Post('me/students')
   @ApiOperation({ summary: 'Adicionar aluno ao trainer' })
-  addStudent(@CurrentUser() user: any, @Body() body: { studentUserId: string; monthlyFee?: number; goalType?: string }) {
-    return this.service.addStudent(user.id, body.studentUserId, body.monthlyFee, body.goalType);
+  addStudent(@CurrentUser() user: any, @Body() body: { studentUserId: string; monthlyFee?: number }) {
+    return this.service.addStudent(user.id, body.studentUserId, body.monthlyFee);
   }
 
   @Delete('me/students/:studentId')
