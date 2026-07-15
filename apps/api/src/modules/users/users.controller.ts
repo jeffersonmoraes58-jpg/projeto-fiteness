@@ -3,6 +3,7 @@ import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { UsersService } from './users.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../../decorators/current-user.decorator';
+import { UpdateProfileDto } from './dto/update-profile.dto';
 
 @ApiTags('users')
 @ApiBearerAuth()
@@ -19,7 +20,7 @@ export class UsersController {
 
   @Put('me/profile')
   @ApiOperation({ summary: 'Atualizar perfil' })
-  updateProfile(@CurrentUser('id') userId: string, @Body() data: any) {
+  updateProfile(@CurrentUser('id') userId: string, @Body() data: UpdateProfileDto) {
     return this.usersService.updateProfile(userId, data);
   }
 

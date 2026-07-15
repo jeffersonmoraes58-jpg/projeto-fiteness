@@ -414,10 +414,19 @@ export class AdminService {
   async deleteUser(id: string) {
     const user = await this.prisma.user.findUnique({
       where: { id },
-      select: { id: true, email: true },
+      include: { student: true, trainer: true, nutritionist: true },
     });
 
     if (!user) throw new NotFoundException('Usuário não encontrado');
+
+    // Remove vínculos TrainerStudent e NutritionistPatient que não têm
+    // onDelete: Cascade no schema e sobrevivem à deleção do User.
+    if (user.student) {
+      await Promise.all([
+        this.prisma.trainerStudent.deleteMany({ where: { studentId: user.student.id } }),
+        this.prisma.nutritionistPatient.deleteMany({ where: { studentId: user.student.id } }),
+      ]);
+    }
 
     // Desabilita temporariamente todas as FKs para permitir a deleção
     await this.prisma.$executeRaw`SET session_replication_role = 'replica'`;
