@@ -372,7 +372,12 @@ export class TrainersService {
               streak: true,
               points: true,
               goalType: true,
-              user: { select: { createdAt: true } },
+              user: {
+                select: {
+                  createdAt: true,
+                  profile: { select: { firstName: true, lastName: true } },
+                },
+              },
             },
           },
         },
