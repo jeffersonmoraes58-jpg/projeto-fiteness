@@ -9,6 +9,7 @@ import {
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
+import { Loader2 } from 'lucide-react';
 
 const GOAL_LABELS: Record<string, string> = {
   LOSE_WEIGHT: 'Perda de peso',
@@ -28,24 +29,41 @@ const statCards = [
 ];
 
 export default function TrainerDashboard() {
-  const { data: dashboard } = useQuery({
+  const { data: dashboard, isLoading: loadingDashboard, isError: errorDashboard } = useQuery({
     queryKey: ['trainer-dashboard'],
     queryFn: () => api.get('/trainers/me/dashboard').then((r) => r.data.data),
   });
 
-  const { data: students } = useQuery({
+  const { data: students, isLoading: loadingStudents } = useQuery({
     queryKey: ['trainer-students'],
     queryFn: () => api.get('/trainers/me/students').then((r) => r.data.data),
   });
 
-  const { data: analytics } = useQuery({
+  const { data: analytics, isLoading: loadingAnalytics } = useQuery({
     queryKey: ['trainer-analytics'],
     queryFn: () => api.get('/trainers/me/analytics').then((r) => r.data.data),
-    refetchInterval: 5 * 60 * 1000, // refresh a cada 5 min
+    refetchInterval: 5 * 60 * 1000,
   });
+
+  const isLoading = loadingDashboard && loadingStudents;
 
   return (
     <div className="space-y-8">
+      {/* Loading overlay */}
+      {isLoading && (
+        <div className="flex items-center justify-center py-8">
+          <Loader2 className="w-6 h-6 animate-spin text-primary" />
+          <span className="ml-2 text-sm text-muted-foreground">Carregando dashboard...</span>
+        </div>
+      )}
+
+      {/* Error state */}
+      {errorDashboard && !isLoading && (
+        <div className="glass-card border border-red-500/30 bg-red-500/5 p-4 text-center">
+          <p className="text-sm text-red-400">Erro ao carregar dados do dashboard. Tente novamente.</p>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
@@ -305,17 +323,6 @@ function StudentRow({ student, index }: { student: any; index: number }) {
       </div>
     </Link>
   );
-}
-
-/**
- * Retorna string YYYY-MM-DD no fuso America/Sao_Paulo, compatível com backend toBRDate().
- */
-function toBRDate(date: Date): string {
-  const br = new Date(date.toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }));
-  const y = br.getFullYear();
-  const m = String(br.getMonth() + 1).padStart(2, '0');
-  const d = String(br.getDate()).padStart(2, '0');
-  return `${y}-${m}-${d}`;
 }
 
 function WeeklyChart({ values }: { values?: number[] }) {

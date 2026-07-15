@@ -424,7 +424,7 @@ export class TrainersService {
       .slice(0, 10)
       .map((s) => ({
         studentId: s.studentId,
-        name: `${s.student.user?.createdAt ? 'Aluno' : 'Aluno'}`,
+        name: `${s.student.user?.profile?.firstName ?? ''} ${s.student.user?.profile?.lastName ?? ''}`.trim() || 'Aluno',
         streak: s.student.streak,
         goalType: s.student.goalType,
       }));
