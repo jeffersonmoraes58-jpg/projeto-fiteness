@@ -40,12 +40,23 @@ export class TrainersService {
     todayStart.setHours(0, 0, 0, 0);
     const sevenDaysAgo = new Date(Date.now() - 7 * 86400000);
 
+    // Buscar IDs dos alunos ativos para filtrar check-ins
+    const activeStudentIds = (
+      await this.prisma.trainerStudent.findMany({
+        where: { trainerId: trainer.id, isActive: true },
+        select: { studentId: true },
+      })
+    ).map((s) => s.studentId);
+
     const [students, workouts, recentLogs, upcomingAppointments, todayLogs, weekLogs, fees] =
       await Promise.all([
         this.prisma.trainerStudent.count({ where: { trainerId: trainer.id, isActive: true } }),
         this.prisma.workout.count({ where: { trainerId: trainer.id, NOT: { tags: { has: '__personalized' } } } }),
         this.prisma.workoutLog.findMany({
-          where: { workoutPlan: { workout: { trainerId: trainer.id } } },
+          where: {
+            studentId: { in: activeStudentIds },
+            workoutPlan: { workout: { trainerId: trainer.id } },
+          },
           orderBy: { completedAt: 'desc' },
           take: 10,
           include: { student: { include: { user: { include: { profile: true } } } } },
@@ -56,10 +67,18 @@ export class TrainersService {
           take: 5,
         }),
         this.prisma.workoutLog.count({
-          where: { workoutPlan: { workout: { trainerId: trainer.id } }, completedAt: { gte: todayStart } },
+          where: {
+            studentId: { in: activeStudentIds },
+            workoutPlan: { workout: { trainerId: trainer.id } },
+            completedAt: { gte: todayStart },
+          },
         }),
         this.prisma.workoutLog.findMany({
-          where: { workoutPlan: { workout: { trainerId: trainer.id } }, completedAt: { gte: sevenDaysAgo } },
+          where: {
+            studentId: { in: activeStudentIds },
+            workoutPlan: { workout: { trainerId: trainer.id } },
+            completedAt: { gte: sevenDaysAgo },
+          },
           select: { completedAt: true },
         }),
         this.prisma.trainerStudent.findMany({
@@ -156,10 +175,16 @@ export class TrainersService {
 
   async removeStudent(userId: string, studentId: string) {
     const trainer = await this.getTrainer(userId);
-    await this.prisma.trainerStudent.updateMany({
-      where: { trainerId: trainer.id, studentId },
-      data: { isActive: false },
-    });
+    await Promise.all([
+      this.prisma.trainerStudent.updateMany({
+        where: { trainerId: trainer.id, studentId },
+        data: { isActive: false },
+      }),
+      this.prisma.workoutPlan.updateMany({
+        where: { studentId, isActive: true },
+        data: { isActive: false },
+      }),
+    ]);
     return { message: 'Aluno removido' };
   }
 

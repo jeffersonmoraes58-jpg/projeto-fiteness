@@ -333,6 +333,9 @@ function StudentCard({ student, index }: { student: any; index: number }) {
       await api.delete(`/trainers/me/students/${student.id}`);
       toast.success('Aluno removido');
       qc.invalidateQueries({ queryKey: ['trainer-students-list'] });
+      qc.invalidateQueries({ queryKey: ['trainer-dashboard'] });
+      qc.invalidateQueries({ queryKey: ['trainer-students'] });
+      qc.invalidateQueries({ queryKey: ['trainer-analytics'] });
     } catch {
       toast.error('Erro ao remover aluno');
     }
