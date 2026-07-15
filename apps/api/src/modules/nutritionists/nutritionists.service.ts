@@ -146,32 +146,38 @@ export class NutritionistsService {
 
     // Buscar meal logs dos últimos 7 dias para calcular adesão individual
     const studentIds = relations.map((r) => r.student.id);
-    const sevenDaysAgo = new Date(Date.now() - 7 * 86400000);
 
-    const dietPlans = await this.prisma.dietPlan.findMany({
-      where: { studentId: { in: studentIds }, isActive: true },
-      include: { diet: { include: { meals: true } } },
-    });
-
-    const planIds = dietPlans.map((p) => p.id);
-    const mealLogs = planIds.length > 0
-      ? await this.prisma.mealLog.findMany({
-          where: { dietPlanId: { in: planIds }, loggedAt: { gte: sevenDaysAgo } },
-          select: { dietPlanId: true, loggedAt: true },
-        })
-      : [];
-
-    // Calcular adesão por estudante
+    // Cálculo de adesão isolado — erro aqui não derruba a listagem de pacientes
     const logsByStudent: Record<string, { planned: number; logged: number }> = {};
-    for (const plan of dietPlans) {
-      const sid = plan.studentId;
-      if (!logsByStudent[sid]) logsByStudent[sid] = { planned: 0, logged: 0 };
-      logsByStudent[sid].planned += (plan.diet?.meals?.length ?? 0) * 7;
-    }
-    for (const log of mealLogs) {
-      const plan = dietPlans.find((p) => p.id === log.dietPlanId);
-      if (plan && logsByStudent[plan.studentId]) {
-        logsByStudent[plan.studentId].logged++;
+    if (studentIds.length > 0) {
+      try {
+        const sevenDaysAgo = new Date(Date.now() - 7 * 86400000);
+        const dietPlans = await this.prisma.dietPlan.findMany({
+          where: { studentId: { in: studentIds }, isActive: true },
+          include: { diet: { include: { meals: true } } },
+        });
+
+        const planIds = dietPlans.map((p) => p.id);
+        const mealLogs = planIds.length > 0
+          ? await this.prisma.mealLog.findMany({
+              where: { dietPlanId: { in: planIds }, loggedAt: { gte: sevenDaysAgo } },
+              select: { dietPlanId: true, loggedAt: true },
+            })
+          : [];
+
+        for (const plan of dietPlans) {
+          const sid = plan.studentId;
+          if (!logsByStudent[sid]) logsByStudent[sid] = { planned: 0, logged: 0 };
+          logsByStudent[sid].planned += (plan.diet?.meals?.length ?? 0) * 7;
+        }
+        for (const log of mealLogs) {
+          const plan = dietPlans.find((p) => p.id === log.dietPlanId);
+          if (plan && logsByStudent[plan.studentId]) {
+            logsByStudent[plan.studentId].logged++;
+          }
+        }
+      } catch (e) {
+        console.error('[getPatients] Erro no calculo de adesao:', e);
       }
     }
 
