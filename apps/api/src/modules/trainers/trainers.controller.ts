@@ -17,6 +17,12 @@ export class TrainersController {
     return this.service.getDashboard(user.id);
   }
 
+  @Get('me/students/search')
+  @ApiOperation({ summary: 'Buscar students por nome/email (para trainers)' })
+  searchStudents(@CurrentUser() user: any, @Query('q') q: string) {
+    return this.service.searchStudents(user.id, q || '');
+  }
+
   @Get('me/students/search-by-email')
   @ApiOperation({ summary: 'Buscar aluno por email no tenant (para evitar duplicacao)' })
   searchStudentByEmail(@CurrentUser() user: any, @Query('email') email: string) {
@@ -31,8 +37,8 @@ export class TrainersController {
 
   @Post('me/students')
   @ApiOperation({ summary: 'Adicionar aluno ao trainer' })
-  addStudent(@CurrentUser() user: any, @Body() body: { studentUserId: string; monthlyFee?: number }) {
-    return this.service.addStudent(user.id, body.studentUserId, body.monthlyFee);
+  addStudent(@CurrentUser() user: any, @Body() body: { studentUserId: string; monthlyFee?: number; goalType?: string }) {
+    return this.service.addStudent(user.id, body.studentUserId, body.monthlyFee, body.goalType);
   }
 
   @Delete('me/students/:studentId')

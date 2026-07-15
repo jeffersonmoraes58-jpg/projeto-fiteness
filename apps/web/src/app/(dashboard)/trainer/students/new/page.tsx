@@ -103,9 +103,9 @@ export default function NewStudentPage() {
   const debounceRef = useRef<NodeJS.Timeout>();
 
   const { data: results, isFetching } = useQuery({
-    queryKey: ['user-search', search],
+    queryKey: ['trainer-student-search', search],
     queryFn: () =>
-      api.get(`/admin/users?search=${encodeURIComponent(search)}&role=STUDENT`).then((r) => r.data.data?.users || []),
+      api.get(`/trainers/me/students/search?q=${encodeURIComponent(search)}`).then((r) => r.data.data || []),
     enabled: mode === 'search' && search.length >= 2,
   });
 
@@ -124,9 +124,14 @@ export default function NewStudentPage() {
 
   const quickLinkFromEmail = () => {
     if (!emailMatch) return;
-    setMode('search');
-    setSelected(emailMatch);
-    setSearch(emailMatch.email);
+    const uid = emailMatch.userId || emailMatch.id;
+    if (!uid) return;
+    setError('');
+    linkMutation.mutate({
+      studentUserId: uid,
+      monthlyFee: mensalidade ? Number(mensalidade) : undefined,
+      goalType: grupo,
+    });
   };
 
   const linkMutation = useMutation({
@@ -168,10 +173,10 @@ export default function NewStudentPage() {
       } catch (registerError: any) {
         const status = registerError?.response?.status;
         if (status === 409 || status === 400 || status === 422) {
-          const searchRes = await api.get(`/admin/users?search=${encodeURIComponent(data.email)}&role=STUDENT`);
-          const existing = (searchRes.data.data?.users || []).find((u: any) => u.email === data.email);
+          const searchRes = await api.get(`/trainers/me/students/search?q=${encodeURIComponent(data.email)}`);
+          const existing = (searchRes.data.data || []).find((u: any) => u.email === data.email);
           if (!existing) throw new Error('E-mail já cadastrado mas não foi possível localizar o aluno. Use "Buscar existente".');
-          userId = existing.id;
+          userId = existing.userId || existing.id;
           tempPassword = null;
           linked = true;
         } else {
@@ -233,7 +238,7 @@ export default function NewStudentPage() {
     const uid = selected.userId || selected.id;
     if (!uid) { setError('Erro: ID do aluno não encontrado'); return; }
     setError('');
-    linkMutation.mutate({ studentUserId: uid, monthlyFee: searchFee ? Number(searchFee) : undefined });
+    linkMutation.mutate({ studentUserId: uid, monthlyFee: searchFee ? Number(searchFee) : undefined, goalType: grupo });
   };
 
   const copyCredentials = () => {

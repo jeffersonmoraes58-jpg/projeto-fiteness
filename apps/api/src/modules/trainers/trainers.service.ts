@@ -160,6 +160,39 @@ export class TrainersService {
     });
   }
 
+  async searchStudents(userId: string, query: string) {
+    const trainer = await this.getTrainer(userId);
+    const q = query.trim().toLowerCase();
+    if (q.length < 2) return [];
+
+    const users = await this.prisma.user.findMany({
+      where: {
+        role: 'STUDENT',
+        OR: [
+          { email: { contains: q, mode: 'insensitive' } },
+          { profile: { firstName: { contains: q, mode: 'insensitive' } } },
+          { profile: { lastName: { contains: q, mode: 'insensitive' } } },
+        ],
+      },
+      include: { profile: true, student: true },
+      take: 20,
+    });
+
+    return users
+      .filter((u) => u.student)
+      .map((u) => ({
+        id: u.id,
+        userId: u.id,
+        studentId: u.student!.id,
+        email: u.email,
+        profile: {
+          firstName: u.profile?.firstName ?? '',
+          lastName: u.profile?.lastName ?? '',
+          avatarUrl: u.profile?.avatarUrl ?? null,
+        },
+      }));
+  }
+
   async searchStudentByEmail(userId: string, email: string) {
     const q = email.trim().toLowerCase();
     const user = await this.prisma.user.findFirst({
@@ -188,7 +221,7 @@ export class TrainersService {
     return { message: 'Aluno removido' };
   }
 
-  async addStudent(userId: string, studentUserId: string, monthlyFee?: number) {
+  async addStudent(userId: string, studentUserId: string, monthlyFee?: number, goalType?: string) {
     const trainer = await this.getTrainer(userId);
     const student = await this.prisma.student.findUnique({
       where: { userId: studentUserId },
@@ -204,11 +237,19 @@ export class TrainersService {
       await this.subscriptionService.checkStudentLimit(trainer.user.tenantId, trainer.id);
     }
 
-    return this.prisma.trainerStudent.upsert({
-      where: { trainerId_studentId: { trainerId: trainer.id, studentId: student.id } },
-      update: { isActive: true, monthlyFee },
-      create: { trainerId: trainer.id, studentId: student.id, monthlyFee, isActive: true },
-    });
+    await Promise.all([
+      this.prisma.trainerStudent.upsert({
+        where: { trainerId_studentId: { trainerId: trainer.id, studentId: student.id } },
+        update: { isActive: true, monthlyFee },
+        create: { trainerId: trainer.id, studentId: student.id, monthlyFee, isActive: true },
+      }),
+      goalType ? this.prisma.student.update({
+        where: { id: student.id },
+        data: { goalType: goalType as any },
+      }) : null,
+    ]);
+
+    return { message: 'Aluno adicionado', studentId: student.id };
   }
 
   async getAppointments(userId: string) {
