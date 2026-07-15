@@ -142,10 +142,12 @@ export class TrainersService {
   }
 
   async searchStudentByEmail(userId: string, email: string) {
-    const trainer = await this.getTrainer(userId);
     const q = email.trim().toLowerCase();
     const user = await this.prisma.user.findFirst({
-      where: { tenantId: trainer.user.tenantId, email: { equals: q, mode: 'insensitive' }, role: 'STUDENT' },
+      where: {
+        email: { equals: q, mode: 'insensitive' },
+        role: 'STUDENT'
+      },
       include: { profile: true, student: true },
     });
     if (!user || !user.student) return null;

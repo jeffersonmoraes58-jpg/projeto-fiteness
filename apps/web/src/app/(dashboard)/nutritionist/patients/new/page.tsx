@@ -58,11 +58,7 @@ export default function NewPatientPage() {
     onSuccess: (res) => {
       queryClient.invalidateQueries({ queryKey: ['nutritionist-patients-list'] });
       const data = res.data.data;
-      if (data.alreadyExisted) {
-        goToList();
-      } else {
-        setCreatedPatient(data);
-      }
+      setCreatedPatient({ ...data, alreadyExisted: data.alreadyExisted ?? false });
     },
     onError: (e: any) => setError(e.response?.data?.message || 'Erro ao criar paciente'),
   });
@@ -96,11 +92,28 @@ export default function NewPatientPage() {
       <div className="max-w-xl mx-auto space-y-6">
         <div className="glass-card text-center space-y-4">
           <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-emerald-600 to-teal-600 flex items-center justify-center mx-auto"><Check className="w-8 h-8 text-white" /></div>
-          <h2 className="text-xl font-bold">Paciente criado com sucesso!</h2>
-          <p className="text-sm text-muted-foreground">A conta de <strong>{createdPatient.profile?.firstName} {createdPatient.profile?.lastName}</strong> foi criada. Compartilhe as credenciais abaixo com o paciente.</p>
+          <h2 className="text-xl font-bold">
+            {createdPatient.alreadyExisted ? 'Paciente vinculado com sucesso!' : 'Paciente criado com sucesso!'}
+          </h2>
+          <p className="text-sm text-muted-foreground">
+            {createdPatient.alreadyExisted
+              ? <>O aluno <strong>{createdPatient.profile?.firstName} {createdPatient.profile?.lastName}</strong> já possuía cadastro no sistema e foi vinculado à sua lista de pacientes.</>
+              : <>A conta de <strong>{createdPatient.profile?.firstName} {createdPatient.profile?.lastName}</strong> foi criada. Compartilhe as credenciais abaixo com o paciente.</>
+            }
+          </p>
           <div className="glass rounded-xl p-4 text-left space-y-2">
             <div className="flex justify-between text-sm"><span className="text-muted-foreground">E-mail</span><span className="font-medium">{createdPatient.email}</span></div>
-            <div className="flex justify-between items-center text-sm"><span className="text-muted-foreground">Senha temporaria</span><div className="flex items-center gap-2"><span className="font-mono font-medium">{createdPatient.tempPassword}</span><button onClick={copyPassword} className="w-7 h-7 rounded-lg hover:bg-accent flex items-center justify-center transition-all">{copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5 text-muted-foreground" />}</button></div></div>
+            {!createdPatient.alreadyExisted && (
+              <div className="flex justify-between items-center text-sm">
+                <span className="text-muted-foreground">Senha temporaria</span>
+                <div className="flex items-center gap-2">
+                  <span className="font-mono font-medium">{createdPatient.tempPassword}</span>
+                  <button onClick={copyPassword} className="w-7 h-7 rounded-lg hover:bg-accent flex items-center justify-center transition-all">
+                    {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5 text-muted-foreground" />}
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
           <button onClick={goToList} className="btn-primary w-full">Ver lista de pacientes</button>
         </div>
@@ -144,7 +157,7 @@ export default function NewPatientPage() {
             <div><label className="text-sm font-medium mb-1.5 block">Mensalidade (R$)</label><input type="number" value={monthlyFee} onChange={(e) => setMonthlyFee(e.target.value)} placeholder="Ex: 200" className="input-field" min={0} /></div>
           </motion.div>
           {error && <div className="glass rounded-xl p-4 border border-red-500/20 text-red-400 text-sm">{error}</div>}
-          <div className="flex gap-3"><Link href="/nutritionist/patients" className="btn-secondary flex-1 text-center">Cancelar</Link><button type="submit" disabled={createMutation.isPending} className="btn-primary flex-1 flex items-center justify-center gap-2 disabled:opacity-50"><UserPlus className="w-4 h-4" />{createMutation.isPending ? 'Criando...' : 'Criar paciente'}</button></div>
+          <div className="flex gap-3"><Link href="/nutritionist/patients" className="btn-secondary flex-1 text-center">Cancelar</Link><button type="submit" disabled={createMutation.isPending || !!emailMatch} title={emailMatch ? 'Use o botão "Vincular este aluno" acima' : undefined} className="btn-primary flex-1 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"><UserPlus className="w-4 h-4" />{createMutation.isPending ? 'Criando...' : 'Criar paciente'}</button></div>
         </form>
       ) : (
         <form onSubmit={handleLink} className="space-y-6">
