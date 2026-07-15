@@ -236,6 +236,19 @@ export default function TrainerWorkouts() {
     mutationFn: async (template: WorkoutTemplate) => {
       const exercisesRes = await api.get('/exercises');
       const allExercises: any[] = exercisesRes.data.data || [];
+
+      const isCloudinary = (url?: string) => !!url && url.includes('cloudinary.com');
+      const scoreEx = (e: any) => (isCloudinary(e.gifUrl) ? 3 : isCloudinary(e.videoUrl) ? 2 : e.gifUrl || e.videoUrl ? 1 : 0);
+      const findBest = (name: string) => {
+        const nl = name.toLowerCase();
+        const exact = allExercises.filter((e: any) => e.name.toLowerCase() === nl);
+        const partial = allExercises.filter((e: any) =>
+          e.name.toLowerCase().includes(nl) || nl.includes(e.name.toLowerCase()),
+        );
+        const pool = exact.length > 0 ? exact : partial;
+        return pool.sort((a: any, b: any) => scoreEx(b) - scoreEx(a))[0] ?? null;
+      };
+
       const createRes = await api.post('/workouts', {
         name: template.name,
         description: template.description,
@@ -246,17 +259,20 @@ export default function TrainerWorkouts() {
       });
       const workoutId = createRes.data.data?.id;
       if (!workoutId) throw new Error('Falha ao criar treino');
+
+      let matched = 0;
       const exercises = template.exercises.flatMap((te) => {
-        const ex = allExercises.find((e: any) => e.name.toLowerCase() === te.name.toLowerCase());
+        const ex = findBest(te.name);
         if (!ex) return [];
+        matched++;
         return [{ exerciseId: ex.id, sets: te.sets, reps: te.reps, restSeconds: te.restSeconds }];
       });
       if (exercises.length > 0) await api.patch(`/workouts/${workoutId}`, { exercises });
-      return workoutId;
+      return { workoutId, matched, total: template.exercises.length };
     },
-    onSuccess: (workoutId) => {
+    onSuccess: ({ workoutId, matched, total }) => {
       queryClient.invalidateQueries({ queryKey: ['trainer-workouts'] });
-      toast.success('Treino criado a partir do template!');
+      toast.success(`Treino criado! ${matched}/${total} exercícios vinculados.`);
       setUsingTemplateId(null);
       router.push(`/trainer/workouts/${workoutId}`);
     },

@@ -5,8 +5,9 @@ import { motion } from 'framer-motion';
 import {
   Dumbbell, ChevronLeft, Clock, Layers, Zap, Users, UserCheck,
   Plus, Trash2, Search, Save, CheckCircle, Video,
-  Link2, Unlink, ExternalLink, ChevronRight,
+  Link2, Unlink, ExternalLink, ChevronRight, Sparkles,
 } from 'lucide-react';
+import toast from 'react-hot-toast';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -210,6 +211,52 @@ export default function WorkoutDetailPage() {
   };
 
   const [addingGifId, setAddingGifId] = useState<string | null>(null);
+  const [autoLinking, setAutoLinking] = useState(false);
+
+  const handleAutoLink = useCallback(async () => {
+    setAutoLinking(true);
+    try {
+      const res = await api.get('/exercises');
+      const allEx: any[] = res.data.data || [];
+      const isCloudinary = (url?: string) => !!url && url.includes('cloudinary.com');
+      const scoreEx = (e: any) => (isCloudinary(e.gifUrl) ? 3 : isCloudinary(e.videoUrl) ? 2 : 0);
+      const findBestWithMedia = (exerciseId: string, name: string) => {
+        const byId = allEx.find(e => e.id === exerciseId);
+        if (byId && (isCloudinary(byId.gifUrl) || isCloudinary(byId.videoUrl))) return byId;
+        const nl = name.toLowerCase();
+        const pool = allEx.filter(e =>
+          e.name.toLowerCase() === nl ||
+          e.name.toLowerCase().includes(nl) ||
+          nl.includes(e.name.toLowerCase()),
+        );
+        return pool.sort((a, b) => scoreEx(b) - scoreEx(a))[0] ?? null;
+      };
+      let linked = 0;
+      setExerciseRows(prev => prev.map(row => {
+        const match = findBestWithMedia(row.exerciseId, row.name);
+        if (!match) return row;
+        const bestUrl = match.gifUrl && isCloudinary(match.gifUrl)
+          ? match.gifUrl
+          : match.videoUrl && isCloudinary(match.videoUrl)
+            ? match.videoUrl
+            : null;
+        if (bestUrl && bestUrl !== row.videoUrl) {
+          linked++;
+          return { ...row, videoUrl: bestUrl };
+        }
+        return row;
+      }));
+      if (linked > 0) {
+        toast.success(`${linked} exercício${linked > 1 ? 's' : ''} vinculado${linked > 1 ? 's' : ''} com mídia da galeria!`);
+      } else {
+        toast('Nenhuma mídia interna nova encontrada para os exercícios atuais.', { icon: 'ℹ️' });
+      }
+    } catch {
+      toast.error('Erro ao buscar exercícios da galeria.');
+    } finally {
+      setAutoLinking(false);
+    }
+  }, []);
 
   const addExercise = useCallback(
     (ex: any) => {
@@ -370,15 +417,28 @@ export default function WorkoutDetailPage() {
 
       {/* Exercise editor */}
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="glass-card space-y-4">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-2 flex-wrap">
           <h2 className="font-semibold flex items-center gap-2">
             <Layers className="w-4 h-4 text-muted-foreground" />
             Exercícios ({exerciseRows.length})
           </h2>
-          <button onClick={() => saveExercisesMutation.mutate(exerciseRows)} disabled={saveExercisesMutation.isPending} className="btn-primary text-xs px-3 py-1.5 flex items-center gap-1.5 disabled:opacity-50">
-            {saveExSuccess ? <CheckCircle className="w-3.5 h-3.5" /> : <Save className="w-3.5 h-3.5" />}
-            {saveExercisesMutation.isPending ? 'Salvando...' : saveExSuccess ? 'Salvo!' : 'Salvar exercícios'}
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleAutoLink}
+              disabled={autoLinking || exerciseRows.length === 0}
+              title="Vincular GIFs e vídeos internos do app nos exercícios deste treino"
+              className="text-xs px-3 py-1.5 flex items-center gap-1.5 rounded-xl border border-violet-500/40 bg-violet-500/10 hover:bg-violet-500/20 text-violet-400 font-medium transition-all disabled:opacity-40"
+            >
+              {autoLinking
+                ? <span className="w-3.5 h-3.5 border-2 border-violet-400 border-t-transparent rounded-full animate-spin" />
+                : <Sparkles className="w-3.5 h-3.5" />}
+              {autoLinking ? 'Vinculando...' : 'Vincular GIFs'}
+            </button>
+            <button onClick={() => saveExercisesMutation.mutate(exerciseRows)} disabled={saveExercisesMutation.isPending} className="btn-primary text-xs px-3 py-1.5 flex items-center gap-1.5 disabled:opacity-50">
+              {saveExSuccess ? <CheckCircle className="w-3.5 h-3.5" /> : <Save className="w-3.5 h-3.5" />}
+              {saveExercisesMutation.isPending ? 'Salvando...' : saveExSuccess ? 'Salvo!' : 'Salvar exercícios'}
+            </button>
+          </div>
         </div>
 
         {/* Source filter buttons */}
