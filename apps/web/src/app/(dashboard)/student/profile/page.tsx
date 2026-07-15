@@ -176,7 +176,7 @@ export default function StudentProfile() {
               Cancelar
             </button>
             <button
-              onClick={() => updateMutation.mutate({ profile: form })}
+              onClick={() => updateMutation.mutate(form)}
               disabled={updateMutation.isPending}
               className="btn-primary flex items-center gap-2 text-sm py-2"
             >
