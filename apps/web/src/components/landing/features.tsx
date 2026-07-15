@@ -3,9 +3,9 @@
 import { motion } from 'framer-motion';
 import {
   Dumbbell, Apple, Brain, BarChart3, MessageCircle, Trophy,
-  Bell, CreditCard, Calendar, FileDown, Activity, Music,
+  Bell, CreditCard, Calendar, FileDown, Activity, Music, Zap,
 } from 'lucide-react';
-import { Zap } from 'lucide-react';
+
 
 const features = [
   {
