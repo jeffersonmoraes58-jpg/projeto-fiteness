@@ -367,7 +367,7 @@ Responda perguntas do personal trainer sobre este aluno de forma precisa e basea
       {/* Student selector */}
       <div className="glass-card">
         <h2 className="text-sm font-semibold mb-3">Selecionar aluno para análise</h2>
-        <div className="flex gap-3">
+        <div className="flex flex-col sm:flex-row gap-3">
           <select
             value={selectedStudent}
             onChange={(e) => { setSelectedStudent(e.target.value); setAnalysis(null); }}
@@ -384,7 +384,7 @@ Responda perguntas do personal trainer sobre este aluno de forma precisa e basea
             onClick={handleAnalyze}
             disabled={!selectedStudent || analyzeMutation.isPending}
             className={cn(
-              'flex items-center gap-2 px-5 py-2 rounded-xl text-sm font-medium transition-all whitespace-nowrap',
+              'flex items-center justify-center gap-2 px-5 py-2 rounded-xl text-sm font-medium transition-all whitespace-nowrap sm:w-auto w-full',
               selectedStudent && !analyzeMutation.isPending
                 ? 'bg-primary hover:bg-primary/80 text-primary-foreground'
                 : 'bg-muted text-muted-foreground cursor-not-allowed',
