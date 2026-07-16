@@ -419,23 +419,73 @@ export class AdminService {
 
     if (!user) throw new NotFoundException('Usuário não encontrado');
 
-    // Remove vínculos TrainerStudent e NutritionistPatient que não têm
-    // onDelete: Cascade no schema e sobrevivem à deleção do User.
+    // 1. Limpar dependências RESTRICT do Student
     if (user.student) {
+      const sid = user.student.id;
       await Promise.all([
-        this.prisma.trainerStudent.deleteMany({ where: { studentId: user.student.id } }),
-        this.prisma.nutritionistPatient.deleteMany({ where: { studentId: user.student.id } }),
+        this.prisma.trainerStudent.deleteMany({ where: { studentId: sid } }),
+        this.prisma.nutritionistPatient.deleteMany({ where: { studentId: sid } }),
+        this.prisma.workoutPlan.deleteMany({ where: { studentId: sid } }),
+        this.prisma.workoutLog.deleteMany({ where: { studentId: sid } }),
+        this.prisma.mealLog.deleteMany({ where: { studentId: sid } }),
+        this.prisma.dietPlan.deleteMany({ where: { studentId: sid } }),
+        this.prisma.nutritionalAssessment.deleteMany({ where: { studentId: sid } }),
+        this.prisma.physicalAssessment.deleteMany({ where: { studentId: sid } }),
+        this.prisma.studentChallenge.deleteMany({ where: { studentId: sid } }),
       ]);
     }
 
-    // Desabilita temporariamente todas as FKs para permitir a deleção
-    await this.prisma.$executeRaw`SET session_replication_role = 'replica'`;
+    // 2. Limpar dependências RESTRICT do Trainer
+    if (user.trainer) {
+      const tid = user.trainer.id;
 
-    try {
-      await this.prisma.user.delete({ where: { id } });
-    } finally {
-      await this.prisma.$executeRaw`SET session_replication_role = 'origin'`;
+      // Workout → WorkoutExercise → WorkoutExerciseLog (cadeia RESTRICT)
+      const trainerWorkouts = await this.prisma.workout.findMany({
+        where: { trainerId: tid },
+        select: { id: true },
+      });
+      if (trainerWorkouts.length > 0) {
+        const wIds = trainerWorkouts.map((w) => w.id);
+        const wExercises = await this.prisma.workoutExercise.findMany({
+          where: { workoutId: { in: wIds } },
+          select: { id: true },
+        });
+        if (wExercises.length > 0) {
+          await this.prisma.workoutExerciseLog.deleteMany({
+            where: { workoutExerciseId: { in: wExercises.map((e) => e.id) } },
+          });
+        }
+        await this.prisma.workout.deleteMany({ where: { trainerId: tid } });
+      }
+
+      await Promise.all([
+        this.prisma.trainerStudent.deleteMany({ where: { trainerId: tid } }),
+        this.prisma.appointment.deleteMany({ where: { trainerId: tid } }),
+        this.prisma.studentBilling.deleteMany({ where: { trainerId: tid } }),
+      ]);
     }
+
+    // 3. Limpar dependências RESTRICT do Nutritionist
+    if (user.nutritionist) {
+      const nid = user.nutritionist.id;
+      await Promise.all([
+        this.prisma.nutritionistPatient.deleteMany({ where: { nutritionistId: nid } }),
+        this.prisma.diet.deleteMany({ where: { nutritionistId: nid } }),
+        this.prisma.nutritionalConsultation.deleteMany({ where: { nutritionistId: nid } }),
+        this.prisma.clinicalNote.deleteMany({ where: { nutritionistId: nid } }),
+        this.prisma.supplementationPlan.deleteMany({ where: { nutritionistId: nid } }),
+        this.prisma.patientExam.deleteMany({ where: { nutritionistId: nid } }),
+      ]);
+    }
+
+    // 4. Limpar dependências RESTRICT do User
+    await Promise.all([
+      this.prisma.chatParticipant.deleteMany({ where: { userId: id } }),
+      this.prisma.message.deleteMany({ where: { senderId: id } }),
+    ]);
+
+    // 5. Deletar User (cascade → Student, Trainer, Nutritionist, Profile, RefreshToken, DeviceToken, Notification)
+    await this.prisma.user.delete({ where: { id } });
 
     return { message: 'Usuário excluído com sucesso', email: user.email };
   }
