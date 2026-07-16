@@ -61,13 +61,14 @@ function getYouTubeId(rawUrl: string): string | null {
   return m ? m[1] : null;
 }
 
-function getEmbedInfo(rawUrl: string): { embedUrl: string; type: 'youtube' | 'vimeo' | 'direct' } | null {
+function getEmbedInfo(rawUrl: string): { embedUrl: string; type: 'youtube' | 'vimeo' | 'direct' | 'gif' } | null {
   if (!rawUrl) return null;
   const url = resolveVideoUrl(rawUrl);
   const ytId = getYouTubeId(url);
   if (ytId) return { type: 'youtube', embedUrl: `https://www.youtube-nocookie.com/embed/${ytId}?rel=0&modestbranding=1&autoplay=1` };
   const vimeoMatch = url.match(/(?:vimeo\.com\/)(\d+)/);
   if (vimeoMatch) return { type: 'vimeo', embedUrl: `https://player.vimeo.com/video/${vimeoMatch[1]}?title=0&byline=0&autoplay=1` };
+  if (/\.gif(\?|$)/i.test(url)) return { type: 'gif', embedUrl: url };
   if (/\.(mp4|webm|ogg)(\?|$)/i.test(url)) return { type: 'direct', embedUrl: url };
   if (url.includes('/musclewiki/stream/')) return { type: 'direct', embedUrl: url };
   return null;
@@ -134,8 +135,15 @@ function VideoModal({ url, title, onClose }: { url: string; title: string; onClo
               </button>
             </div>
           </div>
-          <div className="relative aspect-video">
-            {info?.type === 'direct' ? (
+          <div className="relative aspect-video bg-black">
+            {info?.type === 'gif' ? (
+              <img
+                src={info.embedUrl}
+                alt={title}
+                className="w-full h-full object-contain"
+                loading="lazy"
+              />
+            ) : info?.type === 'direct' ? (
               <>
                 {videoError ? (
                   <div className="flex flex-col items-center justify-center h-full text-muted-foreground text-sm gap-3">
