@@ -151,7 +151,7 @@ export default function NutritionistAIToolbox() {
 
   const toolMutation = useMutation({
     mutationFn: ({ tool, patientId, params }: { tool: string; patientId?: string; params?: any }) =>
-      api.post('/ai/nutrition-tool', { tool, patientId, params }).then((r) => r.data.data),
+      api.post('/ai/nutrition-tool', { tool, patientId, params }, { timeout: 120000 }).then((r) => r.data.data),
     onSuccess: (data) => setToolResult(data),
   });
 

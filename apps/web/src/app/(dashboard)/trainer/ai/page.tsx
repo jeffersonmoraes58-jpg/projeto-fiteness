@@ -405,8 +405,7 @@ Responda perguntas do personal trainer sobre este aluno de forma precisa e basea
         )}
         {analyzeMutation.isError && (
           <p className="text-xs text-red-400 mt-3">
-            {(analyzeMutation.error as any)?.response?.data?.message
-              || (analyzeMutation.error as any)?.message
+            {(analyzeMutation.error as any)?.message
               || 'Erro ao analisar. Tente novamente.'}
           </p>
         )}

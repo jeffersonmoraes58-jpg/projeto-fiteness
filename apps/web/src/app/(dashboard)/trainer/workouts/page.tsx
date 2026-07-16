@@ -229,16 +229,18 @@ export default function TrainerWorkouts() {
 
   const generateAiMutation = useMutation({
     mutationFn: (description: string) =>
-      api.post('/ai/generate-workout', { description }).then((r) => r.data?.data ?? r.data),
+      api.post('/ai/generate-workout', { description }, { timeout: 120000 }).then((r) => r.data?.data ?? r.data),
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['trainer-workouts'] });
       setAiResult(data);
     },
     onError: (err: any) => {
-      const status = err?.response?.status;
+      const status = err?.statusCode || err?.response?.status;
       if (status === 429) toast.error('Limite de requisições da IA atingido. Aguarde 1 minuto e tente novamente.');
-      else if (status === 401 || status === 403) toast.error('Chave da API de IA inválida. Verifique a configuração.');
-      else toast.error('Erro ao gerar treino. Tente novamente.');
+      else if (status === 401 || status === 403) {
+        const msg = err?.message || 'A funcionalidade AI não está disponível no seu plano atual.';
+        toast.error(msg.includes('plano') ? msg : 'Acesso negado. Verifique seu plano de assinatura.');
+      } else toast.error('Erro ao gerar treino. Tente novamente.');
     },
   });
 
