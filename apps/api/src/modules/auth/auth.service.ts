@@ -330,6 +330,61 @@ export class AuthService {
     }
   }
 
+  async checkInviteEmail(email: string) {
+    const user = await this.prisma.user.findFirst({
+      where: { email: email.trim().toLowerCase() },
+      select: { id: true, email: true },
+    });
+    return { exists: !!user, email: email.trim().toLowerCase() };
+  }
+
+  async linkExistingStudent(email: string, password: string, inviteToken: string) {
+    const payload = await this.jwtService.verifyAsync(inviteToken, {
+      secret: this.config.get('JWT_SECRET'),
+    });
+    if (payload.type !== 'student-invite') {
+      throw new BadRequestException('Token de convite inválido');
+    }
+
+    const user = await this.prisma.user.findFirst({
+      where: { email: email.trim().toLowerCase() },
+      include: { profile: true, student: true },
+    });
+    if (!user || !user.password) {
+      throw new UnauthorizedException('Credenciais inválidas');
+    }
+
+    const isPasswordValid = await bcrypt.compare(password, user.password);
+    if (!isPasswordValid) {
+      throw new UnauthorizedException('Credenciais inválidas');
+    }
+
+    if (!user.student) {
+      throw new NotFoundException('Conta não possui perfil de aluno');
+    }
+
+    const trainerId = payload.sub as string;
+
+    const existing = await this.prisma.trainerStudent.findUnique({
+      where: { trainerId_studentId: { trainerId, studentId: user.student.id } },
+    });
+
+    if (existing?.isActive) {
+      return { alreadyLinked: true, user: this.sanitizeUser(user) };
+    }
+
+    await this.prisma.trainerStudent.upsert({
+      where: { trainerId_studentId: { trainerId, studentId: user.student.id } },
+      update: { isActive: true },
+      create: { trainerId, studentId: user.student.id, isActive: true },
+    });
+
+    const tokens = await this.generateTokens(user.id, user.email, user.role, user.tenantId);
+    await this.saveRefreshToken(user.id, tokens.refreshToken);
+
+    return { alreadyLinked: false, user: this.sanitizeUser(user), ...tokens };
+  }
+
   async adminResetPassword(email: string, newPassword: string, adminKey: string) {
     const expectedKey = this.config.get('ADMIN_RESET_KEY', 'FitlyReset@2026');
     if (adminKey !== expectedKey) {

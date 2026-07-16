@@ -126,6 +126,22 @@ export class AuthController {
     return this.authService.validateInviteToken(token);
   }
 
+  @Public()
+  @Post('invite/check-email')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Verificar se email já existe (público)' })
+  async checkInviteEmail(@Body() body: { email: string }) {
+    return this.authService.checkInviteEmail(body.email);
+  }
+
+  @Public()
+  @Post('invite/link-existing')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Vincular conta existente ao trainer via convite (público)' })
+  async linkExistingStudent(@Body() body: { email: string; password: string; inviteToken: string }) {
+    return this.authService.linkExistingStudent(body.email, body.password, body.inviteToken);
+  }
+
   @Patch('change-password')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
