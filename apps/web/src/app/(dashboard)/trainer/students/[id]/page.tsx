@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Users, ChevronLeft, Flame, Dumbbell, Star, Calendar,
@@ -8,7 +8,8 @@ import {
   Clock, Zap, ChevronRight, ClipboardList, TrendingUp,
   Heart, Activity, Moon, Brain, Target, Info,
   Plus, X, Search, Pencil, Scale, Save, Mail, Share2, Send,
-  FileText, Download,
+  FileText, Download, Camera, Upload, ChevronDown, Smile,
+  Minus,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
@@ -51,8 +52,6 @@ export default function StudentDetailPage() {
   const [tab, setTab] = useState('treinos');
   const [editingPlan, setEditingPlan] = useState<any | null>(null);
   const [showAssessForm, setShowAssessForm] = useState(false);
-  const EMPTY_ASSESS = { weight: '', height: '', bodyFatPercent: '', muscleMassKg: '', waistCm: '', hipCm: '', chestCm: '', rightArmCm: '', rightThighCm: '' };
-  const [assessForm, setAssessForm] = useState({ ...EMPTY_ASSESS });
 
   const { data: students, isLoading } = useQuery({
     queryKey: ['trainer-students'],
@@ -83,36 +82,10 @@ export default function StudentDetailPage() {
     onSuccess: () => {
       refetchProgress();
       setShowAssessForm(false);
-      setAssessForm({ ...EMPTY_ASSESS });
       toast.success('Avaliação registrada!');
     },
     onError: () => toast.error('Erro ao salvar avaliação'),
   });
-
-  function handleAssessSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!assessForm.weight || !assessForm.height) {
-      toast.error('Peso e altura são obrigatórios');
-      return;
-    }
-    const w = Number(assessForm.weight);
-    const h = Number(assessForm.height);
-    const bmi = Number((w / ((h / 100) ** 2)).toFixed(1));
-    const num = (v: string) => (v !== '' ? Number(v) : undefined);
-    assessMutation.mutate({
-      studentUserId: student!.userId,
-      weight: w,
-      height: h,
-      bmi,
-      bodyFatPercent: num(assessForm.bodyFatPercent),
-      muscleMassKg: num(assessForm.muscleMassKg),
-      waistCm: num(assessForm.waistCm),
-      hipCm: num(assessForm.hipCm),
-      chestCm: num(assessForm.chestCm),
-      rightArmCm: num(assessForm.rightArmCm),
-      rightThighCm: num(assessForm.rightThighCm),
-    });
-  }
 
   const removePlanMutation = useMutation({
     mutationFn: (planId: string) => api.delete(`/workouts/plans/${planId}`),
@@ -508,80 +481,21 @@ export default function StudentDetailPage() {
         {tab === 'evolucao' && (
           <motion.div key="evolucao" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 8 }} className="space-y-4">
 
-            {/* Assessment form */}
-            {showAssessForm && (
-              <form onSubmit={handleAssessSubmit} className="glass-card border border-primary/20 space-y-4">
-                <div className="flex items-center justify-between">
-                  <h2 className="font-semibold flex items-center gap-2">
-                    <Scale className="w-4 h-4 text-emerald-400" />
-                    Nova Avaliação Física
-                  </h2>
-                  <button type="button" onClick={() => setShowAssessForm(false)} className="w-7 h-7 rounded-lg hover:bg-accent flex items-center justify-center">
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-xs text-muted-foreground mb-1 block">Peso (kg) *</label>
-                    <input type="number" step="0.1" min="1" value={assessForm.weight} onChange={(e) => setAssessForm({ ...assessForm, weight: e.target.value })} className="input-field text-sm py-1.5" placeholder="Ex: 75.5" required />
-                  </div>
-                  <div>
-                    <label className="text-xs text-muted-foreground mb-1 block">Altura (cm) *</label>
-                    <input type="number" step="0.1" min="100" value={assessForm.height} onChange={(e) => setAssessForm({ ...assessForm, height: e.target.value })} className="input-field text-sm py-1.5" placeholder="Ex: 175" required />
-                  </div>
-                  <div>
-                    <label className="text-xs text-muted-foreground mb-1 block">Gordura (%)</label>
-                    <input type="number" step="0.1" min="0" value={assessForm.bodyFatPercent} onChange={(e) => setAssessForm({ ...assessForm, bodyFatPercent: e.target.value })} className="input-field text-sm py-1.5" placeholder="Ex: 18.5" />
-                  </div>
-                  <div>
-                    <label className="text-xs text-muted-foreground mb-1 block">Massa muscular (kg)</label>
-                    <input type="number" step="0.1" min="0" value={assessForm.muscleMassKg} onChange={(e) => setAssessForm({ ...assessForm, muscleMassKg: e.target.value })} className="input-field text-sm py-1.5" placeholder="Ex: 35" />
-                  </div>
-                  <div>
-                    <label className="text-xs text-muted-foreground mb-1 block">Cintura (cm)</label>
-                    <input type="number" step="0.1" min="0" value={assessForm.waistCm} onChange={(e) => setAssessForm({ ...assessForm, waistCm: e.target.value })} className="input-field text-sm py-1.5" placeholder="Ex: 82" />
-                  </div>
-                  <div>
-                    <label className="text-xs text-muted-foreground mb-1 block">Quadril (cm)</label>
-                    <input type="number" step="0.1" min="0" value={assessForm.hipCm} onChange={(e) => setAssessForm({ ...assessForm, hipCm: e.target.value })} className="input-field text-sm py-1.5" placeholder="Ex: 95" />
-                  </div>
-                  <div>
-                    <label className="text-xs text-muted-foreground mb-1 block">Peito (cm)</label>
-                    <input type="number" step="0.1" min="0" value={assessForm.chestCm} onChange={(e) => setAssessForm({ ...assessForm, chestCm: e.target.value })} className="input-field text-sm py-1.5" placeholder="Ex: 100" />
-                  </div>
-                  <div>
-                    <label className="text-xs text-muted-foreground mb-1 block">Braço D. (cm)</label>
-                    <input type="number" step="0.1" min="0" value={assessForm.rightArmCm} onChange={(e) => setAssessForm({ ...assessForm, rightArmCm: e.target.value })} className="input-field text-sm py-1.5" placeholder="Ex: 35" />
-                  </div>
-                  <div>
-                    <label className="text-xs text-muted-foreground mb-1 block">Coxa D. (cm)</label>
-                    <input type="number" step="0.1" min="0" value={assessForm.rightThighCm} onChange={(e) => setAssessForm({ ...assessForm, rightThighCm: e.target.value })} className="input-field text-sm py-1.5" placeholder="Ex: 55" />
-                  </div>
-                  {assessForm.weight && assessForm.height && (
-                    <div className="col-span-2 glass rounded-xl p-3 text-sm">
-                      <span className="text-muted-foreground">IMC calculado: </span>
-                      <span className="font-bold text-primary">
-                        {(Number(assessForm.weight) / ((Number(assessForm.height) / 100) ** 2)).toFixed(1)}
-                      </span>
-                    </div>
-                  )}
-                </div>
-                <div className="flex gap-3">
-                  <button type="button" onClick={() => setShowAssessForm(false)} className="btn-secondary flex-1 text-sm py-2">Cancelar</button>
-                  <button type="submit" disabled={assessMutation.isPending} className="btn-primary flex-1 text-sm py-2 flex items-center justify-center gap-2 disabled:opacity-50">
-                    <Save className="w-4 h-4" />
-                    {assessMutation.isPending ? 'Salvando...' : 'Salvar avaliação'}
-                  </button>
-                </div>
-              </form>
-            )}
+            {/* ─── Quick Check-in ─── */}
+            <QuickCheckIn
+              studentUserId={student.userId}
+              onSuccess={() => refetchProgress()}
+            />
 
-            {/* Physical assessments */}
+            {/* ─── Performance (workout stats) ─── */}
+            <PerformanceStats studentUserId={student.userId} />
+
+            {/* ─── Physical assessments ─── */}
             <div className="glass-card">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="font-semibold flex items-center gap-2">
                   <Scale className="w-4 h-4 text-emerald-400" />
-                  Avaliações físicas
+                  Avaliação física completa
                 </h2>
                 {!showAssessForm && (
                   <button
@@ -592,15 +506,26 @@ export default function StudentDetailPage() {
                   </button>
                 )}
               </div>
-              {physicalAssessments.length === 0 ? (
+              {!showAssessForm && physicalAssessments.length === 0 && (
                 <div className="text-center py-8 text-muted-foreground">
                   <Scale className="w-10 h-10 mx-auto mb-2 opacity-30" />
-                  <p className="text-sm">Nenhuma avaliação registrada ainda.</p>
-                  <button onClick={() => setShowAssessForm(true)} className="text-xs text-primary hover:underline mt-1">
+                  <p className="text-sm">Nenhuma avaliação completa registrada.</p>
+                  <p className="text-xs mt-1">Use a avaliação completa para registrar medidas detalhadas (cintura, quadril, etc.).</p>
+                  <button onClick={() => setShowAssessForm(true)} className="text-xs text-primary hover:underline mt-2">
                     + Adicionar primeira avaliação
                   </button>
                 </div>
-              ) : (
+              )}
+              {showAssessForm && (
+                <AssessForm
+                  student={student}
+                  isPending={assessMutation.isPending}
+                  onSubmit={(data) => assessMutation.mutate(data)}
+                  onCancel={() => setShowAssessForm(false)}
+                  defaultHeight={String(physicalAssessments[0]?.height || '')}
+                />
+              )}
+              {!showAssessForm && physicalAssessments.length > 0 && (
                 <div className="space-y-3">
                   {physicalAssessments.map((a: any, i: number) => (
                     <div key={a.id} className="glass rounded-xl p-3">
@@ -616,38 +541,15 @@ export default function StudentDetailPage() {
                         {a.waistCm && <div className="text-center"><div className="text-sm font-bold">{a.waistCm}cm</div><div className="text-xs text-muted-foreground">Cintura</div></div>}
                         {a.hipCm && <div className="text-center"><div className="text-sm font-bold">{a.hipCm}cm</div><div className="text-xs text-muted-foreground">Quadril</div></div>}
                       </div>
+                      {a.notes && <p className="text-xs text-muted-foreground mt-2 italic">"{a.notes}"</p>}
                     </div>
                   ))}
                 </div>
               )}
             </div>
 
-            {/* Body measurements (student self-logged) */}
-            <div className="glass-card">
-              <h2 className="font-semibold flex items-center gap-2 mb-4">
-                <TrendingUp className="w-4 h-4 text-blue-400" />
-                Medidas registradas pelo aluno
-              </h2>
-              {measurements.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground">
-                  <TrendingUp className="w-10 h-10 mx-auto mb-2 opacity-30" />
-                  <p className="text-sm">O aluno ainda não registrou medidas.</p>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {measurements.slice(0, 10).map((m: any) => (
-                    <div key={m.id} className="glass rounded-xl p-3">
-                      <div className="text-xs text-muted-foreground mb-2">{new Date(m.measuredAt).toLocaleDateString('pt-BR')}</div>
-                      <div className="grid grid-cols-3 gap-2">
-                        {m.weight && <div className="text-center"><div className="text-sm font-bold">{m.weight}kg</div><div className="text-xs text-muted-foreground">Peso</div></div>}
-                        {m.bodyFat && <div className="text-center"><div className="text-sm font-bold">{m.bodyFat}%</div><div className="text-xs text-muted-foreground">Gordura</div></div>}
-                        {m.muscleMass && <div className="text-center"><div className="text-sm font-bold">{m.muscleMass}kg</div><div className="text-xs text-muted-foreground">Massa muscular</div></div>}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
+            {/* ─── Check-in history (quick logs from measurements) ─── */}
+            <CheckInHistory measurements={measurements} photos={progressPhotos} />
           </motion.div>
         )}
       </AnimatePresence>
@@ -655,6 +557,487 @@ export default function StudentDetailPage() {
   );
 }
 
+/* ═══════════════════════════════════════════════════
+   Quick Check-in — peso + humor + notas (30s)
+   ═══════════════════════════════════════════════════ */
+function QuickCheckIn({ studentUserId, onSuccess }: { studentUserId: string; onSuccess: () => void }) {
+  const [open, setOpen] = useState(false);
+  const [weight, setWeight] = useState('');
+  const [feeling, setFeeling] = useState(7);
+  const [notes, setNotes] = useState('');
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const mutation = useMutation({
+    mutationFn: async () => {
+      let photoUrl: string | undefined;
+      if (photoFile) {
+        const fd = new FormData();
+        fd.append('file', photoFile);
+        const { data } = await api.post('/uploads/progress-photo', fd, { headers: { 'Content-Type': 'multipart/form-data' } });
+        photoUrl = data?.data?.url || data?.url;
+        if (photoUrl) {
+          await api.post('/progress/photos', { photoUrl, angle: 'frontal' });
+        }
+      }
+      const payload: any = { feeling, notes: notes || undefined };
+      if (weight) payload.weight = Number(weight);
+      await api.post('/progress/measurements', payload);
+    },
+    onSuccess: () => {
+      toast.success('Check-in registrado!');
+      setWeight(''); setFeeling(7); setNotes(''); setPhotoFile(null); setPhotoPreview(null);
+      setOpen(false);
+      onSuccess();
+    },
+    onError: () => toast.error('Erro ao salvar check-in'),
+  });
+
+  function handlePhoto(f: File) {
+    setPhotoFile(f);
+    const reader = new FileReader();
+    reader.onload = (e) => setPhotoPreview(e.target?.result as string);
+    reader.readAsDataURL(f);
+  }
+
+  const feelingColor = feeling <= 3 ? 'text-red-400' : feeling <= 5 ? 'text-orange-400' : feeling <= 7 ? 'text-yellow-400' : 'text-emerald-400';
+  const feelingLabel = feeling <= 2 ? 'Muito mal' : feeling <= 4 ? 'Mal' : feeling <= 5 ? 'Neutro' : feeling <= 7 ? 'Bem' : feeling <= 9 ? 'Muito bem' : 'Excelente';
+
+  return (
+    <div className="glass-card">
+      {!open ? (
+        <button onClick={() => setOpen(true)} className="w-full flex items-center justify-between group">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500/20 to-teal-500/20 border border-emerald-500/20 flex items-center justify-center">
+              <Smile className="w-5 h-5 text-emerald-400" />
+            </div>
+            <div className="text-left">
+              <div className="text-sm font-semibold">Check-in rápido</div>
+              <div className="text-xs text-muted-foreground">Registrar peso, humor e notas — 30 segundos</div>
+            </div>
+          </div>
+          <Plus className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
+        </button>
+      ) : (
+        <form onSubmit={(e) => { e.preventDefault(); mutation.mutate(); }} className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="font-semibold flex items-center gap-2">
+              <Smile className="w-4 h-4 text-emerald-400" />
+              Check-in rápido
+            </h2>
+            <button type="button" onClick={() => setOpen(false)} className="w-7 h-7 rounded-lg hover:bg-accent flex items-center justify-center">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+
+          {/* Weight */}
+          <div className="glass rounded-xl p-3">
+            <label className="text-xs text-muted-foreground mb-2 block">Peso (kg)</label>
+            <input
+              type="number" step="0.1" min="1"
+              value={weight} onChange={(e) => setWeight(e.target.value)}
+              className="input-field text-sm py-2 w-full"
+              placeholder="Ex: 75.5"
+            />
+          </div>
+
+          {/* Feeling slider */}
+          <div className="glass rounded-xl p-3">
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-xs text-muted-foreground">Como se sente?</label>
+              <span className={`text-xs font-bold ${feelingColor}`}>{feeling}/10 — {feelingLabel}</span>
+            </div>
+            <div className="flex items-center gap-3">
+              <span className="text-lg">😔</span>
+              <input
+                type="range" min={1} max={10} value={feeling}
+                onChange={(e) => setFeeling(Number(e.target.value))}
+                className="flex-1 h-2 rounded-full appearance-none cursor-pointer accent-emerald-500"
+                style={{
+                  background: `linear-gradient(to right, #ef4444 0%, #f59e0b 40%, #22c55e 100%)`,
+                }}
+              />
+              <span className="text-lg">😄</span>
+            </div>
+          </div>
+
+          {/* Notes */}
+          <div className="glass rounded-xl p-3">
+            <label className="text-xs text-muted-foreground mb-2 block">Notas (opcional)</label>
+            <textarea
+              value={notes} onChange={(e) => setNotes(e.target.value)}
+              className="input-field text-sm py-2 w-full resize-none"
+              rows={2}
+              placeholder="Ex: dormi mal, dor no joelho, energia alta..."
+            />
+          </div>
+
+          {/* Photo */}
+          <div className="glass rounded-xl p-3">
+            <label className="text-xs text-muted-foreground mb-2 block">Foto de progresso (opcional)</label>
+            <div
+              className="border-2 border-dashed border-border rounded-xl p-4 flex flex-col items-center justify-center gap-2 cursor-pointer hover:border-primary/40 transition-colors"
+              onClick={() => fileRef.current?.click()}
+            >
+              {photoPreview ? (
+                <div className="relative w-full">
+                  <img src={photoPreview} alt="preview" className="w-full max-h-40 object-contain rounded-lg" />
+                  <button type="button" onClick={(e) => { e.stopPropagation(); setPhotoFile(null); setPhotoPreview(null); }} className="absolute top-1 right-1 w-6 h-6 rounded-full bg-black/60 flex items-center justify-center">
+                    <X className="w-3 h-3 text-white" />
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <Camera className="w-6 h-6 text-muted-foreground" />
+                  <p className="text-xs text-muted-foreground text-center">Toque para adicionar foto</p>
+                </>
+              )}
+            </div>
+            <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) handlePhoto(f); }} />
+          </div>
+
+          <div className="flex gap-3">
+            <button type="button" onClick={() => setOpen(false)} className="btn-secondary flex-1 text-sm py-2">Cancelar</button>
+            <button type="submit" disabled={mutation.isPending || uploading} className="btn-primary flex-1 text-sm py-2 flex items-center justify-center gap-2 disabled:opacity-50">
+              <Save className="w-4 h-4" />
+              {mutation.isPending ? 'Salvando...' : 'Salvar check-in'}
+            </button>
+          </div>
+        </form>
+      )}
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════
+   Performance Stats — dados de treino do aluno
+   ═══════════════════════════════════════════════════ */
+function PerformanceStats({ studentUserId }: { studentUserId: string }) {
+  const { data } = useQuery({
+    queryKey: ['student-report-perf', studentUserId],
+    queryFn: () => api.get(`/progress/trainer/student/${studentUserId}/measurements`).then((r) => r.data.data ?? {}),
+    enabled: !!studentUserId,
+  });
+
+  const { data: workoutLogs } = useQuery({
+    queryKey: ['student-logs-perf', studentUserId],
+    queryFn: () => api.get(`/students/workout-logs`).then((r) => r.data.data ?? []),
+    enabled: !!studentUserId,
+  });
+
+  // Compute stats from workout logs
+  const stats = useMemo(() => {
+    if (!workoutLogs || !Array.isArray(workoutLogs) || workoutLogs.length === 0) return null;
+    const now = new Date();
+    const thirtyDaysAgo = new Date(now.getTime() - 30 * 86400000);
+    const sevenDaysAgo = new Date(now.getTime() - 7 * 86400000);
+    const recent30 = workoutLogs.filter((l: any) => new Date(l.completedAt) >= thirtyDaysAgo);
+    const recent7 = workoutLogs.filter((l: any) => new Date(l.completedAt) >= sevenDaysAgo);
+    const avgFeeling = recent30.length > 0
+      ? (recent30.reduce((s: number, l: any) => s + (l.feeling || 0), 0) / recent30.filter((l: any) => l.feeling).length).toFixed(1)
+      : null;
+    const avgDuration = recent30.length > 0
+      ? Math.round(recent30.filter((l: any) => l.duration).reduce((s: number, l: any) => s + (l.duration || 0), 0) / recent30.filter((l: any) => l.duration).length)
+      : null;
+    return {
+      monthTotal: recent30.length,
+      weekTotal: recent7.length,
+      avgFeeling,
+      avgDuration,
+    };
+  }, [workoutLogs]);
+
+  // Weight trend from measurements
+  const weightTrend = useMemo(() => {
+    const m = data?.measurements;
+    if (!m || !Array.isArray(m) || m.length < 2) return null;
+    const withWeight = m.filter((x: any) => x.weight);
+    if (withWeight.length < 2) return null;
+    const latest = withWeight[0].weight;
+    const previous = withWeight[1].weight;
+    const diff = latest - previous;
+    return { latest, previous, diff, unit: 'kg' };
+  }, [data]);
+
+  if (!stats && !weightTrend) return null;
+
+  return (
+    <div className="glass-card">
+      <h2 className="font-semibold flex items-center gap-2 mb-3">
+        <Activity className="w-4 h-4 text-blue-400" />
+        Desempenho nos treinos
+      </h2>
+      <div className="grid grid-cols-2 gap-2">
+        {weightTrend && (
+          <div className="glass rounded-xl p-3 text-center">
+            <div className="text-lg font-bold">{weightTrend.latest}kg</div>
+            <div className="text-xs text-muted-foreground">Peso atual</div>
+            <div className={`text-xs font-medium mt-0.5 ${weightTrend.diff < 0 ? 'text-emerald-400' : weightTrend.diff > 0 ? 'text-orange-400' : 'text-muted-foreground'}`}>
+              {weightTrend.diff > 0 ? '+' : ''}{weightTrend.diff.toFixed(1)}kg vs anterior
+            </div>
+          </div>
+        )}
+        {stats && (
+          <>
+            <div className="glass rounded-xl p-3 text-center">
+              <div className="text-lg font-bold">{stats.monthTotal}</div>
+              <div className="text-xs text-muted-foreground">Treinos (30 dias)</div>
+            </div>
+            <div className="glass rounded-xl p-3 text-center">
+              <div className="text-lg font-bold">{stats.weekTotal}</div>
+              <div className="text-xs text-muted-foreground">Esta semana</div>
+            </div>
+            {stats.avgFeeling && (
+              <div className="glass rounded-xl p-3 text-center">
+                <div className="text-lg font-bold">{stats.avgFeeling}/5</div>
+                <div className="text-xs text-muted-foreground">Sentimento médio</div>
+              </div>
+            )}
+            {stats.avgDuration && (
+              <div className="glass rounded-xl p-3 text-center">
+                <div className="text-lg font-bold">{stats.avgDuration}min</div>
+                <div className="text-xs text-muted-foreground">Duração média</div>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════
+   Assess Form — avaliação física completa
+   ═══════════════════════════════════════════════════ */
+function AssessForm({ student, isPending, onSubmit, onCancel, defaultHeight }: {
+  student: any;
+  isPending: boolean;
+  onSubmit: (data: any) => void;
+  onCancel: () => void;
+  defaultHeight?: string;
+}) {
+  const [weight, setWeight] = useState('');
+  const [height, setHeight] = useState(defaultHeight || '');
+  const [bodyFat, setBodyFat] = useState('');
+  const [muscleMass, setMuscleMass] = useState('');
+  const [waist, setWaist] = useState('');
+  const [hip, setHip] = useState('');
+  const [chest, setChest] = useState('');
+  const [rightArm, setRightArm] = useState('');
+  const [rightThigh, setRightThigh] = useState('');
+  const [notes, setNotes] = useState('');
+  const [showAdvanced, setShowAdvanced] = useState(false);
+
+  const num = (v: string) => (v !== '' ? Number(v) : undefined);
+  const bmi = weight && height ? (Number(weight) / ((Number(height) / 100) ** 2)).toFixed(1) : null;
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!weight || !height) { toast.error('Peso e altura são obrigatórios'); return; }
+    onSubmit({
+      studentUserId: student.userId,
+      weight: Number(weight),
+      height: Number(height),
+      bmi: bmi ? Number(bmi) : undefined,
+      bodyFatPercent: num(bodyFat),
+      muscleMassKg: num(muscleMass),
+      waistCm: num(waist),
+      hipCm: num(hip),
+      chestCm: num(chest),
+      rightArmCm: num(rightArm),
+      rightThighCm: num(rightThigh),
+      notes: notes || undefined,
+    });
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-3">
+      {/* Essential fields */}
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="text-xs text-muted-foreground mb-1 block">Peso (kg) *</label>
+          <input type="number" step="0.1" min="1" value={weight} onChange={(e) => setWeight(e.target.value)} className="input-field text-sm py-1.5" placeholder="Ex: 75.5" required />
+        </div>
+        <div>
+          <label className="text-xs text-muted-foreground mb-1 block">Altura (cm) *</label>
+          <input type="number" step="0.1" min="100" value={height} onChange={(e) => setHeight(e.target.value)} className="input-field text-sm py-1.5" placeholder="Ex: 175" required />
+        </div>
+        <div>
+          <label className="text-xs text-muted-foreground mb-1 block">Cintura (cm)</label>
+          <input type="number" step="0.1" min="0" value={waist} onChange={(e) => setWaist(e.target.value)} className="input-field text-sm py-1.5" placeholder="Ex: 82" />
+        </div>
+        <div>
+          <label className="text-xs text-muted-foreground mb-1 block">Quadril (cm)</label>
+          <input type="number" step="0.1" min="0" value={hip} onChange={(e) => setHip(e.target.value)} className="input-field text-sm py-1.5" placeholder="Ex: 95" />
+        </div>
+      </div>
+
+      {bmi && (
+        <div className="glass rounded-xl p-2 text-xs text-center">
+          <span className="text-muted-foreground">IMC: </span>
+          <span className="font-bold text-primary">{bmi}</span>
+        </div>
+      )}
+
+      {/* Advanced toggle */}
+      <button
+        type="button"
+        onClick={() => setShowAdvanced(!showAdvanced)}
+        className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors w-full"
+      >
+        <ChevronDown className={`w-3 h-3 transition-transform ${showAdvanced ? 'rotate-180' : ''}`} />
+        {showAdvanced ? 'Ocultar campos avançados' : 'Campos avançados (se disponível)'}
+      </button>
+
+      {showAdvanced && (
+        <div className="grid grid-cols-2 gap-3 border-t border-border/30 pt-3">
+          <div>
+            <label className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
+              Gordura (%)
+              <span title="Requer bioimpedância, caliper ou DEXA" className="text-muted-foreground/50 cursor-help">ℹ</span>
+            </label>
+            <input type="number" step="0.1" min="0" value={bodyFat} onChange={(e) => setBodyFat(e.target.value)} className="input-field text-sm py-1.5" placeholder="Se disponível" />
+          </div>
+          <div>
+            <label className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
+              Massa muscular (kg)
+              <span title="Requer bioimpedância ou DEXA" className="text-muted-foreground/50 cursor-help">ℹ</span>
+            </label>
+            <input type="number" step="0.1" min="0" value={muscleMass} onChange={(e) => setMuscleMass(e.target.value)} className="input-field text-sm py-1.5" placeholder="Se disponível" />
+          </div>
+          <div>
+            <label className="text-xs text-muted-foreground mb-1 block">Peito (cm)</label>
+            <input type="number" step="0.1" min="0" value={chest} onChange={(e) => setChest(e.target.value)} className="input-field text-sm py-1.5" placeholder="Ex: 100" />
+          </div>
+          <div>
+            <label className="text-xs text-muted-foreground mb-1 block">Braço D. (cm)</label>
+            <input type="number" step="0.1" min="0" value={rightArm} onChange={(e) => setRightArm(e.target.value)} className="input-field text-sm py-1.5" placeholder="Ex: 35" />
+          </div>
+          <div>
+            <label className="text-xs text-muted-foreground mb-1 block">Coxa D. (cm)</label>
+            <input type="number" step="0.1" min="0" value={rightThigh} onChange={(e) => setRightThigh(e.target.value)} className="input-field text-sm py-1.5" placeholder="Ex: 55" />
+          </div>
+        </div>
+      )}
+
+      {/* Notes */}
+      <div>
+        <label className="text-xs text-muted-foreground mb-1 block">Observações</label>
+        <textarea value={notes} onChange={(e) => setNotes(e.target.value)} className="input-field text-sm py-1.5 w-full resize-none" rows={2} placeholder="Ex: aluno relata dor lombar..." />
+      </div>
+
+      <div className="flex gap-3">
+        <button type="button" onClick={onCancel} className="btn-secondary flex-1 text-sm py-2">Cancelar</button>
+        <button type="submit" disabled={isPending} className="btn-primary flex-1 text-sm py-2 flex items-center justify-center gap-2 disabled:opacity-50">
+          <Save className="w-4 h-4" />
+          {isPending ? 'Salvando...' : 'Salvar avaliação'}
+        </button>
+      </div>
+    </form>
+  );
+}
+
+/* ═══════════════════════════════════════════════════
+   Check-in History — timeline de check-ins + fotos
+   ═══════════════════════════════════════════════════ */
+function CheckInHistory({ measurements, photos }: { measurements: any[]; photos: any[] }) {
+  const hasData = measurements.length > 0 || photos.length > 0;
+  if (!hasData) return null;
+
+  // Merge measurements and photos into a timeline
+  const entries: { date: string; type: string; data: any }[] = [];
+
+  measurements.slice(0, 15).forEach((m: any) => {
+    entries.push({
+      date: m.measuredAt,
+      type: 'measurement',
+      data: m,
+    });
+  });
+
+  photos.slice(0, 10).forEach((p: any) => {
+    entries.push({
+      date: p.takenAt,
+      type: 'photo',
+      data: p,
+    });
+  });
+
+  entries.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  const shown = entries.slice(0, 15);
+
+  return (
+    <div className="glass-card">
+      <h2 className="font-semibold flex items-center gap-2 mb-3">
+        <TrendingUp className="w-4 h-4 text-blue-400" />
+        Histórico de check-ins
+      </h2>
+      <div className="space-y-2">
+        {shown.map((entry, i) => {
+          const dateStr = new Date(entry.date).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' });
+          const m = entry.type === 'measurement' ? entry.data : null;
+          const p = entry.type === 'photo' ? entry.data : null;
+          const hasFeeling = m?.feeling;
+
+          return (
+            <div key={entry.data.id || i} className="glass rounded-xl p-3 flex items-start gap-3">
+              {/* Timeline dot */}
+              <div className="flex flex-col items-center mt-1">
+                <div className={`w-2.5 h-2.5 rounded-full ${entry.type === 'photo' ? 'bg-purple-400' : hasFeeling ? 'bg-emerald-400' : 'bg-blue-400'}`} />
+                {i < shown.length - 1 && <div className="w-px h-6 bg-border/40 mt-1" />}
+              </div>
+
+              <div className="flex-1 min-w-0">
+                <div className="text-xs text-muted-foreground mb-1">{dateStr}</div>
+                {m && (
+                  <div className="flex flex-wrap items-center gap-2">
+                    {m.weight && (
+                      <span className="text-sm font-bold">{m.weight}kg</span>
+                    )}
+                    {m.bodyFat && (
+                      <span className="text-xs text-muted-foreground">{m.bodyFat}% gordura</span>
+                    )}
+                    {m.muscleMass && (
+                      <span className="text-xs text-muted-foreground">{m.muscleMass}kg músculo</span>
+                    )}
+                    {m.waist && (
+                      <span className="text-xs text-muted-foreground">cintura {m.waist}cm</span>
+                    )}
+                    {hasFeeling && (
+                      <span className={`text-xs px-1.5 py-0.5 rounded-full ${
+                        m.feeling <= 3 ? 'bg-red-500/10 text-red-400' :
+                        m.feeling <= 5 ? 'bg-orange-500/10 text-orange-400' :
+                        m.feeling <= 7 ? 'bg-yellow-500/10 text-yellow-400' :
+                        'bg-emerald-500/10 text-emerald-400'
+                      }`}>
+                        {m.feeling}/10
+                      </span>
+                    )}
+                    {m.notes && (
+                      <span className="text-xs text-muted-foreground italic truncate max-w-[200px]">"{m.notes}"</span>
+                    )}
+                  </div>
+                )}
+                {p && (
+                  <div className="flex items-center gap-2">
+                    <img src={p.photoUrl} alt={p.angle} className="w-12 h-12 rounded-lg object-cover border border-border/40" />
+                    <span className="text-xs text-muted-foreground">{p.angle}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════
+   Plan Edit Form (existing)
+   ═══════════════════════════════════════════════════ */
 function PlanEditForm({ plan, isPending, onSave, onCancel, onPlansChange }: {
   plan: any;
   isPending: boolean;

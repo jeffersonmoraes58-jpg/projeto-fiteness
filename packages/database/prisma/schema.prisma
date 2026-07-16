@@ -575,6 +575,7 @@ model BodyMeasurement {
   chest      Float?
   arm        Float?
   thigh      Float?
+  feeling    Int?     // 1-10 quick check-in mood
   notes      String?
 
   student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
