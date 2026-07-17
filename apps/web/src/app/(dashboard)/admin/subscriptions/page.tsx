@@ -244,7 +244,7 @@ export default function AdminSubscriptions() {
 
       {/* Subscriptions table */}
       <div className="glass-card !p-0 overflow-hidden">
-        <div className="grid grid-cols-[2fr_1fr_1fr_1fr_1fr_60px] gap-4 px-4 py-3 border-b border-border/50 text-xs text-muted-foreground font-medium">
+        <div className="hidden sm:grid grid-cols-[2fr_1fr_1fr_1fr_1fr_60px] gap-4 px-4 py-3 border-b border-border/50 text-xs text-muted-foreground font-medium">
           <span>Tenant</span>
           <span>Plano</span>
           <span>Status</span>
@@ -255,13 +255,28 @@ export default function AdminSubscriptions() {
         <div className="divide-y divide-border/30">
           {isLoading ? (
             [...Array(6)].map((_, i) => (
-              <div key={i} className="grid grid-cols-[2fr_1fr_1fr_1fr_1fr_60px] gap-4 px-4 py-4 animate-pulse items-center">
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-xl bg-white/10" />
-                  <div className="h-3 bg-white/10 rounded w-32" />
+              <div key={i}>
+                <div className="hidden sm:grid grid-cols-[2fr_1fr_1fr_1fr_1fr_60px] gap-4 px-4 py-4 animate-pulse items-center">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-xl bg-white/10" />
+                    <div className="h-3 bg-white/10 rounded w-32" />
+                  </div>
+                  {[...Array(4)].map((__, j) => <div key={j} className="h-3 bg-white/5 rounded" />)}
+                  <div className="h-6 bg-white/10 rounded-lg" />
                 </div>
-                {[...Array(4)].map((__, j) => <div key={j} className="h-3 bg-white/5 rounded" />)}
-                <div className="h-6 bg-white/10 rounded-lg" />
+                <div className="sm:hidden px-4 py-4 animate-pulse">
+                  <div className="flex items-center gap-3 mb-2">
+                    <div className="w-9 h-9 rounded-xl bg-white/10 flex-shrink-0" />
+                    <div className="flex-1 space-y-1.5">
+                      <div className="h-3 bg-white/10 rounded w-32" />
+                      <div className="h-2.5 bg-white/5 rounded w-20" />
+                    </div>
+                  </div>
+                  <div className="flex gap-2 mt-2 ml-[48px]">
+                    <div className="h-5 bg-white/5 rounded-full w-14" />
+                    <div className="h-5 bg-white/5 rounded-full w-16" />
+                  </div>
+                </div>
               </div>
             ))
           ) : filtered.length > 0 ? (
@@ -283,83 +298,23 @@ export default function AdminSubscriptions() {
   );
 }
 
-function SubscriptionRow({ subscription: sub, index, onChangePlan, onCancel }: {
-  subscription: any; index: number; onChangePlan: (p: string) => void; onCancel: () => void;
+function SubActionMenu({ sub, onChangePlan, onCancel }: {
+  sub: any; onChangePlan: (p: string) => void; onCancel: () => void;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
-  const planCfg = PLAN_CONFIG[sub.plan] || PLAN_CONFIG.FREE;
-  const status = STATUS_CONFIG[sub.status] || STATUS_CONFIG.ACTIVE;
-  const StatusIcon = status.icon;
-
-  const cycleLabel = sub.billingCycle === 'ANNUAL' ? 'Anual' : 'Mensal';
-  const monthlyPrice = sub.billingCycle === 'ANNUAL'
-    ? Math.round((PRICE_ANNUAL[sub.plan] || 0) / 12)
-    : (PRICE_MONTHLY[sub.plan] || 0);
-
-  const nextBilling = sub.currentPeriodEnd
-    ? new Date(sub.currentPeriodEnd).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' })
-    : sub.trialEndsAt
-    ? `Trial até ${new Date(sub.trialEndsAt).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}`
-    : '—';
 
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      transition={{ delay: index * 0.03 }}
-      className="grid grid-cols-[2fr_1fr_1fr_1fr_1fr_60px] gap-4 px-4 py-4 hover:bg-accent/50 transition-all items-center text-sm"
-    >
-      {/* Tenant */}
-      <div className="flex items-center gap-3 min-w-0">
-        <div className={`w-9 h-9 rounded-xl bg-gradient-to-br ${planCfg.gradient} flex items-center justify-center flex-shrink-0`}>
-          <Building2 className="w-4 h-4 text-white" />
-        </div>
-        <div className="min-w-0">
-          <div className="font-medium truncate">{sub.tenant?.name || 'Tenant'}</div>
-          <div className="text-xs text-muted-foreground truncate">{sub.tenant?.slug}</div>
-        </div>
-      </div>
-
-      {/* Plan */}
-      <div>
-        <span className={cn('text-xs font-bold px-2 py-1 rounded-full bg-gradient-to-r', planCfg.gradient, 'text-white')}>
-          {planCfg.label}
-        </span>
-        {sub.plan !== 'FREE' && (
-          <span className="text-[10px] text-muted-foreground ml-1.5">{cycleLabel}</span>
-        )}
-      </div>
-
-      {/* Status */}
-      <div>
-        <span className={cn('text-xs px-2 py-1 rounded-full flex items-center gap-1 w-fit', status.color)}>
-          <StatusIcon className="w-3 h-3" />
-          {status.label}
-        </span>
-      </div>
-
-      {/* Next billing */}
-      <div className="text-xs text-muted-foreground">{nextBilling}</div>
-
-      {/* Amount */}
-      <div className="font-medium">
-        {monthlyPrice > 0 ? (
-          <>{`R$ ${monthlyPrice}`}<span className="text-xs text-muted-foreground">/mês</span></>
-        ) : (
-          <span className="text-muted-foreground">Grátis</span>
-        )}
-      </div>
-
-      {/* Actions */}
-      <div className="flex justify-end relative">
-        <button
-          onClick={() => setMenuOpen(!menuOpen)}
-          className="w-8 h-8 rounded-lg hover:bg-accent flex items-center justify-center transition-all"
-        >
-          <MoreVertical className="w-4 h-4 text-muted-foreground" />
-        </button>
-        {menuOpen && (
-          <div className="absolute right-0 top-9 bg-card border border-border rounded-xl shadow-xl z-20 py-1 w-44">
+    <div className="relative">
+      <button
+        onClick={() => setMenuOpen(!menuOpen)}
+        className="w-8 h-8 rounded-lg hover:bg-accent flex items-center justify-center transition-all"
+      >
+        <MoreVertical className="w-4 h-4 text-muted-foreground" />
+      </button>
+      {menuOpen && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setMenuOpen(false)} />
+          <div className="absolute right-0 top-full mt-1 z-50 w-48 glass-card !p-1 shadow-xl">
             <div className="px-3 py-1.5 text-[10px] text-muted-foreground font-medium uppercase tracking-wide">Alterar plano</div>
             {Object.entries(PLAN_CONFIG).filter(([key]) => key !== sub.plan).map(([key, p]) => (
               <button key={key} onClick={() => { onChangePlan(key); setMenuOpen(false); }}
@@ -377,8 +332,123 @@ function SubscriptionRow({ subscription: sub, index, onChangePlan, onCancel }: {
               </>
             )}
           </div>
-        )}
-      </div>
-    </motion.div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function SubscriptionRow({ subscription: sub, index, onChangePlan, onCancel }: {
+  subscription: any; index: number; onChangePlan: (p: string) => void; onCancel: () => void;
+}) {
+  const planCfg = PLAN_CONFIG[sub.plan] || PLAN_CONFIG.FREE;
+  const status = STATUS_CONFIG[sub.status] || STATUS_CONFIG.ACTIVE;
+  const StatusIcon = status.icon;
+
+  const cycleLabel = sub.billingCycle === 'ANNUAL' ? 'Anual' : 'Mensal';
+  const monthlyPrice = sub.billingCycle === 'ANNUAL'
+    ? Math.round((PRICE_ANNUAL[sub.plan] || 0) / 12)
+    : (PRICE_MONTHLY[sub.plan] || 0);
+
+  const nextBilling = sub.currentPeriodEnd
+    ? new Date(sub.currentPeriodEnd).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' })
+    : sub.trialEndsAt
+    ? `Trial até ${new Date(sub.trialEndsAt).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}`
+    : '—';
+
+  return (
+    <>
+      {/* Mobile card */}
+      <motion.div
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: index * 0.03 }}
+        className="sm:hidden px-4 py-4"
+      >
+        <div className="flex items-start justify-between">
+          <div className="flex items-center gap-3 min-w-0 flex-1">
+            <div className={`w-9 h-9 rounded-xl bg-gradient-to-br ${planCfg.gradient} flex items-center justify-center flex-shrink-0`}>
+              <Building2 className="w-4 h-4 text-white" />
+            </div>
+            <div className="min-w-0">
+              <div className="font-medium truncate">{sub.tenant?.name || 'Tenant'}</div>
+              <div className="text-xs text-muted-foreground truncate">{sub.tenant?.slug}</div>
+            </div>
+          </div>
+          <SubActionMenu sub={sub} onChangePlan={onChangePlan} onCancel={onCancel} />
+        </div>
+        <div className="flex flex-wrap gap-1.5 mt-2 ml-[48px]">
+          <span className={cn('text-[10px] font-bold px-2 py-0.5 rounded-full bg-gradient-to-r text-white', planCfg.gradient)}>
+            {planCfg.label}{sub.plan !== 'FREE' && <span className="opacity-75 ml-1">{cycleLabel}</span>}
+          </span>
+          <span className={cn('text-[10px] px-2 py-0.5 rounded-full flex items-center gap-1', status.color)}>
+            <StatusIcon className="w-2.5 h-2.5" />
+            {status.label}
+          </span>
+          <span className="text-[10px] px-2 py-0.5 rounded-full bg-secondary text-secondary-foreground">
+            {monthlyPrice > 0 ? `R$ ${monthlyPrice}/mês` : 'Grátis'}
+          </span>
+          {nextBilling !== '—' && (
+            <span className="text-[10px] px-2 py-0.5 rounded-full bg-secondary text-secondary-foreground truncate max-w-[180px]">
+              {nextBilling}
+            </span>
+          )}
+        </div>
+      </motion.div>
+
+      {/* Desktop row */}
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: index * 0.03 }}
+        className="hidden sm:grid grid-cols-[2fr_1fr_1fr_1fr_1fr_60px] gap-4 px-4 py-4 hover:bg-accent/50 transition-all items-center text-sm"
+      >
+        {/* Tenant */}
+        <div className="flex items-center gap-3 min-w-0">
+          <div className={`w-9 h-9 rounded-xl bg-gradient-to-br ${planCfg.gradient} flex items-center justify-center flex-shrink-0`}>
+            <Building2 className="w-4 h-4 text-white" />
+          </div>
+          <div className="min-w-0">
+            <div className="font-medium truncate">{sub.tenant?.name || 'Tenant'}</div>
+            <div className="text-xs text-muted-foreground truncate">{sub.tenant?.slug}</div>
+          </div>
+        </div>
+
+        {/* Plan */}
+        <div>
+          <span className={cn('text-xs font-bold px-2 py-1 rounded-full bg-gradient-to-r', planCfg.gradient, 'text-white')}>
+            {planCfg.label}
+          </span>
+          {sub.plan !== 'FREE' && (
+            <span className="text-[10px] text-muted-foreground ml-1.5">{cycleLabel}</span>
+          )}
+        </div>
+
+        {/* Status */}
+        <div>
+          <span className={cn('text-xs px-2 py-1 rounded-full flex items-center gap-1 w-fit', status.color)}>
+            <StatusIcon className="w-3 h-3" />
+            {status.label}
+          </span>
+        </div>
+
+        {/* Next billing */}
+        <div className="text-xs text-muted-foreground">{nextBilling}</div>
+
+        {/* Amount */}
+        <div className="font-medium">
+          {monthlyPrice > 0 ? (
+            <>{`R$ ${monthlyPrice}`}<span className="text-xs text-muted-foreground">/mês</span></>
+          ) : (
+            <span className="text-muted-foreground">Grátis</span>
+          )}
+        </div>
+
+        {/* Actions */}
+        <div className="flex justify-end">
+          <SubActionMenu sub={sub} onChangePlan={onChangePlan} onCancel={onCancel} />
+        </div>
+      </motion.div>
+    </>
   );
 }
