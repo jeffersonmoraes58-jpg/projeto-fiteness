@@ -208,10 +208,10 @@ export default function AdminUsers() {
         </div>
       </div>
 
-      {/* Table */}
+      {/* Table — hidden on mobile, shown on sm+ */}
       <div className="glass-card !p-0 overflow-visible">
-        {/* Header row */}
-        <div className="grid grid-cols-[2fr_1.5fr_1fr_1fr_1fr_80px] gap-4 px-4 py-3 border-b border-border/50 text-xs text-muted-foreground font-medium">
+        {/* Header row — desktop only */}
+        <div className="hidden sm:grid grid-cols-[2fr_1.5fr_1fr_1fr_1fr_80px] gap-4 px-4 py-3 border-b border-border/50 text-xs text-muted-foreground font-medium">
           <span>Usuário</span>
           <span>E-mail</span>
           <span>Perfil</span>
@@ -223,13 +223,30 @@ export default function AdminUsers() {
         <div className="divide-y divide-border/30">
           {isLoading ? (
             [...Array(8)].map((_, i) => (
-              <div key={i} className="grid grid-cols-[2fr_1.5fr_1fr_1fr_1fr_80px] gap-4 px-4 py-3 animate-pulse items-center">
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-full bg-white/10 flex-shrink-0" />
-                  <div className="h-3 bg-white/10 rounded w-32" />
+              <div key={i}>
+                {/* Skeleton — desktop */}
+                <div className="hidden sm:grid grid-cols-[2fr_1.5fr_1fr_1fr_1fr_80px] gap-4 px-4 py-3 animate-pulse items-center">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-full bg-white/10 flex-shrink-0" />
+                    <div className="h-3 bg-white/10 rounded w-32" />
+                  </div>
+                  {[...Array(4)].map((__, j) => <div key={j} className="h-3 bg-white/5 rounded" />)}
+                  <div className="h-6 bg-white/10 rounded-lg mx-auto w-16" />
                 </div>
-                {[...Array(4)].map((__, j) => <div key={j} className="h-3 bg-white/5 rounded" />)}
-                <div className="h-6 bg-white/10 rounded-lg mx-auto w-16" />
+                {/* Skeleton — mobile */}
+                <div className="sm:hidden px-4 py-3 animate-pulse">
+                  <div className="flex items-center gap-3 mb-2">
+                    <div className="w-10 h-10 rounded-full bg-white/10 flex-shrink-0" />
+                    <div className="space-y-1.5 flex-1">
+                      <div className="h-3 bg-white/10 rounded w-32" />
+                      <div className="h-2.5 bg-white/5 rounded w-48" />
+                    </div>
+                  </div>
+                  <div className="flex gap-2 mt-2">
+                    <div className="h-5 bg-white/5 rounded-full w-16" />
+                    <div className="h-5 bg-white/5 rounded-full w-14" />
+                  </div>
+                </div>
               </div>
             ))
           ) : filtered.length > 0 ? (
@@ -478,132 +495,185 @@ function UserRow({ user, index, onToggleActive, onChangeRole, planOverride, onPl
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       transition={{ delay: index * 0.02 }}
-      className="grid grid-cols-[2fr_1.5fr_1fr_1fr_1fr_80px] gap-4 px-4 py-3 hover:bg-accent/50 transition-all items-center text-sm"
     >
-      {/* Name */}
-      <div className="flex items-center gap-3 min-w-0">
-        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-600 to-indigo-600 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
-          {user.profile?.avatarUrl
-            ? <img src={user.profile.avatarUrl} alt="" className="w-full h-full rounded-full object-cover" />
-            : initials}
-        </div>
-        <div className="min-w-0">
-          <div className="font-medium truncate">
-            {user.profile?.firstName ? `${user.profile.firstName} ${user.profile.lastName || ''}` : 'Sem nome'}
+      {/* Desktop: table row */}
+      <div className="hidden sm:grid grid-cols-[2fr_1.5fr_1fr_1fr_1fr_80px] gap-4 px-4 py-3 hover:bg-accent/50 transition-all items-center text-sm">
+        {/* Name */}
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-600 to-indigo-600 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+            {user.profile?.avatarUrl
+              ? <img src={user.profile.avatarUrl} alt="" className="w-full h-full rounded-full object-cover" />
+              : initials}
           </div>
-          <div className="text-[10px] text-muted-foreground flex items-center gap-1">
+          <div className="min-w-0">
+            <div className="font-medium truncate">
+              {user.profile?.firstName ? `${user.profile.firstName} ${user.profile.lastName || ''}` : 'Sem nome'}
+            </div>
+            <div className="text-[10px] text-muted-foreground flex items-center gap-1">
+              {user.isActive
+                ? <><CheckCircle2 className="w-2.5 h-2.5 text-emerald-400" />Ativo</>
+                : <><XCircle className="w-2.5 h-2.5 text-red-400" />Inativo</>
+              }
+            </div>
+          </div>
+        </div>
+
+        {/* Email */}
+        <div className="flex items-center gap-1.5 min-w-0">
+          <Mail className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
+          <span className="text-xs text-muted-foreground truncate">{user.email}</span>
+        </div>
+
+        {/* Role */}
+        <div className="relative">
+          <button
+            onClick={() => setRoleMenuOpen(!roleMenuOpen)}
+            className={cn('flex items-center gap-1 text-xs px-2 py-1 rounded-full font-medium', colorClass)}
+          >
+            {ROLE_LABELS[user.role] || user.role}
+            <ChevronDown className="w-3 h-3" />
+          </button>
+          {roleMenuOpen && (
+            <div className="absolute left-0 top-7 bg-card border border-border rounded-xl shadow-xl z-20 py-1 w-36">
+              {Object.entries(ROLE_LABELS).map(([key, label]) => (
+                <button
+                  key={key}
+                  onClick={() => { onChangeRole(key); setRoleMenuOpen(false); }}
+                  className={cn('w-full text-left px-3 py-2 text-xs hover:bg-accent transition-all', user.role === key && 'text-primary')}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Tenant */}
+        <div className="text-xs text-muted-foreground truncate">
+          {user.tenant?.name || '—'}
+        </div>
+
+        {/* Last login */}
+        <div className="flex items-center gap-1 text-xs text-muted-foreground">
+          <Calendar className="w-3 h-3" />
+          {lastLogin}
+        </div>
+
+        {/* Actions */}
+        <div className="flex justify-center relative">
+          <button
+            onClick={() => setMenuOpen(!menuOpen)}
+            className="w-8 h-8 rounded-lg hover:bg-accent flex items-center justify-center transition-all"
+          >
+            <MoreVertical className="w-4 h-4 text-muted-foreground" />
+          </button>
+          {menuOpen && <UserMenu user={user} planOverride={planOverride} onToggleActive={onToggleActive} onChangeRole={onChangeRole} onPlanOverride={onPlanOverride} onDelete={onDelete} onClose={() => setMenuOpen(false)} />}
+        </div>
+      </div>
+
+      {/* Mobile: card */}
+      <div className="sm:hidden px-4 py-3 hover:bg-accent/50 transition-all">
+        <div className="flex items-center gap-3 mb-2">
+          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-600 to-indigo-600 flex items-center justify-center text-white text-sm font-bold flex-shrink-0">
+            {user.profile?.avatarUrl
+              ? <img src={user.profile.avatarUrl} alt="" className="w-full h-full rounded-full object-cover" />
+              : initials}
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="font-medium truncate text-sm">
+              {user.profile?.firstName ? `${user.profile.firstName} ${user.profile.lastName || ''}` : 'Sem nome'}
+            </div>
+            <div className="text-xs text-muted-foreground truncate">{user.email}</div>
+          </div>
+          <button
+            onClick={() => setMenuOpen(!menuOpen)}
+            className="w-8 h-8 rounded-lg hover:bg-accent flex items-center justify-center transition-all flex-shrink-0"
+          >
+            <MoreVertical className="w-4 h-4 text-muted-foreground" />
+          </button>
+          {menuOpen && <UserMenu user={user} planOverride={planOverride} onToggleActive={onToggleActive} onChangeRole={onChangeRole} onPlanOverride={onPlanOverride} onDelete={onDelete} onClose={() => setMenuOpen(false)} />}
+        </div>
+        <div className="flex items-center gap-2 flex-wrap ml-[52px]">
+          <span className={cn('text-[10px] px-2 py-0.5 rounded-full font-medium', colorClass)}>
+            {ROLE_LABELS[user.role] || user.role}
+          </span>
+          <span className="text-[10px] text-muted-foreground flex items-center gap-1">
             {user.isActive
               ? <><CheckCircle2 className="w-2.5 h-2.5 text-emerald-400" />Ativo</>
               : <><XCircle className="w-2.5 h-2.5 text-red-400" />Inativo</>
             }
-          </div>
+          </span>
+          {user.tenant?.name && (
+            <span className="text-[10px] text-muted-foreground truncate max-w-[120px]">{user.tenant.name}</span>
+          )}
+          <span className="text-[10px] text-muted-foreground flex items-center gap-0.5">
+            <Calendar className="w-2.5 h-2.5" /> {lastLogin}
+          </span>
         </div>
       </div>
-
-      {/* Email */}
-      <div className="flex items-center gap-1.5 min-w-0">
-        <Mail className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
-        <span className="text-xs text-muted-foreground truncate">{user.email}</span>
-      </div>
-
-      {/* Role */}
-      <div className="relative">
-        <button
-          onClick={() => setRoleMenuOpen(!roleMenuOpen)}
-          className={cn('flex items-center gap-1 text-xs px-2 py-1 rounded-full font-medium', colorClass)}
-        >
-          {ROLE_LABELS[user.role] || user.role}
-          <ChevronDown className="w-3 h-3" />
-        </button>
-        {roleMenuOpen && (
-          <div className="absolute left-0 top-7 bg-card border border-border rounded-xl shadow-xl z-20 py-1 w-36">
-            {Object.entries(ROLE_LABELS).map(([key, label]) => (
-              <button
-                key={key}
-                onClick={() => { onChangeRole(key); setRoleMenuOpen(false); }}
-                className={cn('w-full text-left px-3 py-2 text-xs hover:bg-accent transition-all', user.role === key && 'text-primary')}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* Tenant */}
-      <div className="text-xs text-muted-foreground truncate">
-        {user.tenant?.name || '—'}
-      </div>
-
-      {/* Last login */}
-      <div className="flex items-center gap-1 text-xs text-muted-foreground">
-        <Calendar className="w-3 h-3" />
-        {lastLogin}
-      </div>
-
-      {/* Actions */}
-      <div className="flex justify-center relative">
-        <button
-          onClick={() => setMenuOpen(!menuOpen)}
-          className="w-8 h-8 rounded-lg hover:bg-accent flex items-center justify-center transition-all"
-        >
-          <MoreVertical className="w-4 h-4 text-muted-foreground" />
-        </button>
-        {menuOpen && (
-          <div className="absolute right-0 top-9 bg-card border border-border rounded-xl shadow-xl z-20 py-1 w-44">
-            <button
-              onClick={() => { onToggleActive(); setMenuOpen(false); }}
-              className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-accent transition-all"
-            >
-              {user.isActive
-                ? <><XCircle className="w-3.5 h-3.5 text-red-400" />Desativar</>
-                : <><CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />Ativar</>
-              }
-            </button>
-            <div className="border-t border-border/50 my-0.5" />
-            <div className="px-3 py-1.5 text-[10px] text-muted-foreground font-medium uppercase tracking-wide">Acesso</div>
-            {Object.entries(PLAN_OPTIONS).map(([key, label]) => (
-              <button
-                key={key}
-                onClick={() => { onPlanOverride?.(key); setMenuOpen(false); }}
-                className={cn(
-                  'w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-accent transition-all',
-                  planOverride === key && 'text-primary',
-                )}
-              >
-                {planOverride === key && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />}
-                <span>{label}</span>
-              </button>
-            ))}
-            {planOverride && (
-              <button
-                onClick={() => { onPlanOverride?.(null); setMenuOpen(false); }}
-                className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-red-500/10 text-red-400 transition-all"
-              >
-                <XCircle className="w-3.5 h-3.5" />
-                Remover acesso especial
-              </button>
-            )}
-            <div className="border-t border-border/50 my-0.5" />
-            <a
-              href={`mailto:${user.email}`}
-              onClick={() => setMenuOpen(false)}
-              className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-accent transition-all"
-            >
-              <Mail className="w-3.5 h-3.5" />
-              Enviar e-mail
-            </a>
-            <div className="border-t border-border/50 my-0.5" />
-            <button
-              onClick={() => { onDelete?.(); setMenuOpen(false); }}
-              className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-red-500/10 text-red-400 transition-all"
-            >
-              <Trash2 className="w-3.5 h-3.5" />
-              Excluir usuário
-            </button>
-          </div>
-        )}
-      </div>
     </motion.div>
+  );
+}
+
+function UserMenu({ user, planOverride, onToggleActive, onChangeRole, onPlanOverride, onDelete, onClose }: {
+  user: any; planOverride?: string; onToggleActive: () => void; onChangeRole: (r: string) => void;
+  onPlanOverride?: (po: string | null) => void; onDelete?: () => void; onClose: () => void;
+}) {
+  return (
+    <>
+      <div className="fixed inset-0 z-40" onClick={onClose} />
+      <div className="absolute right-0 top-9 bg-card border border-border rounded-xl shadow-xl z-50 py-1 w-44">
+        <button
+          onClick={() => { onToggleActive(); onClose(); }}
+          className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-accent transition-all"
+        >
+          {user.isActive
+            ? <><XCircle className="w-3.5 h-3.5 text-red-400" />Desativar</>
+            : <><CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />Ativar</>
+          }
+        </button>
+        <div className="border-t border-border/50 my-0.5" />
+        <div className="px-3 py-1.5 text-[10px] text-muted-foreground font-medium uppercase tracking-wide">Acesso</div>
+        {Object.entries(PLAN_OPTIONS).map(([key, label]) => (
+          <button
+            key={key}
+            onClick={() => { onPlanOverride?.(key); onClose(); }}
+            className={cn(
+              'w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-accent transition-all',
+              planOverride === key && 'text-primary',
+            )}
+          >
+            {planOverride === key && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />}
+            <span>{label}</span>
+          </button>
+        ))}
+        {planOverride && (
+          <button
+            onClick={() => { onPlanOverride?.(null); onClose(); }}
+            className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-red-500/10 text-red-400 transition-all"
+          >
+            <XCircle className="w-3.5 h-3.5" />
+            Remover acesso especial
+          </button>
+        )}
+        <div className="border-t border-border/50 my-0.5" />
+        <a
+          href={`mailto:${user.email}`}
+          onClick={onClose}
+          className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-accent transition-all"
+        >
+          <Mail className="w-3.5 h-3.5" />
+          Enviar e-mail
+        </a>
+        <div className="border-t border-border/50 my-0.5" />
+        <button
+          onClick={() => { onDelete?.(); onClose(); }}
+          className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-red-500/10 text-red-400 transition-all"
+        >
+          <Trash2 className="w-3.5 h-3.5" />
+          Excluir usuário
+        </button>
+      </div>
+    </>
   );
 }
