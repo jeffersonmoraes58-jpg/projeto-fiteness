@@ -222,7 +222,7 @@ export default function AdminTenants() {
 
       {/* Tenant list */}
       <div className="glass-card !p-0 overflow-hidden">
-        <div className="grid grid-cols-[2fr_1fr_1fr_1fr_1fr_80px] gap-4 px-4 py-3 border-b border-border/50 text-xs text-muted-foreground font-medium">
+        <div className="hidden sm:grid grid-cols-[2fr_1fr_1fr_1fr_1fr_80px] gap-4 px-4 py-3 border-b border-border/50 text-xs text-muted-foreground font-medium">
           <span>Academia / Estúdio</span>
           <span>Plano</span>
           <span>Status</span>
@@ -234,16 +234,32 @@ export default function AdminTenants() {
         <div className="divide-y divide-border/30">
           {isLoading ? (
             [...Array(8)].map((_, i) => (
-              <div key={i} className="grid grid-cols-[2fr_1fr_1fr_1fr_1fr_80px] gap-4 px-4 py-4 animate-pulse items-center">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-white/10 flex-shrink-0" />
-                  <div className="space-y-1.5">
-                    <div className="h-3 bg-white/10 rounded w-32" />
-                    <div className="h-2.5 bg-white/5 rounded w-20" />
+              <div key={i}>
+                <div className="hidden sm:grid grid-cols-[2fr_1fr_1fr_1fr_1fr_80px] gap-4 px-4 py-4 animate-pulse items-center">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-white/10 flex-shrink-0" />
+                    <div className="space-y-1.5">
+                      <div className="h-3 bg-white/10 rounded w-32" />
+                      <div className="h-2.5 bg-white/5 rounded w-20" />
+                    </div>
+                  </div>
+                  {[...Array(4)].map((__, j) => <div key={j} className="h-3 bg-white/5 rounded" />)}
+                  <div className="h-6 bg-white/10 rounded-lg" />
+                </div>
+                <div className="sm:hidden px-4 py-4 animate-pulse">
+                  <div className="flex items-center gap-3 mb-2">
+                    <div className="w-10 h-10 rounded-xl bg-white/10 flex-shrink-0" />
+                    <div className="space-y-1.5 flex-1">
+                      <div className="h-3 bg-white/10 rounded w-32" />
+                      <div className="h-2.5 bg-white/5 rounded w-20" />
+                    </div>
+                  </div>
+                  <div className="flex gap-2 mt-2 ml-[52px]">
+                    <div className="h-5 bg-white/5 rounded-full w-14" />
+                    <div className="h-5 bg-white/5 rounded-full w-16" />
+                    <div className="h-5 bg-white/5 rounded-full w-20" />
                   </div>
                 </div>
-                {[...Array(4)].map((__, j) => <div key={j} className="h-3 bg-white/5 rounded" />)}
-                <div className="h-6 bg-white/10 rounded-lg" />
               </div>
             ))
           ) : filtered.length > 0 ? (
@@ -341,8 +357,36 @@ export default function AdminTenants() {
   );
 }
 
-function TenantRow({ tenant, index, onDelete }: { tenant: any; index: number; onDelete: () => void }) {
+function TenantMenu({ tenant, onDelete }: { tenant: any; onDelete: () => void }) {
   const [menuOpen, setMenuOpen] = useState(false);
+
+  return (
+    <div className="relative">
+      <button
+        onClick={(e) => { e.preventDefault(); setMenuOpen(!menuOpen); }}
+        className="w-8 h-8 rounded-lg hover:bg-accent flex items-center justify-center transition-all"
+      >
+        <MoreVertical className="w-4 h-4 text-muted-foreground" />
+      </button>
+      {menuOpen && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setMenuOpen(false)} />
+          <div className="absolute right-0 top-full mt-1 z-50 w-48 glass-card !p-1 shadow-xl">
+            <button
+              onClick={() => { onDelete(); setMenuOpen(false); }}
+              className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-red-500/10 text-red-400 transition-all rounded-lg"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              Excluir academia
+            </button>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function TenantRow({ tenant, index, onDelete }: { tenant: any; index: number; onDelete: () => void }) {
   const plan = PLAN_CONFIG[tenant.subscription?.plan || 'FREE'];
   const statusKey = tenant.subscription?.status || 'TRIAL';
   const status = STATUS_CONFIG[statusKey] || STATUS_CONFIG.TRIAL;
@@ -360,76 +404,94 @@ function TenantRow({ tenant, index, onDelete }: { tenant: any; index: number; on
     .toUpperCase();
 
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      transition={{ delay: index * 0.03 }}
-      className="grid grid-cols-[2fr_1fr_1fr_1fr_1fr_80px] gap-4 px-4 py-4 hover:bg-accent/50 transition-all items-center text-sm"
-    >
-      {/* Name */}
-      <div className="flex items-center gap-3 min-w-0">
-        <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${plan.gradient} flex items-center justify-center text-white text-sm font-bold flex-shrink-0`}>
-          {initials}
-        </div>
-        <div className="min-w-0">
-          <div className="font-medium truncate">{tenant.name}</div>
-          <div className="text-xs text-muted-foreground truncate">{tenant.slug || tenant.id.slice(0, 8)}</div>
-        </div>
-      </div>
-
-      {/* Plan */}
-      <div>
-        <span className={cn('text-xs font-bold px-2 py-1 rounded-full bg-gradient-to-r text-white', plan.gradient)}>
-          {plan.label}
-        </span>
-      </div>
-
-      {/* Status */}
-      <div>
-        <span className={cn('text-xs px-2 py-1 rounded-full flex items-center gap-1 w-fit', status.color)}>
-          <StatusIcon className="w-3 h-3" />
-          {status.label}
-        </span>
-      </div>
-
-      {/* User count */}
-      <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-        <Users className="w-3.5 h-3.5" />
-        {tenant._count?.users ?? 0} usuários
-      </div>
-
-      {/* Created */}
-      <div className="text-xs text-muted-foreground">{createdAt}</div>
-
-      {/* Actions */}
-      <div className="flex justify-end relative">
-        <Link
-          href={`/admin/tenants/${tenant.id}`}
-          className="w-8 h-8 rounded-lg hover:bg-accent flex items-center justify-center transition-all"
-        >
-          <ChevronRight className="w-4 h-4 text-muted-foreground" />
-        </Link>
-        <button
-          onClick={(e) => { e.preventDefault(); setMenuOpen(!menuOpen); }}
-          className="w-8 h-8 rounded-lg hover:bg-accent flex items-center justify-center transition-all"
-        >
-          <MoreVertical className="w-4 h-4 text-muted-foreground" />
-        </button>
-        {menuOpen && (
-          <>
-            <div className="fixed inset-0 z-40" onClick={() => setMenuOpen(false)} />
-            <div className="absolute right-0 top-full mt-1 z-50 w-48 glass-card !p-1 shadow-xl">
-              <button
-                onClick={() => { onDelete(); setMenuOpen(false); }}
-                className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-red-500/10 text-red-400 transition-all rounded-lg"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-                Excluir academia
-              </button>
+    <>
+      {/* Mobile card */}
+      <motion.div
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: index * 0.03 }}
+        className="sm:hidden px-4 py-4"
+      >
+        <div className="flex items-start justify-between">
+          <div className="flex items-center gap-3 min-w-0 flex-1">
+            <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${plan.gradient} flex items-center justify-center text-white text-sm font-bold flex-shrink-0`}>
+              {initials}
             </div>
-          </>
-        )}
-      </div>
-    </motion.div>
+            <div className="min-w-0">
+              <div className="font-medium truncate">{tenant.name}</div>
+              <div className="text-xs text-muted-foreground truncate">{tenant.slug || tenant.id.slice(0, 8)}</div>
+            </div>
+          </div>
+          <TenantMenu tenant={tenant} onDelete={onDelete} />
+        </div>
+        <div className="flex flex-wrap gap-1.5 mt-2 ml-[52px]">
+          <span className={cn('text-[10px] font-bold px-2 py-0.5 rounded-full bg-gradient-to-r text-white', plan.gradient)}>
+            {plan.label}
+          </span>
+          <span className={cn('text-[10px] px-2 py-0.5 rounded-full flex items-center gap-1', status.color)}>
+            <StatusIcon className="w-2.5 h-2.5" />
+            {status.label}
+          </span>
+          <span className="text-[10px] px-2 py-0.5 rounded-full flex items-center gap-1 bg-secondary text-secondary-foreground">
+            <Users className="w-2.5 h-2.5" />
+            {tenant._count?.users ?? 0}
+          </span>
+        </div>
+      </motion.div>
+
+      {/* Desktop row */}
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: index * 0.03 }}
+        className="hidden sm:grid grid-cols-[2fr_1fr_1fr_1fr_1fr_80px] gap-4 px-4 py-4 hover:bg-accent/50 transition-all items-center text-sm"
+      >
+        {/* Name */}
+        <div className="flex items-center gap-3 min-w-0">
+          <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${plan.gradient} flex items-center justify-center text-white text-sm font-bold flex-shrink-0`}>
+            {initials}
+          </div>
+          <div className="min-w-0">
+            <div className="font-medium truncate">{tenant.name}</div>
+            <div className="text-xs text-muted-foreground truncate">{tenant.slug || tenant.id.slice(0, 8)}</div>
+          </div>
+        </div>
+
+        {/* Plan */}
+        <div>
+          <span className={cn('text-xs font-bold px-2 py-1 rounded-full bg-gradient-to-r text-white', plan.gradient)}>
+            {plan.label}
+          </span>
+        </div>
+
+        {/* Status */}
+        <div>
+          <span className={cn('text-xs px-2 py-1 rounded-full flex items-center gap-1 w-fit', status.color)}>
+            <StatusIcon className="w-3 h-3" />
+            {status.label}
+          </span>
+        </div>
+
+        {/* User count */}
+        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          <Users className="w-3.5 h-3.5" />
+          {tenant._count?.users ?? 0} usuários
+        </div>
+
+        {/* Created */}
+        <div className="text-xs text-muted-foreground">{createdAt}</div>
+
+        {/* Actions */}
+        <div className="flex justify-end relative">
+          <Link
+            href={`/admin/tenants/${tenant.id}`}
+            className="w-8 h-8 rounded-lg hover:bg-accent flex items-center justify-center transition-all"
+          >
+            <ChevronRight className="w-4 h-4 text-muted-foreground" />
+          </Link>
+          <TenantMenu tenant={tenant} onDelete={onDelete} />
+        </div>
+      </motion.div>
+    </>
   );
 }
