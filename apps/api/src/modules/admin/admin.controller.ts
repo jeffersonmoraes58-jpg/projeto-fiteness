@@ -66,6 +66,12 @@ export class AdminController {
     return this.service.updateTenantSubscription(id, body);
   }
 
+  @Delete('tenants/:id')
+  @ApiOperation({ summary: 'Excluir tenant — desativa todos os usuários vinculados (irreversível!)' })
+  deleteTenant(@Param('id') id: string) {
+    return this.service.deleteTenant(id);
+  }
+
   @Get('users')
   @ApiOperation({ summary: 'Listar usuários' })
   getUsers(

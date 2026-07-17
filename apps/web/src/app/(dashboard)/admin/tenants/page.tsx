@@ -6,11 +6,12 @@ import { motion } from 'framer-motion';
 import {
   Building2, Search, Users, CreditCard, CheckCircle2,
   AlertCircle, XCircle, Clock, ChevronRight, ArrowUpRight,
-  Filter, TrendingUp,
+  Filter, TrendingUp, MoreVertical, Trash2, Loader2,
 } from 'lucide-react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
+import toast from 'react-hot-toast';
 
 /** Preços alinhados com apps/api/src/common/plan-limits.ts */
 const PRICE_MONTHLY: Record<string, number> = { FREE: 0, BASIC: 35, PRO: 55, ENTERPRISE: 95 };
@@ -39,7 +40,23 @@ export default function AdminTenants() {
   const [planFilter, setPlanFilter] = useState('Todos');
   const [statusFilter, setStatusFilter] = useState('Todos');
   const [page, setPage] = useState(1);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const PER_PAGE = 20;
+  const queryClient = useQueryClient();
+
+  const deleteTenantMutation = useMutation({
+    mutationFn: (id: string) => api.delete(`/admin/tenants/${id}`),
+    onSuccess: (res) => {
+      const data = res.data?.data;
+      queryClient.invalidateQueries({ queryKey: ['admin-tenants'] });
+      toast.success(`${data?.name || 'Tenant'} excluído${data?.usersDeactivated ? ` — ${data.usersDeactivated} usuário(s) desativado(s)` : ''}`);
+      setDeleteConfirmId(null);
+    },
+    onError: () => {
+      toast.error('Erro ao excluir tenant');
+      setDeleteConfirmId(null);
+    },
+  });
 
   const { data, isLoading } = useQuery({
     queryKey: ['admin-tenants', search, page],
@@ -205,19 +222,19 @@ export default function AdminTenants() {
 
       {/* Tenant list */}
       <div className="glass-card !p-0 overflow-hidden">
-        <div className="grid grid-cols-[2fr_1fr_1fr_1fr_1fr_48px] gap-4 px-4 py-3 border-b border-border/50 text-xs text-muted-foreground font-medium">
+        <div className="grid grid-cols-[2fr_1fr_1fr_1fr_1fr_80px] gap-4 px-4 py-3 border-b border-border/50 text-xs text-muted-foreground font-medium">
           <span>Academia / Estúdio</span>
           <span>Plano</span>
           <span>Status</span>
           <span>Usuários</span>
           <span>Cadastro</span>
-          <span />
+          <span className="text-right">Ações</span>
         </div>
 
         <div className="divide-y divide-border/30">
           {isLoading ? (
             [...Array(8)].map((_, i) => (
-              <div key={i} className="grid grid-cols-[2fr_1fr_1fr_1fr_1fr_48px] gap-4 px-4 py-4 animate-pulse items-center">
+              <div key={i} className="grid grid-cols-[2fr_1fr_1fr_1fr_1fr_80px] gap-4 px-4 py-4 animate-pulse items-center">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-xl bg-white/10 flex-shrink-0" />
                   <div className="space-y-1.5">
@@ -231,7 +248,7 @@ export default function AdminTenants() {
             ))
           ) : filtered.length > 0 ? (
             filtered.map((tenant, i) => (
-              <TenantRow key={tenant.id} tenant={tenant} index={i} />
+              <TenantRow key={tenant.id} tenant={tenant} index={i} onDelete={() => setDeleteConfirmId(tenant.id)} />
             ))
           ) : (
             <div className="py-16 flex flex-col items-center gap-3">
@@ -265,11 +282,67 @@ export default function AdminTenants() {
           </div>
         )}
       </div>
+
+      {/* Delete confirmation modal */}
+      {deleteConfirmId && (() => {
+        const tenant = filtered.find((t) => t.id === deleteConfirmId);
+        const userCount = tenant?._count?.users ?? 0;
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setDeleteConfirmId(null)}>
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              onClick={(e) => e.stopPropagation()}
+              className="glass-card w-full max-w-sm mx-4 p-6"
+            >
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-full bg-red-500/10 flex items-center justify-center">
+                  <Trash2 className="w-5 h-5 text-red-400" />
+                </div>
+                <div>
+                  <h3 className="font-bold">Excluir academia</h3>
+                  <p className="text-xs text-muted-foreground">Esta ação é irreversível.</p>
+                </div>
+              </div>
+              <p className="text-sm text-muted-foreground mb-2">
+                O tenant <strong>{tenant?.name || '—'}</strong> será excluído permanentemente, incluindo assinatura e configurações.
+              </p>
+              {userCount > 0 && (
+                <p className="text-sm text-orange-400 mb-6">
+                  {userCount} usuário(s) vinculado(s) serão <strong>desativados</strong> (não excluídos).
+                </p>
+              )}
+              {userCount === 0 && <div className="mb-6" />}
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setDeleteConfirmId(null)}
+                  className="btn-secondary flex-1 py-2.5 text-sm"
+                  disabled={deleteTenantMutation.isPending}
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={() => deleteTenantMutation.mutate(deleteConfirmId)}
+                  disabled={deleteTenantMutation.isPending}
+                  className="flex-1 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl text-sm font-semibold flex items-center justify-center gap-2 transition-all disabled:opacity-60"
+                >
+                  {deleteTenantMutation.isPending ? (
+                    <><Loader2 className="w-4 h-4 animate-spin" /> Excluindo...</>
+                  ) : (
+                    <>Excluir permanentemente</>
+                  )}
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
 
-function TenantRow({ tenant, index }: { tenant: any; index: number }) {
+function TenantRow({ tenant, index, onDelete }: { tenant: any; index: number; onDelete: () => void }) {
+  const [menuOpen, setMenuOpen] = useState(false);
   const plan = PLAN_CONFIG[tenant.subscription?.plan || 'FREE'];
   const statusKey = tenant.subscription?.status || 'TRIAL';
   const status = STATUS_CONFIG[statusKey] || STATUS_CONFIG.TRIAL;
@@ -291,7 +364,7 @@ function TenantRow({ tenant, index }: { tenant: any; index: number }) {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       transition={{ delay: index * 0.03 }}
-      className="grid grid-cols-[2fr_1fr_1fr_1fr_1fr_48px] gap-4 px-4 py-4 hover:bg-accent/50 transition-all items-center text-sm"
+      className="grid grid-cols-[2fr_1fr_1fr_1fr_1fr_80px] gap-4 px-4 py-4 hover:bg-accent/50 transition-all items-center text-sm"
     >
       {/* Name */}
       <div className="flex items-center gap-3 min-w-0">
@@ -328,14 +401,34 @@ function TenantRow({ tenant, index }: { tenant: any; index: number }) {
       {/* Created */}
       <div className="text-xs text-muted-foreground">{createdAt}</div>
 
-      {/* Link */}
-      <div className="flex justify-end">
+      {/* Actions */}
+      <div className="flex justify-end relative">
         <Link
           href={`/admin/tenants/${tenant.id}`}
           className="w-8 h-8 rounded-lg hover:bg-accent flex items-center justify-center transition-all"
         >
           <ChevronRight className="w-4 h-4 text-muted-foreground" />
         </Link>
+        <button
+          onClick={(e) => { e.preventDefault(); setMenuOpen(!menuOpen); }}
+          className="w-8 h-8 rounded-lg hover:bg-accent flex items-center justify-center transition-all"
+        >
+          <MoreVertical className="w-4 h-4 text-muted-foreground" />
+        </button>
+        {menuOpen && (
+          <>
+            <div className="fixed inset-0 z-40" onClick={() => setMenuOpen(false)} />
+            <div className="absolute right-0 top-full mt-1 z-50 w-48 glass-card !p-1 shadow-xl">
+              <button
+                onClick={() => { onDelete(); setMenuOpen(false); }}
+                className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-red-500/10 text-red-400 transition-all rounded-lg"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                Excluir academia
+              </button>
+            </div>
+          </>
+        )}
       </div>
     </motion.div>
   );

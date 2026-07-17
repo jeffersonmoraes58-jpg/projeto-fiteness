@@ -509,6 +509,38 @@ export class AdminService {
     });
   }
 
+  // ── Tenants ────────────────────────────────────────────────
+
+  async deleteTenant(id: string) {
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id },
+      include: { _count: { select: { users: true } } },
+    });
+
+    if (!tenant) throw new NotFoundException('Tenant não encontrado');
+
+    const userCount = tenant._count.users;
+
+    // 1. Desativar todos os usuários do tenant
+    if (userCount > 0) {
+      await this.prisma.user.updateMany({
+        where: { tenantId: id },
+        data: { isActive: false },
+      });
+    }
+
+    // 2. Limpar referências órfãs (Chat.tenantId e AuditLog.tenantId são strings sem FK)
+    await Promise.all([
+      this.prisma.chat.updateMany({ where: { tenantId: id }, data: { tenantId: null } }),
+      this.prisma.auditLog.updateMany({ where: { tenantId: id }, data: { tenantId: null } }),
+    ]);
+
+    // 3. Deletar o Tenant (cascade → TenantSettings, TenantSubscription)
+    await this.prisma.tenant.delete({ where: { id } });
+
+    return { message: 'Tenant excluído com sucesso', name: tenant.name, usersDeactivated: userCount };
+  }
+
   // ── Notificações em massa (admin platform-wide) ─────────────
 
   async listBroadcasts() {
