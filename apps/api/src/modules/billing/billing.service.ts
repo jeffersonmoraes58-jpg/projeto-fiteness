@@ -335,37 +335,50 @@ export class BillingService {
     const mpConfigured = new MercadoPagoConfig({ accessToken: token });
     const prefApi = new Preference(mpConfigured);
 
-    const result = await prefApi.create({
-      body: {
-        items: [
-          {
-            id: invoice.id,
-            title: invoice.description ?? 'Mensalidade Personal Trainer',
-            quantity: 1,
-            unit_price: invoice.amount,
-            currency_id: 'BRL',
+    let result: any;
+    try {
+      result = await prefApi.create({
+        body: {
+          items: [
+            {
+              id: invoice.id,
+              title: invoice.description ?? 'Mensalidade Personal Trainer',
+              quantity: 1,
+              unit_price: invoice.amount,
+              currency_id: 'BRL',
+            },
+          ],
+          payer: {
+            email: student.user.email,
+            name: student.user.profile?.firstName ?? 'Aluno',
+            surname: student.user.profile?.lastName ?? '',
           },
-        ],
-        payer: {
-          email: student.user.email,
-          name: student.user.profile?.firstName ?? 'Aluno',
-          surname: student.user.profile?.lastName ?? '',
-        },
-        // auto_return requires publicly accessible URLs — omit on localhost
-        ...(frontendUrl.includes('localhost') ? {} : {
-          back_urls: {
-            success: `${frontendUrl}/student/billing?payment=success`,
-            failure: `${frontendUrl}/student/billing?payment=failure`,
-            pending: `${frontendUrl}/student/billing?payment=pending`,
+          // auto_return requires publicly accessible URLs — omit on localhost
+          ...(frontendUrl.includes('localhost') ? {} : {
+            back_urls: {
+              success: `${frontendUrl}/student/billing?payment=success`,
+              failure: `${frontendUrl}/student/billing?payment=failure`,
+              pending: `${frontendUrl}/student/billing?payment=pending`,
+            },
+            auto_return: 'approved',
+          }),
+          external_reference: invoice.id,
+          payment_methods: {
+            excluded_payment_types: [{ id: 'ticket' }],
           },
-          auto_return: 'approved',
-        }),
-        external_reference: invoice.id,
-        payment_methods: {
-          excluded_payment_types: [{ id: 'ticket' }],
         },
-      },
-    });
+      });
+    } catch (err: any) {
+      const mpMessage = err?.message || err?.error?.message || JSON.stringify(err);
+      if (mpMessage.includes('Unauthorized') || mpMessage.includes('unauthorized')) {
+        throw new BadRequestException(
+          'Token do Mercado Pago inválido ou sem permissão. Verifique se o token é de produção e tem as permissões necessárias.',
+        );
+      }
+      throw new BadRequestException(
+        `Erro ao criar checkout no Mercado Pago: ${mpMessage.slice(0, 200)}`,
+      );
+    }
 
     return {
       checkoutUrl: result.init_point,
@@ -418,20 +431,33 @@ export class BillingService {
     const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
     const paymentApi = new Payment(mpConfigured);
 
-    const result = await paymentApi.create({
-      body: {
-        transaction_amount: invoice.amount,
-        description: invoice.description ?? 'Mensalidade Personal Trainer',
-        payment_method_id: 'pix',
-        payer: {
-          email: student.user.email,
-          first_name: student.user.profile?.firstName ?? 'Aluno',
-          last_name: student.user.profile?.lastName ?? '',
+    let result: any;
+    try {
+      result = await paymentApi.create({
+        body: {
+          transaction_amount: invoice.amount,
+          description: invoice.description ?? 'Mensalidade Personal Trainer',
+          payment_method_id: 'pix',
+          payer: {
+            email: student.user.email,
+            first_name: student.user.profile?.firstName ?? 'Aluno',
+            last_name: student.user.profile?.lastName ?? '',
+          },
+          date_of_expiration: expiresAt.toISOString(),
         },
-        date_of_expiration: expiresAt.toISOString(),
-      },
-      requestOptions: { idempotencyKey: invoiceId },
-    });
+        requestOptions: { idempotencyKey: invoiceId },
+      });
+    } catch (err: any) {
+      const mpMessage = err?.message || err?.error?.message || JSON.stringify(err);
+      if (mpMessage.includes('Unauthorized') || mpMessage.includes('unauthorized')) {
+        throw new BadRequestException(
+          'Token do Mercado Pago inválido ou sem permissão para pagamentos PIX. Verifique se o token é de produção e tem as permissões necessárias.',
+        );
+      }
+      throw new BadRequestException(
+        `Erro ao gerar PIX no Mercado Pago: ${mpMessage.slice(0, 200)}`,
+      );
+    }
 
     const qrCode = (result as any).point_of_interaction?.transaction_data?.qr_code ?? '';
     const qrBase64 = (result as any).point_of_interaction?.transaction_data?.qr_code_base64 ?? '';
