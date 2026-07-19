@@ -859,38 +859,52 @@ function WorkoutMusicPlayer() {
   const [searchError, setSearchError] = useState('');
   const [activeResultId, setActiveResultId] = useState('');
   const [isPlaying, setIsPlaying] = useState(false);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const [ytReady, setYtReady] = useState(false);
+  const playerRef = useRef<any>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
-  const STREAM_BASE = (process.env.NEXT_PUBLIC_API_URL || '') + '/api/v1/music/stream/';
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if ((window as any).YT?.Player) { setYtReady(true); return; }
+    const tag = document.createElement('script');
+    tag.src = 'https://www.youtube.com/iframe_api';
+    document.head.appendChild(tag);
+    (window as any).onYouTubeIframeAPIReady = () => setYtReady(true);
+    return () => { tag.remove(); };
+  }, []);
 
-  function setupMediaSession(title: string, author: string, thumb: string) {
-    if (!('mediaSession' in navigator)) return;
-    navigator.mediaSession.metadata = new MediaMetadata({
-      title,
-      artist: author || 'YouTube Music',
-      artwork: thumb ? [{ src: thumb, sizes: '320x180', type: 'image/jpeg' }] : [],
+  useEffect(() => {
+    if (!ytReady || !containerRef.current || playerRef.current) return;
+    playerRef.current = new (window as any).YT.Player(containerRef.current, {
+      height: '0',
+      width: '0',
+      playerVars: { autoplay: 0, controls: 0, disablekb: 1, modestbranding: 1, rel: 0 },
+      events: {
+        onStateChange: (e: any) => {
+          const playing = e.data === (window as any).YT?.PlayerState?.PLAYING;
+          setIsPlaying(playing);
+        },
+      },
     });
-    navigator.mediaSession.setActionHandler('play', () => { audioRef.current?.play(); setIsPlaying(true); });
-    navigator.mediaSession.setActionHandler('pause', () => { audioRef.current?.pause(); setIsPlaying(false); });
-    navigator.mediaSession.setActionHandler('stop', () => {
-      const a = audioRef.current;
-      if (a) { a.pause(); a.currentTime = 0; }
-      setIsPlaying(false);
-    });
-  }
+  }, [ytReady]);
 
   function playVideoId(videoId: string, label: string, thumb: string, author: string) {
-    const audio = audioRef.current;
-    if (!audio) return;
-    audio.src = STREAM_BASE + videoId;
-    audio.load();
-    audio.play().then(() => {
-      setIsPlaying(true);
-      setupMediaSession(label, author, thumb);
-    }).catch(() => setIsPlaying(false));
-    audio.onended = () => setIsPlaying(false);
-    audio.onpause = () => setIsPlaying(false);
-    audio.onplay = () => setIsPlaying(true);
+    const player = playerRef.current;
+    if (!player?.loadVideoById) {
+      setTimeout(() => playVideoId(videoId, label, thumb, author), 500);
+      return;
+    }
+    player.loadVideoById(videoId);
+    setActiveVideoId(videoId);
+    setActiveLabel(label);
+    setActiveThumb(thumb);
+    setActiveAuthor(author);
+    if ('mediaSession' in navigator) {
+      navigator.mediaSession.metadata = new MediaMetadata({
+        title: label, artist: author || 'YouTube Music',
+        artwork: thumb ? [{ src: thumb, sizes: '320x180', type: 'image/jpeg' }] : [],
+      });
+    }
   }
 
   async function doSearch(q: string, label?: string) {
@@ -907,12 +921,6 @@ function WorkoutMusicPlayer() {
         setSearchError('Nenhum resultado. Tente outro termo.');
       } else {
         setSearchResults(results);
-        const first = results[0];
-        setActiveResultId(first.id);
-        setActiveVideoId(first.id);
-        setActiveThumb(first.thumbnail || '');
-        setActiveAuthor(first.author || '');
-        if (!label) setActiveLabel(first.title.slice(0, 28));
       }
     } catch {
       setSearchError('Erro ao buscar. Tente novamente.');
@@ -923,17 +931,20 @@ function WorkoutMusicPlayer() {
 
   function playResult(result: MusicSearchResult) {
     setActiveResultId(result.id);
-    setActiveVideoId(result.id);
-    setActiveThumb(result.thumbnail || '');
-    setActiveAuthor(result.author || '');
     const label = result.title.slice(0, 28);
-    setActiveLabel(label);
     playVideoId(result.id, label, result.thumbnail, result.author);
   }
 
+  function togglePlayPause() {
+    const player = playerRef.current;
+    if (!player) return;
+    if (isPlaying) { player.pauseVideo(); }
+    else { player.playVideo(); }
+  }
+
   function stopAudio() {
-    const a = audioRef.current;
-    if (a) { a.pause(); a.currentTime = 0; }
+    const player = playerRef.current;
+    if (player?.stopVideo) player.stopVideo();
     setIsPlaying(false);
     setActiveVideoId('');
     setActiveLabel('');
@@ -941,8 +952,18 @@ function WorkoutMusicPlayer() {
     if ('mediaSession' in navigator) navigator.mediaSession.metadata = null;
   }
 
+  useEffect(() => {
+    if (!('mediaSession' in navigator)) return;
+    navigator.mediaSession.setActionHandler('play', () => { playerRef.current?.playVideo(); });
+    navigator.mediaSession.setActionHandler('pause', () => { playerRef.current?.pauseVideo(); });
+    navigator.mediaSession.setActionHandler('stop', () => stopAudio());
+  }, []);
+
   return (
     <div className="glass-card overflow-hidden">
+      {/* Hidden YouTube IFrame Player */}
+      <div ref={containerRef} className="absolute w-0 h-0 overflow-hidden opacity-0 pointer-events-none" />
+
       {/* Header */}
       <button onClick={() => setOpen((o) => !o)} className="w-full flex items-center justify-between">
         <div className="flex items-center gap-2 min-w-0">
@@ -1042,23 +1063,15 @@ function WorkoutMusicPlayer() {
           </div>
         )}
 
-        {/* Always-rendered hidden audio element — plays via stream proxy */}
-        <audio ref={audioRef} preload="auto" playsInline className="hidden" />
-
         {activeVideoId ? (
-          /* Mini audio status bar */
+          /* Mini player status bar */
           <div className="flex items-center gap-2 rounded-lg bg-red-500/10 border border-red-500/20 px-3 py-2">
             <div className="w-5 h-5 rounded-full bg-red-500/30 flex items-center justify-center flex-shrink-0">
               <span className={cn('block w-1.5 h-1.5 rounded-full bg-red-400', isPlaying && 'animate-pulse')} />
             </div>
             <span className="text-xs font-medium truncate flex-1">{activeLabel || 'Tocando'}</span>
             <button
-              onClick={() => {
-                const a = audioRef.current;
-                if (!a) return;
-                if (isPlaying) { a.pause(); setIsPlaying(false); }
-                else { a.play().then(() => setIsPlaying(true)).catch(() => {}); }
-              }}
+              onClick={togglePlayPause}
               className="w-6 h-6 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center flex-shrink-0 transition-all"
               title={isPlaying ? 'Pausar' : 'Tocar'}
             >
