@@ -3,7 +3,9 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { ScheduleModule } from '@nestjs/schedule';
 import { BullModule } from '@nestjs/bull';
+import { APP_INTERCEPTOR } from '@nestjs/core';
 import { PrismaModule } from './modules/prisma/prisma.module';
+import { AuditInterceptor } from './interceptors/audit.interceptor';
 import { AuthModule } from './modules/auth/auth.module';
 import { UsersModule } from './modules/users/users.module';
 import { TrainersModule } from './modules/trainers/trainers.module';
@@ -80,6 +82,12 @@ import { PushModule } from './modules/push/push.module';
     SubscriptionsModule,
     CloudinaryGifsModule,
     PushModule,
+  ],
+  providers: [
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: AuditInterceptor,
+    },
   ],
 })
 export class AppModule {}

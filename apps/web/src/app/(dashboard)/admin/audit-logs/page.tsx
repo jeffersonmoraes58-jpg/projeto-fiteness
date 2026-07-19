@@ -17,6 +17,42 @@ const ROLE_LABELS: Record<string, string> = {
   ADMIN: 'Admin', STUDIO_OWNER: 'Studio',
 };
 
+function actionColor(action: string) {
+  if (action?.includes('DELETE') || action?.includes('REMOVE')) return 'bg-red-500/10 text-red-400';
+  if (action?.includes('CREATE') || action?.includes('ADD')) return 'bg-emerald-500/10 text-emerald-400';
+  if (action?.includes('UPDATE') || action?.includes('EDIT')) return 'bg-blue-500/10 text-blue-400';
+  if (action?.includes('LOGIN')) return 'bg-purple-500/10 text-purple-400';
+  return 'bg-white/5 text-muted-foreground';
+}
+
+function LogRow({ log }: { log: any }) {
+  return (
+    <div className="flex flex-col gap-2 px-4 py-3 sm:hidden">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2 min-w-0">
+          <div className="w-6 h-6 rounded-full bg-white/10 flex items-center justify-center flex-shrink-0">
+            <User className="w-3 h-3 text-muted-foreground" />
+          </div>
+          <div className="min-w-0">
+            <div className="text-xs font-medium truncate">{log.user?.email ?? 'Sistema'}</div>
+            <div className="text-[10px] text-muted-foreground">{ROLE_LABELS[log.user?.role] || log.user?.role || '—'}</div>
+          </div>
+        </div>
+        <span className={cn('text-[10px] font-medium px-2 py-0.5 rounded-full flex-shrink-0', actionColor(log.action))}>
+          {log.action}
+        </span>
+      </div>
+      <div className="flex items-center gap-3 text-[11px] text-muted-foreground ml-8">
+        <span>{new Date(log.createdAt).toLocaleString('pt-BR')}</span>
+        {(log.resource || log.resourceId) && (
+          <span className="truncate">{log.resource}{log.resourceId ? ` #${log.resourceId.slice(0, 8)}` : ''}</span>
+        )}
+        {log.ipAddress && <span className="font-mono">{log.ipAddress}</span>}
+      </div>
+    </div>
+  );
+}
+
 export default function AdminAuditLogs() {
   const [search, setSearch] = useState('');
   const [actionFilter, setActionFilter] = useState('');
@@ -107,7 +143,7 @@ export default function AdminAuditLogs() {
       </div>
 
       {/* Table */}
-      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="glass-card overflow-hidden">
+      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="glass-card !p-0 overflow-hidden">
         {isLoading ? (
           <div className="p-8 space-y-3">
             {[...Array(6)].map((_, i) => (
@@ -124,7 +160,15 @@ export default function AdminAuditLogs() {
           </div>
         ) : (
           <>
-            <div className="overflow-x-auto">
+            {/* Mobile cards */}
+            <div className="sm:hidden divide-y divide-border/10">
+              {logs.map((log: any) => (
+                <LogRow key={log.id} log={log} />
+              ))}
+            </div>
+
+            {/* Desktop table */}
+            <div className="hidden sm:block overflow-x-auto">
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-border/30">
@@ -157,15 +201,7 @@ export default function AdminAuditLogs() {
                       <td className="p-3">
                         <span className={cn(
                           'text-xs font-medium px-2 py-0.5 rounded-full',
-                          log.action?.includes('DELETE') || log.action?.includes('REMOVE')
-                            ? 'bg-red-500/10 text-red-400'
-                            : log.action?.includes('CREATE') || log.action?.includes('ADD')
-                            ? 'bg-emerald-500/10 text-emerald-400'
-                            : log.action?.includes('UPDATE') || log.action?.includes('EDIT')
-                            ? 'bg-blue-500/10 text-blue-400'
-                            : log.action?.includes('LOGIN')
-                            ? 'bg-purple-500/10 text-purple-400'
-                            : 'bg-white/5 text-muted-foreground',
+                          actionColor(log.action),
                         )}>
                           {log.action}
                         </span>
