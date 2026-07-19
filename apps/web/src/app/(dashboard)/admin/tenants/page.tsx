@@ -221,7 +221,7 @@ export default function AdminTenants() {
       </div>
 
       {/* Tenant list */}
-      <div className="glass-card !p-0 overflow-hidden">
+      <div className="glass-card !p-0 overflow-visible">
         <div className="hidden sm:grid grid-cols-[2fr_1fr_1fr_1fr_1fr_80px] gap-4 px-4 py-3 border-b border-border/50 text-xs text-muted-foreground font-medium">
           <span>Academia / Estúdio</span>
           <span>Plano</span>

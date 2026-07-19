@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState } from 'react';
 import { motion } from 'framer-motion';
 import toast from 'react-hot-toast';
 import {
@@ -243,7 +243,7 @@ export default function AdminSubscriptions() {
       </div>
 
       {/* Subscriptions table */}
-      <div className="glass-card !p-0 overflow-hidden">
+      <div className="glass-card !p-0 overflow-visible">
         <div className="hidden sm:grid grid-cols-[2fr_1fr_1fr_1fr_1fr_60px] gap-4 px-4 py-3 border-b border-border/50 text-xs text-muted-foreground font-medium">
           <span>Tenant</span>
           <span>Plano</span>
@@ -302,12 +302,10 @@ function SubActionMenu({ sub, onChangePlan, onCancel }: {
   sub: any; onChangePlan: (p: string) => void; onCancel: () => void;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
-  const btnRef = useRef<HTMLButtonElement>(null);
 
   return (
     <div className="relative">
       <button
-        ref={btnRef}
         onClick={() => setMenuOpen((v) => !v)}
         className="w-8 h-8 rounded-lg hover:bg-accent flex items-center justify-center transition-all"
       >
@@ -316,17 +314,7 @@ function SubActionMenu({ sub, onChangePlan, onCancel }: {
       {menuOpen && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setMenuOpen(false)} />
-          <div
-            className="fixed z-50 w-48 glass-card !p-1 shadow-xl"
-            style={{
-              top: btnRef.current
-                ? Math.min(btnRef.current.getBoundingClientRect().bottom + 4, window.innerHeight - 240)
-                : 'auto',
-              right: btnRef.current
-                ? window.innerWidth - btnRef.current.getBoundingClientRect().right
-                : 0,
-            }}
-          >
+          <div className="absolute right-0 top-full mt-1 z-50 w-48 glass-card !p-1 shadow-xl">
             <div className="px-3 py-1.5 text-[10px] text-muted-foreground font-medium uppercase tracking-wide">Alterar plano</div>
             {Object.entries(PLAN_CONFIG).filter(([key]) => key !== sub.plan).map(([key, p]) => (
               <button key={key} onClick={() => { onChangePlan(key); setMenuOpen(false); }}
