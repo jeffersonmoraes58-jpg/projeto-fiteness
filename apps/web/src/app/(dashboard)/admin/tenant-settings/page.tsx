@@ -117,7 +117,7 @@ export default function AdminTenantSettings() {
           </div>
         ) : (
           settings.map((s: any) => (
-            <div key={s.id} className="glass-card">
+            <div key={s.tenantId} className="glass-card">
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">

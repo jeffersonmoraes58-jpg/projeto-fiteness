@@ -746,19 +746,32 @@ export class AdminService {
   async getAllTenantSettings(search?: string, page = 1, limit = 20) {
     const where: any = {};
     if (search) {
-      where.tenant = { name: { contains: search, mode: 'insensitive' } };
+      where.name = { contains: search, mode: 'insensitive' };
     }
-    const [settings, total] = await Promise.all([
-      this.prisma.tenantSettings.findMany({
+    const [tenants, total] = await Promise.all([
+      this.prisma.tenant.findMany({
         where,
         skip: (page - 1) * limit,
         take: limit,
-        include: { tenant: { select: { id: true, name: true } } },
-        orderBy: { updatedAt: 'desc' },
+        include: { settings: true },
+        orderBy: { createdAt: 'desc' },
       }),
-      this.prisma.tenantSettings.count({ where }),
+      this.prisma.tenant.count({ where }),
     ]);
-    return { settings, total, page, limit };
+    const results = tenants.map((t) => ({
+      id: t.settings?.id || null,
+      tenantId: t.id,
+      tenant: { id: t.id, name: t.name },
+      enableAI: t.settings?.enableAI ?? true,
+      enableChat: t.settings?.enableChat ?? true,
+      enableNotifications: t.settings?.enableNotifications ?? true,
+      enableGamification: t.settings?.enableGamification ?? true,
+      enableNutrition: t.settings?.enableNutrition ?? true,
+      allowStudentSelfSignup: t.settings?.allowStudentSelfSignup ?? true,
+      maxStudents: t.settings?.maxStudents ?? 50,
+      maxTrainers: t.settings?.maxTrainers ?? 5,
+    }));
+    return { settings: results, total, page, limit };
   }
 
   async updateTenantSettings(tenantId: string, data: {
