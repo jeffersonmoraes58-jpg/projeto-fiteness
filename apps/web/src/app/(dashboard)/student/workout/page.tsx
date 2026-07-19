@@ -860,17 +860,8 @@ function WorkoutMusicPlayer() {
   const [activeResultId, setActiveResultId] = useState('');
   const [isPlaying, setIsPlaying] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  const audioInstanceRef = useRef<HTMLAudioElement | null>(null);
 
   const STREAM_BASE = (process.env.NEXT_PUBLIC_API_URL || '') + '/api/v1/music/stream/';
-
-  function getAudio(): HTMLAudioElement {
-    if (!audioInstanceRef.current) {
-      audioInstanceRef.current = new Audio();
-      audioInstanceRef.current.preload = 'auto';
-    }
-    return audioInstanceRef.current;
-  }
 
   function setupMediaSession(title: string, author: string, thumb: string) {
     if (!('mediaSession' in navigator)) return;
@@ -879,10 +870,27 @@ function WorkoutMusicPlayer() {
       artist: author || 'YouTube Music',
       artwork: thumb ? [{ src: thumb, sizes: '320x180', type: 'image/jpeg' }] : [],
     });
-    const audio = getAudio();
-    navigator.mediaSession.setActionHandler('play', () => { audio.play(); setIsPlaying(true); });
-    navigator.mediaSession.setActionHandler('pause', () => { audio.pause(); setIsPlaying(false); });
-    navigator.mediaSession.setActionHandler('stop', () => { audio.pause(); audio.currentTime = 0; setIsPlaying(false); });
+    navigator.mediaSession.setActionHandler('play', () => { audioRef.current?.play(); setIsPlaying(true); });
+    navigator.mediaSession.setActionHandler('pause', () => { audioRef.current?.pause(); setIsPlaying(false); });
+    navigator.mediaSession.setActionHandler('stop', () => {
+      const a = audioRef.current;
+      if (a) { a.pause(); a.currentTime = 0; }
+      setIsPlaying(false);
+    });
+  }
+
+  function playVideoId(videoId: string, label: string, thumb: string, author: string) {
+    const audio = audioRef.current;
+    if (!audio) return;
+    audio.src = STREAM_BASE + videoId;
+    audio.load();
+    audio.play().then(() => {
+      setIsPlaying(true);
+      setupMediaSession(label, author, thumb);
+    }).catch(() => setIsPlaying(false));
+    audio.onended = () => setIsPlaying(false);
+    audio.onpause = () => setIsPlaying(false);
+    audio.onplay = () => setIsPlaying(true);
   }
 
   async function doSearch(q: string, label?: string) {
@@ -899,13 +907,12 @@ function WorkoutMusicPlayer() {
         setSearchError('Nenhum resultado. Tente outro termo.');
       } else {
         setSearchResults(results);
-        setActiveResultId(results[0].id);
-        setActiveVideoId(results[0].id);
-        setActiveThumb(results[0].thumbnail || '');
-        setActiveAuthor(results[0].author || '');
-        const label0 = results[0].title.slice(0, 28);
-        if (!label) setActiveLabel(label0);
-        playAudio(results[0].id, label0 || results[0].title.slice(0, 28), results[0].thumbnail, results[0].author);
+        const first = results[0];
+        setActiveResultId(first.id);
+        setActiveVideoId(first.id);
+        setActiveThumb(first.thumbnail || '');
+        setActiveAuthor(first.author || '');
+        if (!label) setActiveLabel(first.title.slice(0, 28));
       }
     } catch {
       setSearchError('Erro ao buscar. Tente novamente.');
@@ -921,25 +928,12 @@ function WorkoutMusicPlayer() {
     setActiveAuthor(result.author || '');
     const label = result.title.slice(0, 28);
     setActiveLabel(label);
-    playAudio(result.id, label, result.thumbnail, result.author);
-  }
-
-  function playAudio(videoId: string, label: string, thumb: string, author: string) {
-    const audio = getAudio();
-    audio.src = STREAM_BASE + videoId;
-    audio.play().then(() => {
-      setIsPlaying(true);
-      setupMediaSession(label, author, thumb);
-    }).catch(() => setIsPlaying(false));
-    audio.onended = () => setIsPlaying(false);
-    audio.onpause = () => setIsPlaying(false);
-    audio.onplay = () => setIsPlaying(true);
+    playVideoId(result.id, label, result.thumbnail, result.author);
   }
 
   function stopAudio() {
-    const audio = getAudio();
-    audio.pause();
-    audio.currentTime = 0;
+    const a = audioRef.current;
+    if (a) { a.pause(); a.currentTime = 0; }
     setIsPlaying(false);
     setActiveVideoId('');
     setActiveLabel('');
@@ -1048,35 +1042,38 @@ function WorkoutMusicPlayer() {
           </div>
         )}
 
-        {/* Audio-only player — native <audio> with MediaSession for background play */}
+        {/* Always-rendered hidden audio element — plays via stream proxy */}
+        <audio ref={audioRef} preload="auto" playsInline className="hidden" />
+
         {activeVideoId ? (
-          <>
-            {/* Hidden audio element — plays via stream proxy */}
-            <audio ref={(el) => { audioRef.current = el; if (el) audioInstanceRef.current = el; }} preload="auto" className="hidden" />
-            {/* Mini audio status bar */}
-            <div className="flex items-center gap-2 rounded-lg bg-red-500/10 border border-red-500/20 px-3 py-2">
-              <div className="w-5 h-5 rounded-full bg-red-500/30 flex items-center justify-center flex-shrink-0">
-                <span className={cn('block w-1.5 h-1.5 rounded-full bg-red-400', isPlaying && 'animate-pulse')} />
-              </div>
-              <span className="text-xs font-medium truncate flex-1">{activeLabel || 'Tocando'}</span>
-              <button
-                onClick={() => { const a = getAudio(); if (isPlaying) { a.pause(); setIsPlaying(false); } else { a.play().catch(() => {}); } }}
-                className="w-6 h-6 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center flex-shrink-0 transition-all"
-                title={isPlaying ? 'Pausar' : 'Tocar'}
-              >
-                {isPlaying
-                  ? <span className="block w-1.5 h-3 bg-white/80 border-r border-white/80" />
-                  : <span className="block w-0 h-0 border-t-[4px] border-t-transparent border-b-[4px] border-b-transparent border-l-[6px] border-l-white/80 ml-0.5" />}
-              </button>
-              <button
-                onClick={stopAudio}
-                className="w-5 h-5 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center flex-shrink-0 transition-all"
-                title="Parar música"
-              >
-                <X className="w-3 h-3" />
-              </button>
+          /* Mini audio status bar */
+          <div className="flex items-center gap-2 rounded-lg bg-red-500/10 border border-red-500/20 px-3 py-2">
+            <div className="w-5 h-5 rounded-full bg-red-500/30 flex items-center justify-center flex-shrink-0">
+              <span className={cn('block w-1.5 h-1.5 rounded-full bg-red-400', isPlaying && 'animate-pulse')} />
             </div>
-          </>
+            <span className="text-xs font-medium truncate flex-1">{activeLabel || 'Tocando'}</span>
+            <button
+              onClick={() => {
+                const a = audioRef.current;
+                if (!a) return;
+                if (isPlaying) { a.pause(); setIsPlaying(false); }
+                else { a.play().then(() => setIsPlaying(true)).catch(() => {}); }
+              }}
+              className="w-6 h-6 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center flex-shrink-0 transition-all"
+              title={isPlaying ? 'Pausar' : 'Tocar'}
+            >
+              {isPlaying
+                ? <span className="block w-1.5 h-3 bg-white/80 border-r border-white/80" />
+                : <span className="block w-0 h-0 border-t-[4px] border-t-transparent border-b-[4px] border-b-transparent border-l-[6px] border-l-white/80 ml-0.5" />}
+            </button>
+            <button
+              onClick={stopAudio}
+              className="w-5 h-5 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center flex-shrink-0 transition-all"
+              title="Parar música"
+            >
+              <X className="w-3 h-3" />
+            </button>
+          </div>
         ) : (
           <div className="flex flex-col items-center justify-center gap-2 py-4">
             <Music className="w-6 h-6 text-red-400/40" />
