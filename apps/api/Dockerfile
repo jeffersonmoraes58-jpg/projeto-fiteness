@@ -20,7 +20,8 @@ RUN npm run build
 
 # ── Production runner ─────────────────────────────────────────────────────────
 FROM node:20-alpine AS runner
-RUN apk add --no-cache openssl
+RUN apk add --no-cache openssl python3 py3-pip ffmpeg
+RUN pip3 install --break-system-packages yt-dlp
 WORKDIR /app
 ENV NODE_ENV=production
 

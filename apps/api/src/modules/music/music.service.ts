@@ -210,26 +210,30 @@ export class MusicService {
   }
 
   async streamYouTubeAudio(videoId: string, res: Response) {
-    const ytdl = require('@distube/ytdl-core');
-    const url = `https://www.youtube.com/watch?v=${videoId}`;
+    const { execFile } = require('child_process') as typeof import('child_process');
+    const { promisify } = require('util') as typeof import('util');
+    const execFileAsync = promisify(execFile);
 
     try {
-      const info = await ytdl.getInfo(url);
-      const format = ytdl.chooseFormat(info.formats, {
-        quality: 'highestaudio',
-        filter: 'audioonly',
+      const { stdout } = await execFileAsync('yt-dlp', [
+        '-f', 'bestaudio',
+        '-g',
+        '--no-warnings',
+        `https://www.youtube.com/watch?v=${videoId}`,
+      ], { timeout: 30000 });
+
+      const audioUrl = stdout.trim().split('\n')[0];
+      if (!audioUrl) throw new Error('No audio URL returned by yt-dlp');
+
+      const streamRes = await fetch(audioUrl, {
+        headers: { 'User-Agent': 'Mozilla/5.0' },
       });
-
-      if (!format || !format.url) {
-        throw new Error('No audio format found');
-      }
-
-      const streamRes = await fetch(format.url);
       if (!streamRes.ok || !streamRes.body) {
         throw new Error(`Upstream returned ${streamRes.status}`);
       }
 
-      res.setHeader('Content-Type', 'audio/webm; codecs=opus');
+      const contentType = streamRes.headers.get('content-type') || 'audio/webm; codecs=opus';
+      res.setHeader('Content-Type', contentType);
       res.setHeader('Cache-Control', 'public, max-age=3600');
       res.setHeader('Accept-Ranges', 'bytes');
 
