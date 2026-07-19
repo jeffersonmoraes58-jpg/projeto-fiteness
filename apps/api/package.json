@@ -54,6 +54,7 @@
     "swagger-ui-express": "^5.0.1",
     "uuid": "^10.0.0",
     "web-push": "^3.6.7",
+    "@distube/ytdl-core": "^4.16.5",
     "yt-search": "^2.13.1"
   },
   "devDependencies": {

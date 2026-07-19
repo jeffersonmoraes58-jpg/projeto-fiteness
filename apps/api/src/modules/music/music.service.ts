@@ -1,5 +1,6 @@
-import { Injectable, BadGatewayException, ServiceUnavailableException } from '@nestjs/common';
+import { Injectable, BadGatewayException, ServiceUnavailableException, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { Response } from 'express';
 
 export interface MusicResult {
   id: string;
@@ -22,6 +23,7 @@ const INNERTUBE_CLIENT_VERSION = '2.20231121.08.00';
 @Injectable()
 export class MusicService {
   private spotifyCache: SpotifyTokenCache | null = null;
+  private readonly logger = new Logger('Music');
 
   constructor(private config: ConfigService) {}
 
@@ -205,5 +207,50 @@ export class MusicService {
     };
 
     return this.spotifyCache.token;
+  }
+
+  async streamYouTubeAudio(videoId: string, res: Response) {
+    const ytdl = require('@distube/ytdl-core');
+    const url = `https://www.youtube.com/watch?v=${videoId}`;
+
+    try {
+      const info = await ytdl.getInfo(url);
+      const format = ytdl.chooseFormat(info.formats, {
+        quality: 'highestaudio',
+        filter: 'audioonly',
+      });
+
+      if (!format || !format.url) {
+        throw new Error('No audio format found');
+      }
+
+      const streamRes = await fetch(format.url);
+      if (!streamRes.ok || !streamRes.body) {
+        throw new Error(`Upstream returned ${streamRes.status}`);
+      }
+
+      res.setHeader('Content-Type', 'audio/webm; codecs=opus');
+      res.setHeader('Cache-Control', 'public, max-age=3600');
+      res.setHeader('Accept-Ranges', 'bytes');
+
+      const reader = streamRes.body.getReader();
+      const pump = async (): Promise<void> => {
+        const { done, value } = await reader.read();
+        if (done) { res.end(); return; }
+        const canWrite = res.write(value);
+        if (!canWrite) {
+          await new Promise((resolve) => res.once('drain', resolve));
+        }
+        return pump();
+      };
+      await pump();
+    } catch (err: any) {
+      this.logger.warn(`Stream failed for ${videoId}: ${err.message}`);
+      if (!res.headersSent) {
+        res.status(502).json({ statusCode: 502, message: 'Não foi possível obter o stream de áudio.' });
+      } else {
+        res.end();
+      }
+    }
   }
 }

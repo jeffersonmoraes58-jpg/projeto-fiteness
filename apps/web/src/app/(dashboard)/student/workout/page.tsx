@@ -850,12 +850,40 @@ const GENRES = [
 function WorkoutMusicPlayer() {
   const [open, setOpen] = useState(true);
   const [activeLabel, setActiveLabel] = useState('');
-  const [embedSrc, setEmbedSrc] = useState('');
+  const [activeVideoId, setActiveVideoId] = useState('');
+  const [activeThumb, setActiveThumb] = useState('');
+  const [activeAuthor, setActiveAuthor] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [searching, setSearching] = useState(false);
   const [searchResults, setSearchResults] = useState<MusicSearchResult[]>([]);
   const [searchError, setSearchError] = useState('');
   const [activeResultId, setActiveResultId] = useState('');
+  const [isPlaying, setIsPlaying] = useState(false);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const audioInstanceRef = useRef<HTMLAudioElement | null>(null);
+
+  const STREAM_BASE = (process.env.NEXT_PUBLIC_API_URL || '') + '/api/v1/music/stream/';
+
+  function getAudio(): HTMLAudioElement {
+    if (!audioInstanceRef.current) {
+      audioInstanceRef.current = new Audio();
+      audioInstanceRef.current.preload = 'auto';
+    }
+    return audioInstanceRef.current;
+  }
+
+  function setupMediaSession(title: string, author: string, thumb: string) {
+    if (!('mediaSession' in navigator)) return;
+    navigator.mediaSession.metadata = new MediaMetadata({
+      title,
+      artist: author || 'YouTube Music',
+      artwork: thumb ? [{ src: thumb, sizes: '320x180', type: 'image/jpeg' }] : [],
+    });
+    const audio = getAudio();
+    navigator.mediaSession.setActionHandler('play', () => { audio.play(); setIsPlaying(true); });
+    navigator.mediaSession.setActionHandler('pause', () => { audio.pause(); setIsPlaying(false); });
+    navigator.mediaSession.setActionHandler('stop', () => { audio.pause(); audio.currentTime = 0; setIsPlaying(false); });
+  }
 
   async function doSearch(q: string, label?: string) {
     if (!q.trim()) return;
@@ -872,8 +900,12 @@ function WorkoutMusicPlayer() {
       } else {
         setSearchResults(results);
         setActiveResultId(results[0].id);
-        setEmbedSrc(results[0].embedUrl);
-        if (!label) setActiveLabel(results[0].title.slice(0, 28));
+        setActiveVideoId(results[0].id);
+        setActiveThumb(results[0].thumbnail || '');
+        setActiveAuthor(results[0].author || '');
+        const label0 = results[0].title.slice(0, 28);
+        if (!label) setActiveLabel(label0);
+        playAudio(results[0].id, label0 || results[0].title.slice(0, 28), results[0].thumbnail, results[0].author);
       }
     } catch {
       setSearchError('Erro ao buscar. Tente novamente.');
@@ -884,8 +916,35 @@ function WorkoutMusicPlayer() {
 
   function playResult(result: MusicSearchResult) {
     setActiveResultId(result.id);
-    setEmbedSrc(result.embedUrl);
-    setActiveLabel(result.title.slice(0, 28));
+    setActiveVideoId(result.id);
+    setActiveThumb(result.thumbnail || '');
+    setActiveAuthor(result.author || '');
+    const label = result.title.slice(0, 28);
+    setActiveLabel(label);
+    playAudio(result.id, label, result.thumbnail, result.author);
+  }
+
+  function playAudio(videoId: string, label: string, thumb: string, author: string) {
+    const audio = getAudio();
+    audio.src = STREAM_BASE + videoId;
+    audio.play().then(() => {
+      setIsPlaying(true);
+      setupMediaSession(label, author, thumb);
+    }).catch(() => setIsPlaying(false));
+    audio.onended = () => setIsPlaying(false);
+    audio.onpause = () => setIsPlaying(false);
+    audio.onplay = () => setIsPlaying(true);
+  }
+
+  function stopAudio() {
+    const audio = getAudio();
+    audio.pause();
+    audio.currentTime = 0;
+    setIsPlaying(false);
+    setActiveVideoId('');
+    setActiveLabel('');
+    setActiveResultId('');
+    if ('mediaSession' in navigator) navigator.mediaSession.metadata = null;
   }
 
   return (
@@ -989,29 +1048,28 @@ function WorkoutMusicPlayer() {
           </div>
         )}
 
-        {/* Audio-only player — iframe hidden, mini control bar above */}
-        {embedSrc ? (
+        {/* Audio-only player — native <audio> with MediaSession for background play */}
+        {activeVideoId ? (
           <>
-            {/* Hidden iframe — audio only */}
-            <div className="h-0 overflow-hidden">
-              <iframe
-                key={embedSrc}
-                src={embedSrc}
-                width="320"
-                height="180"
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                title="YouTube Audio"
-                style={{ border: 'none' }}
-              />
-            </div>
+            {/* Hidden audio element — plays via stream proxy */}
+            <audio ref={(el) => { audioRef.current = el; if (el) audioInstanceRef.current = el; }} preload="auto" className="hidden" />
             {/* Mini audio status bar */}
             <div className="flex items-center gap-2 rounded-lg bg-red-500/10 border border-red-500/20 px-3 py-2">
               <div className="w-5 h-5 rounded-full bg-red-500/30 flex items-center justify-center flex-shrink-0">
-                <span className="block w-1.5 h-1.5 rounded-full bg-red-400 animate-pulse" />
+                <span className={cn('block w-1.5 h-1.5 rounded-full bg-red-400', isPlaying && 'animate-pulse')} />
               </div>
               <span className="text-xs font-medium truncate flex-1">{activeLabel || 'Tocando'}</span>
               <button
-                onClick={() => { setEmbedSrc(''); setActiveLabel(''); setActiveResultId(''); }}
+                onClick={() => { const a = getAudio(); if (isPlaying) { a.pause(); setIsPlaying(false); } else { a.play().catch(() => {}); } }}
+                className="w-6 h-6 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center flex-shrink-0 transition-all"
+                title={isPlaying ? 'Pausar' : 'Tocar'}
+              >
+                {isPlaying
+                  ? <span className="block w-1.5 h-3 bg-white/80 border-r border-white/80" />
+                  : <span className="block w-0 h-0 border-t-[4px] border-t-transparent border-b-[4px] border-b-transparent border-l-[6px] border-l-white/80 ml-0.5" />}
+              </button>
+              <button
+                onClick={stopAudio}
                 className="w-5 h-5 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center flex-shrink-0 transition-all"
                 title="Parar música"
               >

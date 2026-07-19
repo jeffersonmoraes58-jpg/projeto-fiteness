@@ -1,5 +1,6 @@
-import { Controller, Get, Query, HttpException, HttpStatus } from '@nestjs/common';
+import { Controller, Get, Param, Query, Res, HttpException, HttpStatus } from '@nestjs/common';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
+import { Response } from 'express';
 import { Public } from '../../decorators/public.decorator';
 import { MusicService } from './music.service';
 
@@ -28,5 +29,18 @@ export class MusicController {
           HttpStatus.BAD_REQUEST,
         );
     }
+  }
+
+  @Public()
+  @Get('stream/:videoId')
+  @ApiOperation({ summary: 'Stream de áudio YouTube (proxy para background play)' })
+  async streamAudio(
+    @Param('videoId') videoId: string,
+    @Res() res: Response,
+  ) {
+    if (!videoId || !/^[a-zA-Z0-9_-]{11}$/.test(videoId)) {
+      throw new HttpException('Video ID inválido', HttpStatus.BAD_REQUEST);
+    }
+    await this.musicService.streamYouTubeAudio(videoId, res);
   }
 }
