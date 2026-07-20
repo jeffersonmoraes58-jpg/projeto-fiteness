@@ -214,12 +214,14 @@ export class MusicService {
     const { promisify } = require('util') as typeof import('util');
     const execFileAsync = promisify(execFile);
 
+    const cookiesPath = '/app/cookies/youtube-cookies.txt';
+
     try {
       const { stdout } = await execFileAsync('yt-dlp', [
         '-f', 'bestaudio',
         '-g',
         '--no-warnings',
-        '--cookies', '/app/cookies/youtube-cookies.txt',
+        '--cookies', cookiesPath,
         `https://www.youtube.com/watch?v=${videoId}`,
       ], { timeout: 30000 });
 
