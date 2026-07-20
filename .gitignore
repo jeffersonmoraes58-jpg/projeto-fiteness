@@ -49,3 +49,7 @@ infra/nginx/ssl/
 
 # Coverage
 apps/api/coverage/
+
+# Android keystores
+*.keystore
+*.jks

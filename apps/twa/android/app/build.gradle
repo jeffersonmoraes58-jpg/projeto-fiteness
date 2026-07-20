@@ -15,9 +15,9 @@ android {
     signingConfigs {
         release {
             storeFile file('release.keystore')
-            storePassword 'android'
+            storePassword System.getenv('KEYSTORE_STORE_PASSWORD') ?: 'F1tN!utr1_K3ystore#2026'
             keyAlias 'release'
-            keyPassword 'android'
+            keyPassword System.getenv('KEYSTORE_KEY_PASSWORD') ?: 'F1tN!utr1_K3ystore#2026'
         }
     }
 

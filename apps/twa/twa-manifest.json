@@ -17,8 +17,8 @@
     "alias": "release"
   },
   "signingKeyPasswords": {
-    "store": "android",
-    "key": "android"
+    "store": "F1tN!utr1_K3ystore#2026",
+    "key": "F1tN!utr1_K3ystore#2026"
   },
   "enableNotifications": true,
   "features": {},

@@ -30,7 +30,7 @@ Deve retornar:
     "namespace": "android_app",
     "package_name": "com.fitlynutri.app",
     "sha256_cert_fingerprints": [
-      "88:6F:7A:63:4E:02:D4:BB:88:05:2B:3C:51:C0:68:41:BD:D2:CC:22:1D:E5:CC:8B:D9:40:99:01:14:CA:F8:65"
+      "<SEU_NOVO_SHA256_AQUI>"
     ]
   }
 }]
@@ -40,9 +40,10 @@ Deve retornar:
 ```bash
 # Verificar se o APK está assinado com o keystore correto
 cd apps/twa/android
-keytool -list -v -keystore app/release.keystore -alias release -storepass android
+keytool -list -v -keystore app/release.keystore -alias release -storepass <SUA_SENHA_DO_KEYSTORE>
 ```
-O SHA-256 deve ser: `88:6F:7A:63:4E:02:D4:BB:88:05:2B:3C:51:C0:68:41:BD:D2:CC:22:1D:E5:CC:8B:D9:40:99:01:14:CA:F8:65`
+> A senha do keystore está em `build.gradle` (variável de ambiente `KEYSTORE_STORE_PASSWORD` ou fallback local).
+> Anote o SHA-256 retornado e atualize o `assetlinks.json` com ele.
 
 ### 3. Verificar package name
 O `applicationId` no `build.gradle` deve ser: `com.fitlynutri.app`
@@ -205,12 +206,21 @@ cd apps/twa/android && ./gradlew bundleRelease
 curl https://fitlynutri.com.br/.well-known/assetlinks.json
 
 # Verificar assinatura do keystore
-keytool -list -v -keystore apps/twa/android/app/release.keystore -alias release -storepass android
+keytool -list -v -keystore apps/twa/android/app/release.keystore -alias release -storepass <SUA_SENHA_DO_KEYSTORE>
 
 # Verificar se APK está assinado
 cd apps/twa/android/app/build/outputs/apk/release
 keytool -printcert -jarfile app-release.apk
 ```
+
+---
+
+## 🔒 Segurança do Keystore
+
+- O keystore (`release.keystore`) NUNCA deve ser commitado no git
+- A senha do keystore deve ser definida via variável de ambiente `KEYSTORE_STORE_PASSWORD` em produção
+- Se o keystore for comprometido, gere um novo com `keytool -genkeypair` e re-assine o app
+- Mantenha backup seguro do keystore em local fora do repositório
 
 ---
 
