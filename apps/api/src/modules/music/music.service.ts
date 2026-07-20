@@ -219,6 +219,7 @@ export class MusicService {
         '-f', 'bestaudio',
         '-g',
         '--no-warnings',
+        '--cookies', '/app/cookies/youtube-cookies.txt',
         `https://www.youtube.com/watch?v=${videoId}`,
       ], { timeout: 30000 });
 

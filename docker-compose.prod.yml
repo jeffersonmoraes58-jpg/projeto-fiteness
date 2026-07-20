@@ -81,6 +81,7 @@ services:
         condition: service_healthy
     volumes:
       - musclewiki_cache:/data/musclewiki-cache
+      - ./infra/cookies/youtube-cookies.txt:/app/cookies/youtube-cookies.txt:ro
     networks:
       fitsaas-network:
         aliases:
