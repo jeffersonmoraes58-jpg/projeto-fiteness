@@ -235,7 +235,7 @@ export class MusicService {
 
     try {
       const { stdout } = await execFileAsync('yt-dlp', [
-        '-f', 'bestaudio',
+        '-f', 'bestaudio/best',
         '-g',
         '--no-warnings',
         '--cookies', cookiesPath,
