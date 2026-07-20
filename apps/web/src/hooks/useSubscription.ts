@@ -67,7 +67,6 @@ export function useSubscription() {
     trialEndsAt,
     canUseFeature: (feature: keyof PlanLimits): boolean => {
       if (feature === 'maxStudents') return true;
-      if (status === 'TRIAL') return false; // Acesso bloqueado até confirmação de pagamento
       return limits?.[feature as keyof Omit<PlanLimits, 'maxStudents'>] ?? false;
     },
     isAtStudentLimit: (count: number): boolean => {

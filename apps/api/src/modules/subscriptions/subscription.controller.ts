@@ -4,6 +4,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../../decorators/current-user.decorator';
 import { SubscriptionService } from './subscription.service';
 import { Public } from '../../decorators/public.decorator';
+import { SkipSubscriptionCheck } from './skip-subscription-check.decorator';
 import { SubscriptionPlan, BillingInterval } from '@prisma/client';
 
 @ApiTags('subscriptions')
@@ -14,6 +15,7 @@ export class SubscriptionController {
   constructor(private subscriptionService: SubscriptionService) {}
 
   @Get('my')
+  @SkipSubscriptionCheck()
   @ApiOperation({ summary: 'Retorna o plano atual e limites de features do tenant' })
   getMyPlan(
     @CurrentUser('tenantId') tenantId: string,
@@ -23,6 +25,7 @@ export class SubscriptionController {
   }
 
   @Post('checkout')
+  @SkipSubscriptionCheck()
   @ApiOperation({ summary: 'Cria preferência de pagamento Mercado Pago para upgrade de plano' })
   createCheckout(
     @CurrentUser('tenantId') tenantId: string,

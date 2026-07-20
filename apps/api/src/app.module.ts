@@ -3,9 +3,10 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { ScheduleModule } from '@nestjs/schedule';
 import { BullModule } from '@nestjs/bull';
-import { APP_INTERCEPTOR } from '@nestjs/core';
+import { APP_INTERCEPTOR, APP_GUARD } from '@nestjs/core';
 import { PrismaModule } from './modules/prisma/prisma.module';
 import { AuditInterceptor } from './interceptors/audit.interceptor';
+import { ActiveSubscriptionGuard } from './modules/subscriptions/active-subscription.guard';
 import { AuthModule } from './modules/auth/auth.module';
 import { UsersModule } from './modules/users/users.module';
 import { TrainersModule } from './modules/trainers/trainers.module';
@@ -31,6 +32,7 @@ import { MusicModule } from './modules/music/music.module';
 import { SubscriptionsModule } from './modules/subscriptions/subscription.module';
 import { CloudinaryGifsModule } from './modules/cloudinary-gifs/cloudinary-gifs.module';
 import { PushModule } from './modules/push/push.module';
+import { MercadoPagoModule } from './modules/mercadopago/mercadopago.module';
 
 @Module({
   imports: [
@@ -82,11 +84,16 @@ import { PushModule } from './modules/push/push.module';
     SubscriptionsModule,
     CloudinaryGifsModule,
     PushModule,
+    MercadoPagoModule,
   ],
   providers: [
     {
       provide: APP_INTERCEPTOR,
       useClass: AuditInterceptor,
+    },
+    {
+      provide: APP_GUARD,
+      useClass: ActiveSubscriptionGuard,
     },
   ],
 })

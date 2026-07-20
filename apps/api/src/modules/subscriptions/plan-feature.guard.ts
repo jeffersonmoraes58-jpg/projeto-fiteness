@@ -25,20 +25,13 @@ export class PlanFeatureGuard implements CanActivate {
 
     if (!tenantId) throw new ForbiddenException('Tenant não identificado');
 
-    // Se o usuário tem planOverride, usa o plano efetivo (ignora checkFeature do tenant)
-    if (userId) {
-      const effectivePlan = await this.subscriptionService.getEffectivePlan(tenantId, userId);
-      for (const feature of features) {
-        const limits = PLAN_LIMITS[effectivePlan];
-        if (!limits[feature as keyof typeof limits] || limits[feature as keyof typeof limits] === false) {
-          throw new ForbiddenException(
-            `A funcionalidade "${feature}" não está disponível no seu plano. Faça upgrade para continuar.`,
-          );
-        }
-      }
-    } else {
-      for (const feature of features) {
-        await this.subscriptionService.checkFeature(tenantId, feature);
+    const effectivePlan = await this.subscriptionService.getEffectivePlan(tenantId, userId);
+    for (const feature of features) {
+      const limits = PLAN_LIMITS[effectivePlan];
+      if (!limits[feature as keyof typeof limits] || limits[feature as keyof typeof limits] === false) {
+        throw new ForbiddenException(
+          `A funcionalidade "${feature}" não está disponível no seu plano. Faça upgrade para continuar.`,
+        );
       }
     }
 
