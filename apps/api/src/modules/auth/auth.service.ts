@@ -84,7 +84,7 @@ export class AuthService {
       data: {
         email: dto.email,
         password: hashedPassword,
-        role: dto.role || UserRole.STUDENT,
+        role: dto.role === 'TRAINER' ? UserRole.TRAINER : dto.role === 'NUTRITIONIST' ? UserRole.NUTRITIONIST : dto.role === 'STUDIO_OWNER' ? UserRole.STUDIO_OWNER : UserRole.STUDENT,
         tenantId,
         profile: {
           create: {
@@ -386,7 +386,10 @@ export class AuthService {
   }
 
   async adminResetPassword(email: string, newPassword: string, adminKey: string) {
-    const expectedKey = this.config.get('ADMIN_RESET_KEY', 'FitlyReset@2026');
+    const expectedKey = this.config.get<string>('ADMIN_RESET_KEY');
+    if (!expectedKey) {
+      throw new BadRequestException('Funcionalidade não configurada. Defina ADMIN_RESET_KEY no ambiente.');
+    }
     if (adminKey !== expectedKey) {
       throw new UnauthorizedException('Chave de administrador inválida');
     }

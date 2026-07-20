@@ -2,11 +2,17 @@ const bcrypt = require("/app/node_modules/bcryptjs");
 const { PrismaClient } = require("/app/node_modules/@prisma/client");
 const prisma = new PrismaClient();
 
-// Altere os valores abaixo conforme necessário
-const TARGET_EMAIL = "jeffersonmoraes58@gmail.com";
-const NEW_PASSWORD = "Admin@123456"; // Troque pela senha que quiser
+// Uso: TARGET_EMAIL=xxx NEW_PASSWORD=xxx node reset-password.js
+const TARGET_EMAIL = process.env.TARGET_EMAIL;
+const NEW_PASSWORD = process.env.NEW_PASSWORD;
 
 async function main() {
+  if (!TARGET_EMAIL || !NEW_PASSWORD) {
+    console.error("Defina TARGET_EMAIL e NEW_PASSWORD via variáveis de ambiente.");
+    console.error("Exemplo: TARGET_EMAIL=user@example.com NEW_PASSWORD=NewPass123 node reset-password.js");
+    process.exit(1);
+  }
+
   const user = await prisma.user.findFirst({ where: { email: TARGET_EMAIL } });
 
   if (!user) {
@@ -36,7 +42,6 @@ async function main() {
 
   console.log("\nSenha resetada com sucesso!");
   console.log("  Email:", TARGET_EMAIL);
-  console.log("  Nova senha:", NEW_PASSWORD);
 }
 
 main()

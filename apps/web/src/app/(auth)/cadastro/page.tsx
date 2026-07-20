@@ -84,7 +84,6 @@ function CadastroConvite() {
         firstName: form.firstName.trim(),
         lastName: form.lastName.trim(),
         phone: form.phone || undefined,
-        role: 'STUDENT',
         tenantId,
         inviteToken: token,
       } as any);

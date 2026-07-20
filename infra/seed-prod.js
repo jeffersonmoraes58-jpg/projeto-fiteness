@@ -2,6 +2,14 @@ const bcrypt = require("/app/node_modules/bcryptjs");
 const { PrismaClient } = require("/app/node_modules/@prisma/client");
 const prisma = new PrismaClient();
 
+// Senhas devem ser definidas via variáveis de ambiente
+const DEMO_PASSWORDS = {
+  admin: process.env.SEED_ADMIN_PASSWORD || 'ChangeMe-Admin-123',
+  trainer: process.env.SEED_TRAINER_PASSWORD || 'ChangeMe-Trainer-123',
+  nutri: process.env.SEED_NUTRI_PASSWORD || 'ChangeMe-Nutri-123',
+  student: process.env.SEED_STUDENT_PASSWORD || 'ChangeMe-Student-123',
+};
+
 async function main() {
   console.log("Seeding...");
 
@@ -25,15 +33,15 @@ async function main() {
     return u;
   }
 
-  await upsert("admin@fitsaas.com", "Admin@123", "ADMIN", "Admin", "FitSaaS");
+  await upsert("admin@fitlynutri.com.br", DEMO_PASSWORDS.admin, "ADMIN", "Admin", "Fitlynutri");
 
-  const trainerUser = await upsert("trainer@demo.com", "Trainer@123", "TRAINER", "Joao", "Trainer");
+  const trainerUser = await upsert("trainer@demo.com", DEMO_PASSWORDS.trainer, "TRAINER", "Joao", "Trainer");
   await prisma.trainer.upsert({ where: { userId: trainerUser.id }, update: {}, create: { userId: trainerUser.id, specialties: ["Musculacao", "Funcional"] } });
 
-  const nutriUser = await upsert("nutri@demo.com", "Nutri@123", "NUTRITIONIST", "Maria", "Nutricionista");
+  const nutriUser = await upsert("nutri@demo.com", DEMO_PASSWORDS.nutri, "NUTRITIONIST", "Maria", "Nutricionista");
   await prisma.nutritionist.upsert({ where: { userId: nutriUser.id }, update: {}, create: { userId: nutriUser.id, specialties: ["Nutricao Esportiva"] } });
 
-  const studentUser = await upsert("student@demo.com", "Student@123", "STUDENT", "Pedro", "Aluno");
+  const studentUser = await upsert("student@demo.com", DEMO_PASSWORDS.student, "STUDENT", "Pedro", "Aluno");
   const student = await prisma.student.upsert({ where: { userId: studentUser.id }, update: {}, create: { userId: studentUser.id, points: 120, streak: 5, level: 2 } });
 
   const trainer = await prisma.trainer.findUnique({ where: { userId: trainerUser.id } });

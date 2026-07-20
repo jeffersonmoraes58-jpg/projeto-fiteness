@@ -11,7 +11,7 @@ import {
   HttpStatus,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
-import { ThrottlerGuard } from '@nestjs/throttler';
+import { ThrottlerGuard, Throttle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
 import { EmailService } from '../email/email.service';
 import { RegisterDto } from './dto/register.dto';
@@ -81,6 +81,7 @@ export class AuthController {
 
   @Public()
   @Post('admin-reset-password')
+  @Throttle({ default: { limit: 3, ttl: 60000 } })
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: '[Admin] Resetar senha de qualquer usuário (protegido por chave)' })
   async adminResetPassword(@Body() dto: AdminResetPasswordDto) {
