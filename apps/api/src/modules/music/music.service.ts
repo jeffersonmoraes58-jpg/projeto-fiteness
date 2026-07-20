@@ -209,10 +209,7 @@ export class MusicService {
     return this.spotifyCache.token;
   }
 
-  private cookiesReady = false;
-
   private async ensureCookies(): Promise<string> {
-    if (this.cookiesReady) return '/tmp/youtube-cookies.txt';
     const fs = require('fs') as typeof import('fs');
     const src = '/app/cookies/youtube-cookies.txt';
     const dst = '/tmp/youtube-cookies.txt';
@@ -220,7 +217,6 @@ export class MusicService {
       if (fs.existsSync(src)) {
         fs.copyFileSync(src, dst);
         fs.chmodSync(dst, 0o644);
-        this.cookiesReady = true;
       }
     } catch {}
     return dst;
@@ -239,6 +235,8 @@ export class MusicService {
         '-g',
         '--no-warnings',
         '--cookies', cookiesPath,
+        '--user-agent', 'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.6422.165 Mobile Safari/537.36',
+        '--extractor-args', 'youtube:player_client=ios',
         `https://www.youtube.com/watch?v=${videoId}`,
       ], { timeout: 30000 });
 
