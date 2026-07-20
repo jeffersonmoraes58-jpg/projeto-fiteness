@@ -209,12 +209,29 @@ export class MusicService {
     return this.spotifyCache.token;
   }
 
+  private cookiesReady = false;
+
+  private async ensureCookies(): Promise<string> {
+    if (this.cookiesReady) return '/tmp/youtube-cookies.txt';
+    const fs = require('fs') as typeof import('fs');
+    const src = '/app/cookies/youtube-cookies.txt';
+    const dst = '/tmp/youtube-cookies.txt';
+    try {
+      if (fs.existsSync(src)) {
+        fs.copyFileSync(src, dst);
+        fs.chmodSync(dst, 0o644);
+        this.cookiesReady = true;
+      }
+    } catch {}
+    return dst;
+  }
+
   async streamYouTubeAudio(videoId: string, res: Response) {
     const { execFile } = require('child_process') as typeof import('child_process');
     const { promisify } = require('util') as typeof import('util');
     const execFileAsync = promisify(execFile);
 
-    const cookiesPath = '/app/cookies/youtube-cookies.txt';
+    const cookiesPath = await this.ensureCookies();
 
     try {
       const { stdout } = await execFileAsync('yt-dlp', [
