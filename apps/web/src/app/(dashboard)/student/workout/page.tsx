@@ -1115,8 +1115,8 @@ function ExerciseRow({
 }) {
   const videoUrl: string | undefined = exercise.videoUrl;
   const name: string = exercise.name || '';
-  const thumbnailUrl: string | undefined = exercise.gifUrl;
-  const thumbnail = thumbnailUrl ? resolveImageUrl(thumbnailUrl) : getVideoThumbnail(videoUrl || '');
+  const rawThumb: string | undefined = exercise.gifUrl || exercise.thumbnailUrl;
+  const thumbnail = rawThumb ? resolveImageUrl(rawThumb) : getVideoThumbnail(videoUrl || '');
   const doneCount = completedSets.filter(Boolean).length;
   const allDone = isActive && doneCount >= exercise.sets;
 

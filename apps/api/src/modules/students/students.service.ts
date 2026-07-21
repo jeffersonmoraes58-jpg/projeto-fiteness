@@ -199,6 +199,7 @@ export class StudentsService {
           superSetGroupId: we.superSetGroupId,
           videoUrl: we.exercise.videoUrl,
           gifUrl: we.exercise.gifUrl,
+          thumbnailUrl: we.exercise.thumbnailUrl,
           category: we.exercise.category,
           description: we.exercise.description,
           instructions: we.exercise.instructions,
