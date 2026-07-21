@@ -9,7 +9,6 @@ const navLinks = [
   { label: 'Funcionalidades', href: '#features' },
   { label: 'Preços', href: '#pricing' },
   { label: 'Depoimentos', href: '#testimonials' },
-  { label: 'Blog', href: '/blog' },
 ];
 
 export function LandingNavbar() {

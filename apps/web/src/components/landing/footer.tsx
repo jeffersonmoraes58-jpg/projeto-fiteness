@@ -11,7 +11,6 @@ const links = {
   ],
   Empresa: [
     { label: 'Sobre nós', href: '/about' },
-    { label: 'Blog', href: '/blog' },
     { label: 'Contato', href: '/contact' },
     { label: 'Termos de uso', href: '/terms' },
     { label: 'Privacidade', href: '/privacy' },
