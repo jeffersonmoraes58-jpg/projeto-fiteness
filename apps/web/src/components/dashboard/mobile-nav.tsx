@@ -9,7 +9,7 @@ import { useAuthStore } from '@/store/auth';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
 
-const navByRole: Record<string, { icon: any; label: string; href: string; isChat?: boolean }[]> = {
+const navByRole: Record<string, { icon: any; label: string; href: string; isChat?: boolean; disabled?: boolean }[]> = {
   TRAINER: [
     { icon: Home, label: 'Início', href: '/trainer' },
     { icon: Users, label: 'Alunos', href: '/trainer/students' },
@@ -27,7 +27,7 @@ const navByRole: Record<string, { icon: any; label: string; href: string; isChat
   STUDENT: [
     { icon: Home, label: 'Início', href: '/student' },
     { icon: Dumbbell, label: 'Treino', href: '/student/workout' },
-    { icon: Clock, label: 'Dieta', href: '/student/diet' },
+    { icon: Clock, label: 'Dieta', href: '#', disabled: true },
     { icon: Activity, label: 'Evolução', href: '/student/progress' },
     { icon: MessageCircle, label: 'Chat', href: '/student/chat', isChat: true },
   ],
@@ -55,8 +55,22 @@ export function MobileNav() {
   return (
     <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-30 bg-card border-t border-border flex items-center safe-area-inset-bottom">
       {items.map((item) => {
-        const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
+        const isActive = !item.disabled && (pathname === item.href || pathname.startsWith(item.href + '/'));
         const badge = item.isChat ? unreadCount : 0;
+
+        if (item.disabled) {
+          return (
+            <div
+              key={item.href}
+              className="flex-1 flex flex-col items-center justify-center py-2 gap-0.5 text-muted-foreground/40 cursor-not-allowed relative"
+              title="Em breve"
+            >
+              <item.icon className="w-5 h-5" />
+              <span className="text-[10px] font-medium">{item.label}</span>
+            </div>
+          );
+        }
+
         return (
           <Link
             key={item.href}

@@ -446,6 +446,55 @@ export class EmailService {
   /**
    * Alerta o personal trainer por email quando um aluno está inativo há 7+ dias.
    */
+  async sendPasswordResetEmail(data: {
+    to: string;
+    firstName: string;
+    resetUrl: string;
+  }): Promise<{ sent: boolean; error?: string }> {
+    const html = `
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#0f0f1a;font-family:'Segoe UI',Arial,sans-serif">
+  <div style="max-width:560px;margin:32px auto;background:#1a1a2e;border-radius:16px;overflow:hidden;border:1px solid rgba(255,255,255,0.08)">
+    <div style="background:linear-gradient(135deg,#7c3aed,#2563eb);padding:32px 24px;text-align:center">
+      <div style="font-size:28px;font-weight:800;color:#fff;letter-spacing:-0.5px">Fitlynutri</div>
+      <div style="color:rgba(255,255,255,0.8);font-size:14px;margin-top:4px">Recuperação de Senha</div>
+    </div>
+    <div style="padding:32px 24px">
+      <p style="color:#e2e8f0;font-size:16px;margin:0 0 8px">Olá, <strong>${data.firstName}</strong>!</p>
+      <p style="color:#94a3b8;font-size:14px;margin:0 0 24px">
+        Recebemos uma solicitação para redefinir sua senha. Clique no botão abaixo para criar uma nova senha:
+      </p>
+      <div style="text-align:center;margin-bottom:24px">
+        <a href="${data.resetUrl}" style="display:inline-block;background:linear-gradient(135deg,#7c3aed,#2563eb);color:#fff;text-decoration:none;padding:14px 32px;border-radius:12px;font-weight:700;font-size:15px">
+          Redefinir minha senha →
+        </a>
+      </div>
+      <p style="color:#64748b;font-size:12px;margin:0 0 16px;text-align:center">
+        Caso o botão não funcione, copie e cole este link no navegador:<br>
+        <span style="color:#94a3b8;word-break:break-all">${data.resetUrl}</span>
+      </p>
+      <div style="background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);border-radius:12px;padding:16px;margin-bottom:8px">
+        <p style="color:#fca5a5;font-size:12px;margin:0">
+          ⏰ Este link expira em <strong>1 hora</strong>. Se você não solicitou a redefinição de senha, ignore este e-mail — sua senha permanecerá a mesma.
+        </p>
+      </div>
+    </div>
+    <div style="padding:16px 24px;border-top:1px solid rgba(255,255,255,0.06);text-align:center">
+      <p style="color:#475569;font-size:12px;margin:0">© 2026 Fitlynutri · Todos os direitos reservados</p>
+    </div>
+  </div>
+</body>
+</html>`;
+
+    return this.sendMail({
+      to: data.to,
+      subject: 'Redefina sua senha — Fitlynutri',
+      html,
+    });
+  }
+
   async sendInactivityAlert(data: {
     to: string;
     trainerName: string;

@@ -501,8 +501,12 @@ export class AuthService {
 
     const resetUrl = `${this.config.get('FRONTEND_URL', 'http://localhost:3000')}/reset-password?token=${token}`;
 
-    // TODO: replace with real email service (SendGrid, Resend, etc.)
-    console.log(`[PASSWORD RESET] ${user.email} → ${resetUrl}`);
+    const firstName = (user as any).profile?.firstName || user.email.split('@')[0];
+    await this.emailService.sendPasswordResetEmail({
+      to: user.email,
+      firstName,
+      resetUrl,
+    });
 
     return { message: 'Se o e-mail existir, você receberá as instruções.' };
   }

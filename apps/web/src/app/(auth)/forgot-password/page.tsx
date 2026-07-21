@@ -8,6 +8,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Dumbbell, Loader2, Mail, ArrowLeft, CheckCircle2 } from 'lucide-react';
 import { api } from '@/lib/api';
+import toast from 'react-hot-toast';
 
 const schema = z.object({
   email: z.string().email('E-mail inválido'),
@@ -24,9 +25,13 @@ export default function ForgotPasswordPage() {
   });
 
   const onSubmit = async (data: FormData) => {
-    await api.post('/auth/forgot-password', { email: data.email });
-    setSentEmail(data.email);
-    setSent(true);
+    try {
+      await api.post('/auth/forgot-password', { email: data.email });
+      setSentEmail(data.email);
+      setSent(true);
+    } catch {
+      toast.error('Erro ao enviar e-mail. Tente novamente.');
+    }
   };
 
   return (

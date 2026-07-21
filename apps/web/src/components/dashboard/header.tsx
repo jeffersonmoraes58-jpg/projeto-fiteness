@@ -8,7 +8,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
-import toast, { Toaster } from 'react-hot-toast';
+import toast from 'react-hot-toast';
 import { PushNotificationManager } from '@/components/push-notification-manager';
 
 const TYPE_CONFIG: Record<string, { icon: any; color: string; bg: string }> = {
@@ -94,8 +94,6 @@ export function DashboardHeader() {
   const hasUnread = unreadCount > 0;
 
   return (
-    <>
-    <Toaster position="top-right" />
     <header className="h-14 sm:h-16 border-b border-border/50 px-3 sm:px-4 lg:px-6 flex items-center gap-3 bg-background/80 backdrop-blur-xl sticky top-0 z-20 relative">
       {/* Mobile menu button — integrated in header */}
       <button
@@ -248,6 +246,5 @@ export function DashboardHeader() {
         </div>
       </div>
     </header>
-    </>
   );
 }
