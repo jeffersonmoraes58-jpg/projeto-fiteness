@@ -9,7 +9,6 @@ import './globals.css';
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
-  maximumScale: 1,
   themeColor: '#7c3aed',
 };
 
@@ -35,11 +34,20 @@ export const metadata: Metadata = {
     title: 'Fitlynutri - Plataforma Fitness Completa',
     description: 'Gerencie treinos, dietas e evolução com IA',
     siteName: 'Fitlynutri',
+    images: [
+      {
+        url: 'https://fitlynutri.com.br/og-image.png',
+        width: 1200,
+        height: 630,
+        alt: 'Fitlynutri — Plataforma Fitness Completa',
+      },
+    ],
   },
   twitter: {
     card: 'summary_large_image',
     title: 'Fitlynutri',
     description: 'Plataforma SaaS Fitness com IA',
+    images: ['https://fitlynutri.com.br/og-image.png'],
   },
   robots: { index: true, follow: true },
   icons: {

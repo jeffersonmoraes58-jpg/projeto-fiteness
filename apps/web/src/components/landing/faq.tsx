@@ -73,7 +73,7 @@ export function LandingFAQ() {
   const [openIndex, setOpenIndex] = useState<number | null>(0);
 
   return (
-    <section className="py-16 md:py-32 bg-gradient-dark">
+    <section id="faq" className="py-16 md:py-32 bg-gradient-dark">
       <div className="container mx-auto px-4 sm:px-6">
         <div className="max-w-3xl mx-auto">
           <motion.div
