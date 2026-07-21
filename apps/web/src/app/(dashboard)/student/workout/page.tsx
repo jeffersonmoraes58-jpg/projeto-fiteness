@@ -422,6 +422,8 @@ export default function StudentWorkout() {
           workoutName={activePlan.workout?.name || 'Treino'}
           startTime={startTime}
           isPending={logMutation.isPending}
+          weekWorkoutsCompleted={completedDaysThisWeek.size}
+          weekWorkoutsTotal={5}
           onConfirm={(intensity, comment, duration) => logMutation.mutate({ workoutPlanId: activePlan.id, intensity, comment, duration })}
           onClose={() => {
             setShowSummary(false);
@@ -1209,10 +1211,12 @@ function Circle({ className }: { className?: string }) {
 
 // ─── Workout Summary Modal ────────────────────────────────────────────────────
 
-function WorkoutSummaryModal({ workoutName, startTime, isPending, onConfirm, onClose }: {
+function WorkoutSummaryModal({ workoutName, startTime, isPending, weekWorkoutsCompleted, weekWorkoutsTotal, onConfirm, onClose }: {
   workoutName: string;
   startTime: Date;
   isPending: boolean;
+  weekWorkoutsCompleted: number;
+  weekWorkoutsTotal: number;
   onConfirm: (intensity: string, comment: string, duration: number) => void;
   onClose: () => void;
 }) {
@@ -1353,6 +1357,8 @@ function WorkoutSummaryModal({ workoutName, startTime, isPending, onConfirm, onC
                 dayName: DAY_NAMES[now.getDay()],
                 dateStr: now.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' }),
                 timeStr: now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+                weekWorkoutsCompleted,
+                weekWorkoutsTotal: 5,
               });
               setCapturedUrl(canvas.toDataURL('image/jpeg', 0.93));
               setShowSelfie(true);
@@ -1366,6 +1372,8 @@ function WorkoutSummaryModal({ workoutName, startTime, isPending, onConfirm, onC
                 dayName: DAY_NAMES[now.getDay()],
                 dateStr: now.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' }),
                 timeStr: now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+                weekWorkoutsCompleted,
+                weekWorkoutsTotal: 5,
               });
               setCapturedUrl(canvas.toDataURL('image/jpeg', 0.93));
               setShowSelfie(true);
@@ -1446,6 +1454,8 @@ function WorkoutSummaryModal({ workoutName, startTime, isPending, onConfirm, onC
       dayName: DAY_NAMES[now.getDay()],
       dateStr: now.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' }),
       timeStr: now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+      weekWorkoutsCompleted,
+      weekWorkoutsTotal: 5,
     });
     streamRef.current?.getTracks().forEach((t) => t.stop());
     streamRef.current = null;
@@ -1789,12 +1799,52 @@ function generateWorkoutCard({ workoutName, dateStr, startStr, endStr, durationS
 
 const DAY_SHORT = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 
+const MOTIVATIONAL_QUOTES = [
+  'Não pare. Resultados vêm com consistência.',
+  'Cada gota de suor é um passo mais perto do seu objetivo.',
+  'Você é mais forte do que imagina.',
+  'Disciplina é escolher entre o que você quer agora e o que você mais quer.',
+  'O único treino ruim é o que não foi feito.',
+  'Seu corpo pode. Seu mente deve.',
+  'Progresso, não perfeição.',
+  'Não_COMPARE com os outros. Compare com ontem.',
+  'Acredite no processo.',
+  'Sucesso é a soma de pequenos esforços repetidos dia após dia.',
+];
+
+function wrapText(ctx: CanvasRenderingContext2D, text: string, x: number, y: number, maxWidth: number, lineHeight: number) {
+  const words = text.split(' ');
+  let line = '';
+  let currentY = y;
+  for (let i = 0; i < words.length; i++) {
+    const testLine = line + words[i] + ' ';
+    const metrics = ctx.measureText(testLine);
+    if (metrics.width > maxWidth && i > 0) {
+      ctx.fillText(line.trim(), x, currentY);
+      line = words[i] + ' ';
+      currentY += lineHeight;
+    } else {
+      line = testLine;
+    }
+  }
+  ctx.fillText(line.trim(), x, currentY);
+}
+
 function drawSelfieOverlay(ctx: CanvasRenderingContext2D, w: number, h: number, info: {
   workoutName: string; durationStr: string; intensity: string;
   dayName: string; dateStr: string; timeStr: string;
+  weekWorkoutsCompleted?: number; weekWorkoutsTotal?: number;
 }) {
   const scale = w / 1080;
   const pad = scale * 52;
+
+  // ── VINHETA: Subtle edge darkening for depth ────────────────────────────
+  const vignetteGrad = ctx.createRadialGradient(w / 2, h / 2, w * 0.25, w / 2, h / 2, w * 0.85);
+  vignetteGrad.addColorStop(0, 'rgba(0,0,0,0)');
+  vignetteGrad.addColorStop(0.7, 'rgba(0,0,0,0)');
+  vignetteGrad.addColorStop(1, 'rgba(0,0,0,0.45)');
+  ctx.fillStyle = vignetteGrad;
+  ctx.fillRect(0, 0, w, h);
 
   // ── TOP: Logo FitlyNutri ──────────────────────────────────────────────────
   // Semi-transparent dark bar at the top — does NOT cover the photo content
@@ -1891,17 +1941,24 @@ function drawSelfieOverlay(ctx: CanvasRenderingContext2D, w: number, h: number, 
   roundRect(ctx, borderW * 2, borderW * 2, w - borderW * 4, h - borderW * 4, scale * 14);
   ctx.stroke();
 
-  // ── SELO: "Treino Concluído" badge (top right, below day checklist) ──────
+  // ── SELO: "🔥 TREINO FINALIZADO" badge (top right, below day checklist) ──
   const seloCX = w - pad - scale * 55;
   const seloCY = topBarH + scale * 40;
   const seloR = scale * 48;
 
-  // Outer glow
-  const seloGlow = ctx.createRadialGradient(seloCX, seloCY, seloR * 0.7, seloCX, seloCY, seloR * 1.5);
-  seloGlow.addColorStop(0, 'rgba(5,150,105,0.35)');
-  seloGlow.addColorStop(1, 'rgba(5,150,105,0)');
-  ctx.fillStyle = seloGlow;
-  ctx.beginPath(); ctx.arc(seloCX, seloCY, seloR * 1.5, 0, Math.PI * 2); ctx.fill();
+  // Outer glow (stronger, multi-layer)
+  const seloGlow1 = ctx.createRadialGradient(seloCX, seloCY, seloR * 0.5, seloCX, seloCY, seloR * 2.2);
+  seloGlow1.addColorStop(0, 'rgba(5,150,105,0.45)');
+  seloGlow1.addColorStop(0.5, 'rgba(5,150,105,0.15)');
+  seloGlow1.addColorStop(1, 'rgba(5,150,105,0)');
+  ctx.fillStyle = seloGlow1;
+  ctx.beginPath(); ctx.arc(seloCX, seloCY, seloR * 2.2, 0, Math.PI * 2); ctx.fill();
+
+  const seloGlow2 = ctx.createRadialGradient(seloCX, seloCY, seloR * 0.3, seloCX, seloCY, seloR * 1.6);
+  seloGlow2.addColorStop(0, 'rgba(16,185,129,0.3)');
+  seloGlow2.addColorStop(1, 'rgba(16,185,129,0)');
+  ctx.fillStyle = seloGlow2;
+  ctx.beginPath(); ctx.arc(seloCX, seloCY, seloR * 1.6, 0, Math.PI * 2); ctx.fill();
 
   // Badge circle
   ctx.beginPath(); ctx.arc(seloCX, seloCY, seloR, 0, Math.PI * 2);
@@ -1922,15 +1979,27 @@ function drawSelfieOverlay(ctx: CanvasRenderingContext2D, w: number, h: number, 
   ctx.lineTo(seloCX + scale * 18, seloCY - scale * 14);
   ctx.stroke();
 
-  // "Concluído" text below badge
+  // "TREINO FINALIZADO" text below badge
   ctx.textAlign = 'center';
   ctx.textBaseline = 'top';
   ctx.fillStyle = '#ffffff';
+  ctx.font = `bold ${Math.round(scale * 16)}px system-ui,sans-serif`;
+  ctx.fillText('TREINO', seloCX, seloCY + seloR + scale * 6);
+  ctx.fillStyle = '#34d399';
   ctx.font = `bold ${Math.round(scale * 14)}px system-ui,sans-serif`;
-  ctx.fillText('Concluído', seloCX, seloCY + seloR + scale * 8);
+  ctx.fillText('FINALIZADO', seloCX, seloCY + seloR + scale * 24);
+
+  // ── TOP CENTER: Motivational quote ──────────────────────────────────────
+  const quote = MOTIVATIONAL_QUOTES[Math.floor(Math.random() * MOTIVATIONAL_QUOTES.length)];
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'top';
+  ctx.fillStyle = 'rgba(255,255,255,0.55)';
+  ctx.font = `italic ${Math.round(scale * 22)}px system-ui,sans-serif`;
+  const quoteMaxW = w * 0.6;
+  wrapText(ctx, `"${quote}"`, w / 2, topBarH + scale * 12, quoteMaxW, scale * 28);
 
   // ── BOTTOM: Info bar with dark background for readability ─────────────────
-  const bottomBarH = scale * 200;
+  const bottomBarH = scale * 280;
   const bottomY = h - bottomBarH;
 
   // Dark background for bottom info — fully opaque at bottom, fading up
@@ -1956,11 +2025,12 @@ function drawSelfieOverlay(ctx: CanvasRenderingContext2D, w: number, h: number, 
   // Reset text baseline for the rest
   ctx.textBaseline = 'alphabetic';
 
-  const y1 = bottomY + scale * 60;
-  const y2 = y1 + scale * 54;
-  const y3 = y2 + scale * 46;
+  const y1 = bottomY + scale * 52;
+  const y2 = y1 + scale * 46;
+  const y3 = y2 + scale * 42;
+  const y4 = y3 + scale * 42;
 
-  // Row 1: Workout name (left) | Duration (right)
+  // Row 1: Workout name (left) | Duration with icon (right)
   ctx.textAlign = 'left';
   ctx.fillStyle = '#ffffff';
   ctx.font = `bold ${Math.round(scale * 42)}px system-ui,sans-serif`;
@@ -1972,24 +2042,53 @@ function drawSelfieOverlay(ctx: CanvasRenderingContext2D, w: number, h: number, 
   ctx.font = `bold ${Math.round(scale * 36)}px system-ui,sans-serif`;
   ctx.fillText(`${info.durationStr} min`, w - pad, y1);
 
-  // Row 2: Day + Date + Time (left) | Intensity (right)
+  // Row 2: Date with icon (left) | Intensity with icon (right)
   ctx.textAlign = 'left';
   ctx.fillStyle = 'rgba(255,255,255,0.80)';
-  ctx.font = `${Math.round(scale * 28)}px system-ui,sans-serif`;
-  ctx.fillText(`${info.dayName}, ${info.dateStr} • ${info.timeStr}`, pad, y2);
+  ctx.font = `${Math.round(scale * 26)}px system-ui,sans-serif`;
+  ctx.fillText(`${info.dayName}, ${info.dateStr}`, pad, y2);
 
   if (info.intensity) {
+    const intensityEmoji = info.intensity.includes('Muito pesado') ? '🔥' : info.intensity.includes('Pesado') ? '💪' : info.intensity.includes('Moderado') ? '⚡' : info.intensity.includes('Leve') ? '👍' : '🌱';
     ctx.textAlign = 'right';
     ctx.fillStyle = 'rgba(255,255,255,0.70)';
     ctx.font = `${Math.round(scale * 26)}px system-ui,sans-serif`;
-    ctx.fillText(info.intensity, w - pad, y2);
+    ctx.fillText(`${intensityEmoji} ${info.intensity}`, w - pad, y2);
   }
 
-  // Row 3: Brand hashtags
+  // Row 3: Time (left) | Weekly stats (right)
+  ctx.textAlign = 'left';
+  ctx.fillStyle = 'rgba(255,255,255,0.55)';
+  ctx.font = `${Math.round(scale * 24)}px system-ui,sans-serif`;
+  ctx.fillText(`⏰ ${info.timeStr}`, pad, y3);
+
+  if (info.weekWorkoutsCompleted != null && info.weekWorkoutsTotal) {
+    ctx.textAlign = 'right';
+    ctx.fillStyle = 'rgba(167,139,250,0.85)';
+    ctx.font = `bold ${Math.round(scale * 24)}px system-ui,sans-serif`;
+    ctx.fillText(`🏋️ ${info.weekWorkoutsCompleted}/${info.weekWorkoutsTotal} treinos`, w - pad, y3);
+  }
+
+  // Row 4: Streak (if > 1 day) | Brand hashtags
+  const hasStreak = info.weekWorkoutsCompleted != null && info.weekWorkoutsCompleted > 1;
+  if (hasStreak) {
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#f59e0b';
+    ctx.font = `bold ${Math.round(scale * 26)}px system-ui,sans-serif`;
+    ctx.fillText(`🔥 ${info.weekWorkoutsCompleted} dias seguidos esta semana!`, w / 2, y4);
+  }
+
+  // Hashtags with gradient
+  const hashY = hasStreak ? y4 + scale * 40 : y4;
+  const hashText = '#FitlyNutri  #SeuPersonalOnline';
+  const hashGrad = ctx.createLinearGradient(w * 0.3, 0, w * 0.7, 0);
+  hashGrad.addColorStop(0, 'rgba(124,58,237,0.55)');
+  hashGrad.addColorStop(0.5, 'rgba(167,139,250,0.65)');
+  hashGrad.addColorStop(1, 'rgba(192,132,252,0.55)');
   ctx.textAlign = 'center';
-  ctx.fillStyle = 'rgba(167,139,250,0.45)';
-  ctx.font = `${Math.round(scale * 22)}px system-ui,sans-serif`;
-  ctx.fillText('#FitlyNutri  #SeuPersonalOnline', w / 2, y3);
+  ctx.fillStyle = hashGrad;
+  ctx.font = `600 ${Math.round(scale * 22)}px system-ui,sans-serif`;
+  ctx.fillText(hashText, w / 2, hashY);
 }
 
 const DAY_NAMES = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
