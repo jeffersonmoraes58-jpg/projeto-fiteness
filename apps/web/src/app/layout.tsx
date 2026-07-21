@@ -4,6 +4,8 @@ import { ThemeProvider } from '@/components/providers/theme-provider';
 import { QueryProvider } from '@/components/providers/query-provider';
 import { Toaster } from 'react-hot-toast';
 import { PwaRegister } from '@/components/pwa-register';
+import { IosSplashLinks } from '@/components/ios-splash';
+import { IosInstallPrompt } from '@/components/ios-install-prompt';
 import './globals.css';
 
 export const viewport: Viewport = {
@@ -52,9 +54,12 @@ export const metadata: Metadata = {
   robots: { index: true, follow: true },
   icons: {
     icon: [
-      { url: '/logo.png', type: 'image/png' },
+      { url: '/icons/icon-192.png', sizes: '192x192', type: 'image/png' },
+      { url: '/icons/icon-512.png', sizes: '512x512', type: 'image/png' },
     ],
-    apple: '/logo.png',
+    apple: [
+      { url: '/icons/apple-touch-icon.png', sizes: '180x180', type: 'image/png' },
+    ],
     shortcut: '/logo.png',
   },
 };
@@ -62,6 +67,9 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="pt-BR" suppressHydrationWarning>
+      <head>
+        <IosSplashLinks />
+      </head>
       <body>
         <ThemeProvider attribute="class" defaultTheme="dark" enableSystem disableTransitionOnChange>
           <QueryProvider>
@@ -80,6 +88,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           </QueryProvider>
         </ThemeProvider>
         <PwaRegister />
+        <IosInstallPrompt />
       </body>
     </html>
   );
