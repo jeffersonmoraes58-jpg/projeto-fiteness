@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Delete, Body, Param, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Body, Param, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { ProgressService } from './progress.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -51,5 +51,76 @@ export class ProgressController {
   @ApiOperation({ summary: 'Dados de progresso do aluno (visão do trainer)' })
   getStudentData(@Param('userId') userId: string) {
     return this.service.getStudentData(userId);
+  }
+
+  // ═══════════════════════════════════════════════
+  // AI INSIGHTS
+  // ═══════════════════════════════════════════════
+
+  @Post('insights/:studentUserId')
+  @ApiOperation({ summary: 'Gerar insights de evolução do aluno via IA' })
+  generateInsights(
+    @CurrentUser() user: any,
+    @Param('studentUserId') studentUserId: string,
+  ) {
+    return this.service.generateInsights(studentUserId, user.id);
+  }
+
+  // ═══════════════════════════════════════════════
+  // TRAINER GOALS
+  // ═══════════════════════════════════════════════
+
+  @Get('trainer-goals/:studentUserId')
+  @ApiOperation({ summary: 'Metas do trainer para o aluno' })
+  getTrainerGoals(
+    @CurrentUser() user: any,
+    @Param('studentUserId') studentUserId: string,
+  ) {
+    return this.service.getTrainerGoals(user.id, studentUserId);
+  }
+
+  @Post('trainer-goals')
+  @ApiOperation({ summary: 'Criar meta para o aluno' })
+  createTrainerGoal(@CurrentUser() user: any, @Body() body: any) {
+    return this.service.createTrainerGoal(user.id, body);
+  }
+
+  @Patch('trainer-goals/:id')
+  @ApiOperation({ summary: 'Atualizar meta do aluno' })
+  updateTrainerGoal(
+    @CurrentUser() user: any,
+    @Param('id') id: string,
+    @Body() body: any,
+  ) {
+    return this.service.updateTrainerGoal(user.id, id, body);
+  }
+
+  @Delete('trainer-goals/:id')
+  @ApiOperation({ summary: 'Remover meta do aluno' })
+  deleteTrainerGoal(@CurrentUser() user: any, @Param('id') id: string) {
+    return this.service.deleteTrainerGoal(user.id, id);
+  }
+
+  // ═══════════════════════════════════════════════
+  // EXERCISE EVOLUTION
+  // ═══════════════════════════════════════════════
+
+  @Get('exercise-evolution/:studentUserId')
+  @ApiOperation({ summary: 'Evolução de carga/reps por exercício' })
+  getExerciseEvolution(@Param('studentUserId') studentUserId: string) {
+    return this.service.getExerciseEvolution(studentUserId);
+  }
+
+  // ═══════════════════════════════════════════════
+  // REQUEST CHECK-IN
+  // ═══════════════════════════════════════════════
+
+  @Post('request-checkin/:studentUserId')
+  @ApiOperation({ summary: 'Solicitar check-in rápido do aluno' })
+  requestCheckin(
+    @CurrentUser() user: any,
+    @Param('studentUserId') studentUserId: string,
+  ) {
+    return this.service.requestCheckin(user.id, studentUserId);
   }
 }

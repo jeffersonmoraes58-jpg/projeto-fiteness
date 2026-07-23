@@ -358,6 +358,8 @@ model Trainer {
   exercises       Exercise[]
   appointments    Appointment[]
   assessments     PhysicalAssessment[]
+  trainerGoals    TrainerStudentGoal[]
+  evolutionInsights EvolutionInsight[]
   pricing         TrainerPricing?
   studentBillings StudentBilling[]
   challenges      Challenge[]
@@ -467,6 +469,8 @@ model Student {
   progressPhotos         ProgressPhoto[]
   physicalAssessments    PhysicalAssessment[]
   goals                  Goal[]
+  trainerGoals           TrainerStudentGoal[]
+  evolutionInsights      EvolutionInsight[]
   challenges             StudentChallenge[]
   lessonProgress         LessonProgress[]
   achievements           Achievement[]
@@ -1349,6 +1353,52 @@ model Invoice {
   billing StudentBilling @relation(fields: [billingId], references: [id], onDelete: Cascade)
 
   @@map("invoices")
+}
+
+// ================================================
+// TRAINER STUDENT GOALS (alerts configuráveis)
+// ================================================
+
+model TrainerStudentGoal {
+  id           String    @id @default(cuid())
+  trainerId    String
+  studentId    String
+  metric       String    // e.g. "weight", "bodyFatPercent", "muscleMassKg", "waistCm", "workoutsPerWeek"
+  targetValue  Float
+  currentValue Float?
+  unit         String?   // e.g. "kg", "%", "cm", "treinos/semana"
+  direction    String    @default("decrease") // "decrease" or "increase"
+  title        String
+  notes        String?
+  isCompleted  Boolean   @default(false)
+  completedAt  DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  trainer Trainer @relation(fields: [trainerId], references: [id])
+  student Student @relation(fields: [studentId], references: [id])
+
+  @@unique([trainerId, studentId, metric])
+  @@map("trainer_student_goals")
+}
+
+// ================================================
+// EVOLUTION INSIGHTS (cache de análises IA)
+// ================================================
+
+model EvolutionInsight {
+  id        String   @id @default(cuid())
+  studentId String
+  trainerId String?
+  rating    Int?
+  summary   String?
+  data      Json?
+  createdAt DateTime @default(now())
+
+  student Student  @relation(fields: [studentId], references: [id])
+  trainer Trainer? @relation(fields: [trainerId], references: [id])
+
+  @@map("evolution_insights")
 }
 
 // ================================================

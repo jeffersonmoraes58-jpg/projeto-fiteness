@@ -241,7 +241,15 @@ export default function NewStudentPage() {
 
   const copyCredentials = () => {
     if (!created) return;
-    navigator.clipboard.writeText(`E-mail: ${created.email}\nSenha: ${created.password}`);
+    const text = [
+      `Dados de Acesso - Fitlynutri`,
+      ``,
+      `Login: ${created.email}`,
+      `Senha: ${created.password}`,
+      ``,
+      `Acesse: https://fitlynutri.com.br/login`,
+    ].join('\n');
+    navigator.clipboard.writeText(text);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };

@@ -9,7 +9,8 @@ import {
   Heart, Activity, Moon, Brain, Target, Info,
   Plus, X, Search, Pencil, Scale, Save, Mail, Share2, Send,
   FileText, Download, Camera, Upload, ChevronDown, Smile,
-  Minus,
+  Minus, Sparkles, AlertTriangle, TrendingDown, BarChart3,
+  CheckCircle2, RefreshCw, Trophy, ArrowUp, ArrowDown,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
@@ -84,7 +85,10 @@ export default function StudentDetailPage() {
       setShowAssessForm(false);
       toast.success('Avaliação registrada!');
     },
-    onError: () => toast.error('Erro ao salvar avaliação'),
+    onError: (err: any) => {
+      const msg = err?.response?.data?.message || err?.message || 'Erro ao salvar avaliação';
+      toast.error(typeof msg === 'string' ? msg : 'Erro ao salvar avaliação');
+    },
   });
 
   const removePlanMutation = useMutation({
@@ -487,8 +491,23 @@ export default function StudentDetailPage() {
               onSuccess={() => refetchProgress()}
             />
 
+            {/* ─── Request Check-in Button ─── */}
+            <RequestCheckinButton studentUserId={student.userId} />
+
             {/* ─── Performance (workout stats) ─── */}
             <PerformanceStats studentUserId={student.userId} />
+
+            {/* ─── AI Insights ─── */}
+            <EvolutionInsights studentUserId={student.userId} />
+
+            {/* ─── Trainer Goals ─── */}
+            <TrainerGoals studentUserId={student.userId} />
+
+            {/* ─── Exercise Evolution ─── */}
+            <ExerciseEvolution studentUserId={student.userId} />
+
+            {/* ─── Evolution Report Button ─── */}
+            <EvolutionReport student={student} assessments={physicalAssessments} measurements={measurements} />
 
             {/* ─── Physical assessments ─── */}
             <div className="glass-card">
@@ -527,23 +546,67 @@ export default function StudentDetailPage() {
               )}
               {!showAssessForm && physicalAssessments.length > 0 && (
                 <div className="space-y-3">
-                  {physicalAssessments.map((a: any, i: number) => (
-                    <div key={a.id} className="glass rounded-xl p-3">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-xs text-muted-foreground">{new Date(a.assessedAt).toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })}</span>
-                        {i === 0 && <span className="text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded-full">Atual</span>}
+                  {physicalAssessments.map((a: any, i: number) => {
+                    const prev = physicalAssessments[i + 1];
+                    const delta = (cur: any, prv: any): number | null => {
+                      if (cur == null || prv == null) return null;
+                      return Number(cur) - Number(prv);
+                    };
+                    const fmt = (val: number | null, invert?: boolean) => {
+                      if (val == null || val === 0 || !prev) return null;
+                      const positive = invert ? val < 0 : val > 0;
+                      return <span className={`text-[10px] font-medium ml-1 ${positive ? 'text-emerald-400' : 'text-red-400'}`}>{val > 0 ? '+' : ''}{val.toFixed(1)}</span>;
+                    };
+                    const weightD = delta(a.weight, prev?.weight);
+                    const fatD = delta(a.bodyFatPercent, prev?.bodyFatPercent);
+                    const muscleD = delta(a.muscleMassKg, prev?.muscleMassKg);
+                    const waistD = delta(a.waistCm, prev?.waistCm);
+                    const hipD = delta(a.hipCm, prev?.hipCm);
+
+                    return (
+                      <div key={a.id} className="glass rounded-xl p-3">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-xs text-muted-foreground">{new Date(a.assessedAt).toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })}</span>
+                          {i === 0 && <span className="text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded-full">Atual</span>}
+                        </div>
+                        <div className="grid grid-cols-3 gap-2">
+                          <div className="text-center">
+                            <div className="text-sm font-bold">{a.weight}kg{fmt(weightD)}</div>
+                            <div className="text-xs text-muted-foreground">Peso</div>
+                          </div>
+                          <div className="text-center">
+                            <div className="text-sm font-bold">{a.bmi}</div>
+                            <div className="text-xs text-muted-foreground">IMC</div>
+                          </div>
+                          {a.bodyFatPercent && (
+                            <div className="text-center">
+                              <div className="text-sm font-bold">{a.bodyFatPercent}%{fmt(fatD, true)}</div>
+                              <div className="text-xs text-muted-foreground">Gordura</div>
+                            </div>
+                          )}
+                          {a.muscleMassKg && (
+                            <div className="text-center">
+                               <div className="text-sm font-bold">{a.muscleMassKg}kg{fmt(muscleD)}</div>
+                              <div className="text-xs text-muted-foreground">Músculo</div>
+                            </div>
+                          )}
+                          {a.waistCm && (
+                            <div className="text-center">
+                               <div className="text-sm font-bold">{a.waistCm}cm{fmt(waistD, true)}</div>
+                              <div className="text-xs text-muted-foreground">Cintura</div>
+                            </div>
+                          )}
+                          {a.hipCm && (
+                            <div className="text-center">
+                               <div className="text-sm font-bold">{a.hipCm}cm{fmt(hipD, true)}</div>
+                              <div className="text-xs text-muted-foreground">Quadril</div>
+                            </div>
+                          )}
+                        </div>
+                        {a.notes && <p className="text-xs text-muted-foreground mt-2 italic">"{a.notes}"</p>}
                       </div>
-                      <div className="grid grid-cols-3 gap-2">
-                        <div className="text-center"><div className="text-sm font-bold">{a.weight}kg</div><div className="text-xs text-muted-foreground">Peso</div></div>
-                        <div className="text-center"><div className="text-sm font-bold">{a.bmi}</div><div className="text-xs text-muted-foreground">IMC</div></div>
-                        {a.bodyFatPercent && <div className="text-center"><div className="text-sm font-bold">{a.bodyFatPercent}%</div><div className="text-xs text-muted-foreground">Gordura</div></div>}
-                        {a.muscleMassKg && <div className="text-center"><div className="text-sm font-bold">{a.muscleMassKg}kg</div><div className="text-xs text-muted-foreground">Músculo</div></div>}
-                        {a.waistCm && <div className="text-center"><div className="text-sm font-bold">{a.waistCm}cm</div><div className="text-xs text-muted-foreground">Cintura</div></div>}
-                        {a.hipCm && <div className="text-center"><div className="text-sm font-bold">{a.hipCm}cm</div><div className="text-xs text-muted-foreground">Quadril</div></div>}
-                      </div>
-                      {a.notes && <p className="text-xs text-muted-foreground mt-2 italic">"{a.notes}"</p>}
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -708,6 +771,37 @@ function QuickCheckIn({ studentUserId, onSuccess }: { studentUserId: string; onS
         </form>
       )}
     </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════
+   Request Check-in — Solicitar check-in ao aluno
+   ═══════════════════════════════════════════════════ */
+function RequestCheckinButton({ studentUserId }: { studentUserId: string }) {
+  const [sent, setSent] = useState(false);
+
+  const mutation = useMutation({
+    mutationFn: () => api.post(`/progress/request-checkin/${studentUserId}`),
+    onSuccess: () => {
+      toast.success('Check-in solicitado! O aluno receberá uma notificação.');
+      setSent(true);
+      setTimeout(() => setSent(false), 3000);
+    },
+    onError: () => toast.error('Erro ao solicitar check-in'),
+  });
+
+  return (
+    <button
+      onClick={() => mutation.mutate()}
+      disabled={mutation.isPending || sent}
+      className="w-full glass-card flex items-center justify-center gap-2 py-3 text-sm text-primary hover:bg-accent/30 transition-colors disabled:opacity-50"
+    >
+      {sent ? (
+        <><CheckCircle2 className="w-4 h-4 text-emerald-400" /> Check-in solicitado!</>
+      ) : (
+        <><Send className="w-4 h-4" /> Solicitar check-in do aluno</>
+      )}
+    </button>
   );
 }
 
@@ -1032,6 +1126,527 @@ function CheckInHistory({ measurements, photos }: { measurements: any[]; photos:
         })}
       </div>
     </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════
+   Evolution Insights — Análise IA da evolução
+   ═══════════════════════════════════════════════════ */
+function EvolutionInsights({ studentUserId }: { studentUserId: string }) {
+  const [insights, setInsights] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
+
+  async function generateInsights() {
+    setLoading(true);
+    try {
+      const res = await api.post(`/progress/insights/${studentUserId}`);
+      setInsights(res.data?.data ?? res.data);
+    } catch {
+      toast.error('Erro ao gerar insights');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const scoreColor = (score: number) => {
+    if (score >= 8) return 'text-emerald-400';
+    if (score >= 6) return 'text-yellow-400';
+    if (score >= 4) return 'text-orange-400';
+    return 'text-red-400';
+  };
+
+  const scoreLabel = (score: number) => {
+    if (score >= 8) return 'Excelente';
+    if (score >= 6) return 'Bom';
+    if (score >= 4) return 'Regular';
+    return 'Precisa de atenção';
+  };
+
+  return (
+    <div className="glass-card">
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="font-semibold flex items-center gap-2">
+          <Sparkles className="w-4 h-4 text-purple-400" />
+          Insights de Evolução (IA)
+        </h2>
+        <button
+          onClick={generateInsights}
+          disabled={loading}
+          className="text-xs text-primary flex items-center gap-1 hover:underline disabled:opacity-50"
+        >
+          {loading ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
+          {insights ? 'Atualizar' : 'Gerar análise'}
+        </button>
+      </div>
+
+      {!insights && !loading && (
+        <div className="text-center py-6 text-muted-foreground">
+          <Brain className="w-10 h-10 mx-auto mb-2 opacity-30" />
+          <p className="text-sm">Clique em &quot;Gerar análise&quot; para obter insights inteligentes sobre a evolução do aluno.</p>
+        </div>
+      )}
+
+      {loading && (
+        <div className="text-center py-6">
+          <RefreshCw className="w-8 h-8 mx-auto mb-2 animate-spin text-purple-400" />
+          <p className="text-sm text-muted-foreground">Analisando dados do aluno...</p>
+        </div>
+      )}
+
+      {insights && (
+        <div className="space-y-3">
+          {/* Score */}
+          <div className="glass rounded-xl p-4 text-center">
+            <div className={`text-3xl font-bold ${scoreColor(insights.evolutionScore)}`}>
+              {insights.evolutionScore}/10
+            </div>
+            <div className="text-xs text-muted-foreground mt-1">{scoreLabel(insights.evolutionScore)}</div>
+          </div>
+
+          {/* Summary */}
+          <div className="glass rounded-xl p-3">
+            <p className="text-sm">{insights.summary}</p>
+          </div>
+
+          {/* Highlights */}
+          {insights.highlights?.length > 0 && (
+            <div className="glass rounded-xl p-3">
+              <h3 className="text-xs font-semibold text-emerald-400 mb-2 flex items-center gap-1">
+                <CheckCircle2 className="w-3 h-3" /> Destaques
+              </h3>
+              <ul className="space-y-1">
+                {insights.highlights.map((h: string, i: number) => (
+                  <li key={i} className="text-xs text-muted-foreground flex items-start gap-2">
+                    <span className="text-emerald-400 mt-0.5">+</span> {h}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {/* Concerns */}
+          {insights.concerns?.length > 0 && (
+            <div className="glass rounded-xl p-3">
+              <h3 className="text-xs font-semibold text-orange-400 mb-2 flex items-center gap-1">
+                <AlertTriangle className="w-3 h-3" /> Atenção
+              </h3>
+              <ul className="space-y-1">
+                {insights.concerns.map((c: string, i: number) => (
+                  <li key={i} className="text-xs text-muted-foreground flex items-start gap-2">
+                    <span className="text-orange-400 mt-0.5">!</span> {c}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {/* AI Insights */}
+          {insights.insights?.length > 0 && (
+            <div className="glass rounded-xl p-3">
+              <h3 className="text-xs font-semibold text-purple-400 mb-2 flex items-center gap-1">
+                <Brain className="w-3 h-3" /> Insights IA
+              </h3>
+              <ul className="space-y-1">
+                {insights.insights.map((ins: string, i: number) => (
+                  <li key={i} className="text-xs text-muted-foreground flex items-start gap-2">
+                    <span className="text-purple-400 mt-0.5">*</span> {ins}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {/* Recommendations */}
+          {insights.recommendations?.length > 0 && (
+            <div className="glass rounded-xl p-3">
+              <h3 className="text-xs font-semibold text-blue-400 mb-2 flex items-center gap-1">
+                <Target className="w-3 h-3" /> Recomendações
+              </h3>
+              <ul className="space-y-1">
+                {insights.recommendations.map((r: string, i: number) => (
+                  <li key={i} className="text-xs text-muted-foreground flex items-start gap-2">
+                    <span className="text-blue-400 mt-0.5">&gt;</span> {r}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════
+   Trainer Goals — Metas configuráveis
+   ═══════════════════════════════════════════════════ */
+function TrainerGoals({ studentUserId }: { studentUserId: string }) {
+  const [showForm, setShowForm] = useState(false);
+  const [editingGoal, setEditingGoal] = useState<any>(null);
+
+  const { data: goals, refetch } = useQuery({
+    queryKey: ['trainer-goals', studentUserId],
+    queryFn: () => api.get(`/progress/trainer-goals/${studentUserId}`).then((r) => r.data.data ?? []),
+    enabled: !!studentUserId,
+  });
+
+  const createMutation = useMutation({
+    mutationFn: (data: any) => api.post('/progress/trainer-goals', { ...data, studentUserId }),
+    onSuccess: () => { toast.success('Meta criada!'); refetch(); setShowForm(false); },
+    onError: () => toast.error('Erro ao criar meta'),
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: ({ id, ...data }: any) => api.patch(`/progress/trainer-goals/${id}`, data),
+    onSuccess: () => { toast.success('Meta atualizada!'); refetch(); setEditingGoal(null); },
+    onError: () => toast.error('Erro ao atualizar meta'),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => api.delete(`/progress/trainer-goals/${id}`),
+    onSuccess: () => { toast.success('Meta removida!'); refetch(); },
+    onError: () => toast.error('Erro ao remover meta'),
+  });
+
+  const metricOptions = [
+    { value: 'weight', label: 'Peso', unit: 'kg', direction: 'decrease' },
+    { value: 'bodyFatPercent', label: '% Gordura', unit: '%', direction: 'decrease' },
+    { value: 'muscleMassKg', label: 'Massa Muscular', unit: 'kg', direction: 'increase' },
+    { value: 'waistCm', label: 'Cintura', unit: 'cm', direction: 'decrease' },
+    { value: 'hipCm', label: 'Quadril', unit: 'cm', direction: 'decrease' },
+    { value: 'workoutsPerWeek', label: 'Treinos/Semana', unit: 'treinos', direction: 'increase' },
+  ];
+
+  const goalList = goals || [];
+
+  return (
+    <div className="glass-card">
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="font-semibold flex items-center gap-2">
+          <Target className="w-4 h-4 text-yellow-400" />
+          Metas do Aluno
+        </h2>
+        {!showForm && !editingGoal && (
+          <button onClick={() => setShowForm(true)} className="text-xs text-primary flex items-center gap-1 hover:underline">
+            <Plus className="w-3 h-3" /> Nova meta
+          </button>
+        )}
+      </div>
+
+      {!showForm && !editingGoal && goalList.length === 0 && (
+        <div className="text-center py-6 text-muted-foreground">
+          <Target className="w-10 h-10 mx-auto mb-2 opacity-30" />
+          <p className="text-sm">Nenhuma meta configurada.</p>
+          <p className="text-xs mt-1">Defina metas para acompanhar o progresso do aluno.</p>
+        </div>
+      )}
+
+      {(showForm || editingGoal) && (
+        <GoalForm
+          initialData={editingGoal}
+          metricOptions={metricOptions}
+          isPending={createMutation.isPending || updateMutation.isPending}
+          onSubmit={(data) => {
+            if (editingGoal) {
+              updateMutation.mutate({ id: editingGoal.id, ...data });
+            } else {
+              createMutation.mutate(data);
+            }
+          }}
+          onCancel={() => { setShowForm(false); setEditingGoal(null); }}
+        />
+      )}
+
+      {!showForm && !editingGoal && goalList.length > 0 && (
+        <div className="space-y-2">
+          {goalList.map((g: any) => {
+            const metric = metricOptions.find(m => m.value === g.metric);
+            const progress = g.targetValue && g.currentValue != null
+              ? Math.min(100, Math.round((g.currentValue / g.targetValue) * 100))
+              : null;
+
+            return (
+              <div key={g.id} className={`glass rounded-xl p-3 ${g.isCompleted ? 'border border-emerald-500/30' : ''}`}>
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium">{g.title}</span>
+                    {g.isCompleted && <CheckCircle2 className="w-4 h-4 text-emerald-400" />}
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <button onClick={() => setEditingGoal(g)} className="w-6 h-6 rounded hover:bg-accent flex items-center justify-center">
+                      <Pencil className="w-3 h-3" />
+                    </button>
+                    <button onClick={() => deleteMutation.mutate(g.id)} className="w-6 h-6 rounded hover:bg-destructive/20 flex items-center justify-center">
+                      <Trash2 className="w-3 h-3 text-destructive" />
+                    </button>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                  <span>{g.direction === 'decrease' ? <TrendingDown className="w-3 h-3 inline" /> : <ArrowUp className="w-3 h-3 inline" />} {metric?.label || g.metric}</span>
+                  <span>Meta: {g.targetValue}{g.unit || metric?.unit || ''}</span>
+                  {g.currentValue != null && <span>Atual: {g.currentValue}{g.unit || metric?.unit || ''}</span>}
+                </div>
+                {progress !== null && (
+                  <div className="mt-2">
+                    <div className="h-1.5 bg-border/30 rounded-full overflow-hidden">
+                      <div
+                        className={`h-full rounded-full transition-all ${g.isCompleted ? 'bg-emerald-400' : 'bg-primary'}`}
+                        style={{ width: `${progress}%` }}
+                      />
+                    </div>
+                    <div className="text-[10px] text-muted-foreground mt-1 text-right">{progress}%</div>
+                  </div>
+                )}
+                {g.notes && <p className="text-xs text-muted-foreground mt-1 italic">"{g.notes}"</p>}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function GoalForm({ initialData, metricOptions, isPending, onSubmit, onCancel }: {
+  initialData?: any;
+  metricOptions: Array<{ value: string; label: string; unit: string; direction: string }>;
+  isPending: boolean;
+  onSubmit: (data: any) => void;
+  onCancel: () => void;
+}) {
+  const [metric, setMetric] = useState(initialData?.metric || metricOptions[0].value);
+  const [title, setTitle] = useState(initialData?.title || '');
+  const [targetValue, setTargetValue] = useState(initialData?.targetValue?.toString() || '');
+  const [currentValue, setCurrentValue] = useState(initialData?.currentValue?.toString() || '');
+  const [notes, setNotes] = useState(initialData?.notes || '');
+
+  const selectedMetric = metricOptions.find(m => m.value === metric);
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!title || !targetValue) { toast.error('Título e valor alvo são obrigatórios'); return; }
+    onSubmit({
+      metric,
+      title,
+      targetValue: Number(targetValue),
+      currentValue: currentValue ? Number(currentValue) : undefined,
+      unit: selectedMetric?.unit,
+      direction: selectedMetric?.direction || 'decrease',
+      notes: notes || undefined,
+    });
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-3">
+      <div>
+        <label className="text-xs text-muted-foreground mb-1 block">Métrica</label>
+        <select value={metric} onChange={(e) => setMetric(e.target.value)} className="input-field text-sm py-1.5 w-full">
+          {metricOptions.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
+        </select>
+      </div>
+      <div>
+        <label className="text-xs text-muted-foreground mb-1 block">Título da meta</label>
+        <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} className="input-field text-sm py-1.5 w-full" placeholder="Ex: Chegar a 75kg" required />
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="text-xs text-muted-foreground mb-1 block">Valor alvo ({selectedMetric?.unit})</label>
+          <input type="number" step="0.1" value={targetValue} onChange={(e) => setTargetValue(e.target.value)} className="input-field text-sm py-1.5" placeholder="Ex: 75" required />
+        </div>
+        <div>
+          <label className="text-xs text-muted-foreground mb-1 block">Valor atual ({selectedMetric?.unit})</label>
+          <input type="number" step="0.1" value={currentValue} onChange={(e) => setCurrentValue(e.target.value)} className="input-field text-sm py-1.5" placeholder="Opcional" />
+        </div>
+      </div>
+      <div>
+        <label className="text-xs text-muted-foreground mb-1 block">Notas (opcional)</label>
+        <textarea value={notes} onChange={(e) => setNotes(e.target.value)} className="input-field text-sm py-1.5 w-full resize-none" rows={2} placeholder="Observações sobre a meta..." />
+      </div>
+      <div className="flex gap-3">
+        <button type="button" onClick={onCancel} className="btn-secondary flex-1 text-sm py-2">Cancelar</button>
+        <button type="submit" disabled={isPending} className="btn-primary flex-1 text-sm py-2 flex items-center justify-center gap-2 disabled:opacity-50">
+          <Save className="w-4 h-4" />
+          {isPending ? 'Salvando...' : 'Salvar meta'}
+        </button>
+      </div>
+    </form>
+  );
+}
+
+/* ═══════════════════════════════════════════════════
+   Exercise Evolution — Evolução de carga por exercício
+   ═══════════════════════════════════════════════════ */
+function ExerciseEvolution({ studentUserId }: { studentUserId: string }) {
+  const [expanded, setExpanded] = useState<string | null>(null);
+
+  const { data: exercises, isLoading } = useQuery({
+    queryKey: ['exercise-evolution', studentUserId],
+    queryFn: () => api.get(`/progress/exercise-evolution/${studentUserId}`).then((r) => r.data.data ?? []),
+    enabled: !!studentUserId,
+  });
+
+  const exerciseList = exercises || [];
+
+  if (isLoading) {
+    return (
+      <div className="glass-card">
+        <h2 className="font-semibold flex items-center gap-2 mb-3">
+          <BarChart3 className="w-4 h-4 text-blue-400" />
+          Evolução por Exercício
+        </h2>
+        <div className="text-center py-4">
+          <RefreshCw className="w-6 h-6 mx-auto animate-spin text-muted-foreground" />
+        </div>
+      </div>
+    );
+  }
+
+  if (exerciseList.length === 0) return null;
+
+  return (
+    <div className="glass-card">
+      <h2 className="font-semibold flex items-center gap-2 mb-3">
+        <BarChart3 className="w-4 h-4 text-blue-400" />
+        Evolução por Exercício
+      </h2>
+      <div className="space-y-2">
+        {exerciseList.map((ex: any) => {
+          const isExpanded = expanded === ex.exerciseId;
+          const hasWeightDelta = ex.weightDelta != null;
+          const deltaPositive = ex.weightDelta > 0;
+
+          return (
+            <div key={ex.exerciseId} className="glass rounded-xl overflow-hidden">
+              <button
+                onClick={() => setExpanded(isExpanded ? null : ex.exerciseId)}
+                className="w-full flex items-center justify-between p-3 text-left hover:bg-accent/30 transition-colors"
+              >
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-medium truncate">{ex.name}</div>
+                  <div className="text-xs text-muted-foreground">{ex.totalSessions} sessões</div>
+                </div>
+                <div className="flex items-center gap-2">
+                  {hasWeightDelta && (
+                    <span className={`text-xs font-medium ${deltaPositive ? 'text-emerald-400' : 'text-red-400'}`}>
+                      {deltaPositive ? '+' : ''}{ex.weightDelta.toFixed(1)}kg
+                    </span>
+                  )}
+                  {ex.firstWeight != null && ex.lastWeight != null && (
+                    <span className="text-xs text-muted-foreground">
+                      {ex.firstWeight}→{ex.lastWeight}kg
+                    </span>
+                  )}
+                  <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                </div>
+              </button>
+
+              {isExpanded && (
+                <div className="border-t border-border/30 p-3">
+                  <div className="space-y-1">
+                    {ex.logs.slice(-10).map((log: any, i: number) => (
+                      <div key={i} className="flex items-center justify-between text-xs">
+                        <span className="text-muted-foreground">
+                          {new Date(log.date).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}
+                        </span>
+                        <div className="flex items-center gap-3">
+                          {log.weight != null && <span className="font-medium">{log.weight}kg</span>}
+                          {log.reps != null && <span className="text-muted-foreground">{log.reps} reps</span>}
+                          <span className="text-muted-foreground">série {log.setNumber}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  {ex.logs.length > 10 && (
+                    <div className="text-[10px] text-muted-foreground text-center mt-2">
+                      Mostrando últimas de {ex.logs.length} registros
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════
+   Evolution Report — Relatório visual de evolução
+   ═══════════════════════════════════════════════════ */
+function EvolutionReport({ student, assessments, measurements }: { student: any; assessments: any[]; measurements: any[] }) {
+  function generateReport() {
+    const name = [student.user?.profile?.firstName, student.user?.profile?.lastName].filter(Boolean).join(' ') || 'Aluno';
+    const date = new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' });
+    const latest = assessments[0];
+    const first = assessments[assessments.length - 1];
+
+    const totalDelta = (cur: number | null, prv: number | null) => {
+      if (cur == null || prv == null) return '—';
+      const d = cur - prv;
+      return `${d > 0 ? '+' : ''}${d.toFixed(1)}`;
+    };
+
+    const assessRows = assessments.map(a => {
+      const d = new Date(a.assessedAt).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' });
+      return `<tr><td>${d}</td><td>${a.weight}kg</td><td>${a.bmi}</td><td>${a.bodyFatPercent ?? '—'}%</td><td>${a.muscleMassKg ?? '—'}kg</td><td>${a.waistCm ?? '—'}cm</td><td>${a.hipCm ?? '—'}cm</td></tr>`;
+    }).join('');
+
+    const measRows = measurements.slice(0, 15).map(m => {
+      const d = new Date(m.measuredAt).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
+      return `<tr><td>${d}</td><td>${m.weight ?? '—'}kg</td><td>${m.bodyFat ?? '—'}%</td><td>${m.muscleMass ?? '—'}kg</td><td>${m.feeling ?? '—'}/10</td></tr>`;
+    }).join('');
+
+    const html = `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><title>Relatório de Evolução — ${name}</title>
+    <style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:'Segoe UI',Arial,sans-serif;color:#1e293b;background:#fff;padding:32px}
+    h1{font-size:22px;font-weight:700;color:#7c3aed;margin-bottom:4px}.subtitle{color:#64748b;font-size:13px;margin-bottom:24px}
+    h2{font-size:15px;font-weight:600;margin:20px 0 10px;color:#334155}
+    .kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:24px}
+    .kpi{background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:14px;text-align:center}
+    .kpi-val{font-size:22px;font-weight:700;color:#7c3aed}.kpi-label{font-size:10px;color:#94a3b8;margin-top:2px;text-transform:uppercase}
+    table{width:100%;border-collapse:collapse;font-size:12px}
+    th{text-align:left;padding:6px 8px;background:#f1f5f9;font-weight:600;color:#64748b;font-size:10px;text-transform:uppercase}
+    td{padding:6px 8px;border-bottom:1px solid #f1f5f9}
+    .footer{margin-top:24px;text-align:center;color:#94a3b8;font-size:11px}
+    @media print{body{padding:16px}@page{margin:1cm}}</style></head><body>
+    <h1>Relatório de Evolução</h1>
+    <p class="subtitle">${name} &bull; ${date}</p>
+
+    ${latest ? `<div class="kpi-grid">
+      <div class="kpi"><div class="kpi-val">${latest.weight}kg</div><div class="kpi-label">Peso Atual</div></div>
+      <div class="kpi"><div class="kpi-val">${latest.bmi}</div><div class="kpi-label">IMC</div></div>
+      <div class="kpi"><div class="kpi-val">${latest.bodyFatPercent ?? '—'}%</div><div class="kpi-label">Gordura</div></div>
+      <div class="kpi"><div class="kpi-val">${latest.muscleMassKg ?? '—'}kg</div><div class="kpi-label">Massa Muscular</div></div>
+    </div>` : '<p style="color:#94a3b8;text-align:center;padding:20px">Nenhuma avaliação registrada ainda.</p>'}
+
+    ${first && latest && first.id !== latest.id ? `<div class="kpi-grid">
+      <div class="kpi"><div class="kpi-val" style="color:${(latest.weight - first.weight) < 0 ? '#10b981' : '#ef4444'}">${totalDelta(latest.weight, first.weight)}kg</div><div class="kpi-label">Variação Total Peso</div></div>
+      <div class="kpi"><div class="kpi-val" style="color:${((latest.bodyFatPercent ?? 0) - (first.bodyFatPercent ?? 0)) < 0 ? '#10b981' : '#ef4444'}">${totalDelta(latest.bodyFatPercent, first.bodyFatPercent)}%</div><div class="kpi-label">Variação Gordura</div></div>
+      <div class="kpi"><div class="kpi-val" style="color:${((latest.muscleMassKg ?? 0) - (first.muscleMassKg ?? 0)) > 0 ? '#10b981' : '#ef4444'}">${totalDelta(latest.muscleMassKg, first.muscleMassKg)}kg</div><div class="kpi-label">Variação Massa</div></div>
+      <div class="kpi"><div class="kpi-val">${assessments.length}</div><div class="kpi-label">Avaliações</div></div>
+    </div>` : ''}
+
+    <h2>Avaliações Físicas</h2>
+    <table><thead><tr><th>Data</th><th>Peso</th><th>IMC</th><th>Gordura</th><th>Músculo</th><th>Cintura</th><th>Quadril</th></tr></thead>
+    <tbody>${assessRows || '<tr><td colspan="7" style="text-align:center;color:#94a3b8">Sem avaliações</td></tr>'}</tbody></table>
+
+    <h2>Medições Recentes</h2>
+    <table><thead><tr><th>Data</th><th>Peso</th><th>Gordura</th><th>Músculo</th><th>Sensação</th></tr></thead>
+    <tbody>${measRows || '<tr><td colspan="5" style="text-align:center;color:#94a3b8">Sem medições</td></tr>'}</tbody></table>
+
+    <div class="footer">Relatório gerado pela Fitlynutri &mdash; ${date}</div>
+    <script>window.onload=function(){window.print();window.onafterprint=function(){window.close()}}<\/script>
+    </body></html>`;
+
+    const w = window.open('', '_blank', 'width=900,height=700');
+    if (w) { w.document.write(html); w.document.close(); }
+  }
+
+  return (
+    <button onClick={generateReport} className="w-full glass-card flex items-center justify-center gap-2 py-3 text-sm text-primary hover:bg-accent/30 transition-colors">
+      <FileText className="w-4 h-4" />
+      Gerar relatório de evolução
+    </button>
   );
 }
 
