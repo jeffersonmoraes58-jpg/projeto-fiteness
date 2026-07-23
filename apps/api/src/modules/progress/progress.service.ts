@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, Optional } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AiService } from '../ai/ai.service';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -7,8 +7,8 @@ import { NotificationsService } from '../notifications/notifications.service';
 export class ProgressService {
   constructor(
     private prisma: PrismaService,
-    private aiService: AiService,
-    private notifications: NotificationsService,
+    @Optional() private aiService?: AiService,
+    @Optional() private notifications?: NotificationsService,
   ) {}
 
   private async getStudent(userId: string) {
@@ -185,6 +185,8 @@ Retorne APENAS JSON:
   "recommendations": ["recomendação 1", "recomendação 2"],
   "evolutionScore": 7
 }`;
+
+    if (!this.aiService) throw new Error('Serviço de IA não disponível');
 
     let raw: string;
     try {
@@ -366,12 +368,14 @@ Retorne APENAS JSON:
 
     const trainerName = [trainer.user.profile?.firstName, trainer.user.profile?.lastName].filter(Boolean).join(' ') || 'Seu personal';
 
-    await this.notifications.create({
-      userId: studentUserId,
-      type: 'WORKOUT_REMINDER',
-      title: '📋 Check-in solicitado!',
-      body: `${trainerName} está solicitando um check-in rápido. Registre seu peso e como se sente!`,
-    });
+    if (this.notifications) {
+      await this.notifications.create({
+        userId: studentUserId,
+        type: 'WORKOUT_REMINDER',
+        title: '📋 Check-in solicitado!',
+        body: `${trainerName} está solicitando um check-in rápido. Registre seu peso e como se sente!`,
+      });
+    }
 
     return { sent: true };
   }
