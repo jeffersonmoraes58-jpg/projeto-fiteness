@@ -324,22 +324,62 @@ export default function StudentWorkout() {
   function downloadWorkoutPDF() {
     if (!filteredPlans?.length) { toast.error('Nenhum plano de treino carregado'); return; }
     const date = new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' });
-    const dayBlocks = filteredPlans.map((plan: any) => {
-      const exercises = (plan.workout?.exercises ?? []).map((ex: any, i: number) => `
+
+    const TECH_PDF: Record<string, { label: string; borderColor: string; bgColor: string; labelColor: string }> = {
+      BI_SET:    { label: 'Bi Set',    borderColor: '#f97316', bgColor: '#fff7ed', labelColor: '#f97316' },
+      SUPER_SET: { label: 'Super Set', borderColor: '#3b82f6', bgColor: '#eff6ff', labelColor: '#3b82f6' },
+      TRI_SET:   { label: 'Tri Set',   borderColor: '#a855f7', bgColor: '#faf5ff', labelColor: '#a855f7' },
+      DROP_SET:  { label: 'Drop Set',  borderColor: '#ef4444', bgColor: '#fef2f2', labelColor: '#ef4444' },
+      GIANT_SET: { label: 'Giant Set', borderColor: '#ec4899', bgColor: '#fdf2f8', labelColor: '#ec4899' },
+      CIRCUIT:   { label: 'Circuito',  borderColor: '#10b981', bgColor: '#ecfdf5', labelColor: '#10b981' },
+    };
+
+    function exerciseRow(ex: any, num: number) {
+      return `
         <tr>
-          <td style="padding:8px 12px;font-size:13px;color:#111827;">${i + 1}. ${ex.name ?? '—'}</td>
+          <td style="padding:8px 12px;font-size:13px;color:#111827;">${num}. ${ex.name ?? '—'}</td>
           <td style="padding:8px 8px;text-align:center;font-size:13px;color:#374151;">${ex.sets}</td>
           <td style="padding:8px 8px;text-align:center;font-size:13px;color:#374151;">${ex.reps ?? '—'}</td>
           <td style="padding:8px 8px;text-align:center;font-size:13px;color:#374151;">${ex.weight ? ex.weight + ' kg' : '—'}</td>
           <td style="padding:8px 8px;text-align:center;font-size:13px;color:#374151;">${ex.restSeconds ? ex.restSeconds + 's' : '—'}</td>
         </tr>
         ${ex.notes ? `<tr><td colspan="5" style="padding:0 12px 8px 28px;font-size:11px;color:#9ca3af;font-style:italic;">Obs: ${ex.notes}</td></tr>` : ''}
-      `).join('');
+      `;
+    }
+
+    const dayBlocks = filteredPlans.map((plan: any) => {
+      const allExercises = plan.workout?.exercises ?? [];
+      const groups = groupExercises(allExercises);
+      let counter = 0;
+
+      let exercisesHTML = '';
+      for (const group of groups) {
+        if (group.technique === 'NORMAL') {
+          for (const ex of group.items) {
+            counter++;
+            exercisesHTML += exerciseRow(ex, counter);
+          }
+        } else {
+          const tech = TECH_PDF[group.technique] || TECH_PDF.BI_SET;
+          exercisesHTML += `
+            <tr><td colspan="5" style="padding:10px 12px 0;">
+              <div style="border-left:4px solid ${tech.borderColor};background:${tech.bgColor};border-radius:0 8px 8px 0;padding:8px 12px;margin-bottom:4px;">
+                <span style="font-size:12px;font-weight:700;color:${tech.labelColor};">${tech.label}</span>
+                <span style="font-size:11px;color:#6b7280;margin-left:6px;">· ${group.items.length} exercícios em sequência</span>
+              </div>
+            </td></tr>`;
+          for (const ex of group.items) {
+            counter++;
+            exercisesHTML += exerciseRow(ex, counter);
+          }
+        }
+      }
+
       return `
         <div class="plan-block">
           <div class="plan-header">
             <span class="plan-title">${plan.workout?.name ?? 'Treino'}</span>
-            <span class="plan-meta">${plan.workout?.duration ?? 45} min • ${plan.workout?.exercises?.length ?? 0} exercícios</span>
+            <span class="plan-meta">${plan.workout?.duration ?? 45} min • ${allExercises.length} exercícios</span>
           </div>
           ${plan.division ? `<div class="division">${plan.division}</div>` : ''}
           <table>
@@ -347,7 +387,7 @@ export default function StudentWorkout() {
               <th style="text-align:left;">Exercício</th>
               <th>Séries</th><th>Reps</th><th>Carga</th><th>Descanso</th>
             </tr></thead>
-            <tbody>${exercises || '<tr><td colspan="5" style="padding:8px 12px;color:#9ca3af;font-size:12px;">Nenhum exercício cadastrado</td></tr>'}</tbody>
+            <tbody>${exercisesHTML || '<tr><td colspan="5" style="padding:8px 12px;color:#9ca3af;font-size:12px;">Nenhum exercício cadastrado</td></tr>'}</tbody>
           </table>
         </div>`;
     }).join('');
