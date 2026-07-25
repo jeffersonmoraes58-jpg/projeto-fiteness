@@ -7,9 +7,10 @@ import {
   Flame, RotateCcw, Timer, ChevronRight,
   X, PlayCircle, Trophy, Share2, Download, Camera, SwitchCamera,
   Music, ChevronUp, ChevronDown, ExternalLink, Loader2, Search,
-  Lock, CreditCard,
+  Lock, CreditCard, Zap, TrendingUp, Award,
 } from 'lucide-react';
 import Link from 'next/link';
+import { useAuthStore } from '@/store/auth';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
@@ -231,6 +232,58 @@ export default function StudentWorkout() {
   const [showSummary, setShowSummary] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const queryClient = useQueryClient();
+  const { user } = useAuthStore();
+
+  // ── Rest timer state ────────────────────────────────────────────────────
+  const [restTimer, setRestTimer] = useState<{ seconds: number; total: number; exerciseName: string } | null>(null);
+  const restIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // ── Live workout timer state ────────────────────────────────────────────
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const timerIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // ── PR celebration state ────────────────────────────────────────────────
+  const [prCelebration, setPrCelebration] = useState<{ exerciseName: string; type: string; value: string } | null>(null);
+  const prTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // ── Exercise evolution data (prev session + PRs) ────────────────────────
+  const { data: evolutionData } = useQuery({
+    queryKey: ['exercise-evolution', user?.id],
+    queryFn: () => api.get(`/progress/exercise-evolution/${user!.id}`).then((r) => r.data?.data ?? r.data ?? []),
+    enabled: !!user?.id,
+    staleTime: 300_000,
+  });
+
+  const prevSessionMap = useMemo(() => {
+    if (!evolutionData || !Array.isArray(evolutionData)) return {};
+    const map: Record<string, { weight: number | null; reps: number | null; sets: number; date: string }[]> = {};
+    for (const ex of evolutionData) {
+      if (ex.logs?.length > 0) {
+        map[ex.exerciseId] = ex.logs;
+      }
+    }
+    return map;
+  }, [evolutionData]);
+
+  const prMap = useMemo(() => {
+    if (!evolutionData || !Array.isArray(evolutionData)) return {};
+    const map: Record<string, { maxWeight: number | null; maxReps: number | null; maxVolume: number | null }> = {};
+    for (const ex of evolutionData) {
+      let maxW = 0, maxR = 0, maxV = 0;
+      for (const log of (ex.logs || [])) {
+        if (log.weight != null && log.weight > maxW) maxW = log.weight;
+        if (log.reps != null && log.reps > maxR) maxR = log.reps;
+        const vol = (log.weight || 0) * (log.reps || 0);
+        if (vol > maxV) maxV = vol;
+      }
+      map[ex.exerciseId] = {
+        maxWeight: maxW > 0 ? maxW : null,
+        maxReps: maxR > 0 ? maxR : null,
+        maxVolume: maxV > 0 ? maxV : null,
+      };
+    }
+    return map;
+  }, [evolutionData]);
 
   const { data: billingStatus } = useQuery({
     queryKey: ['student-billing-status'],
@@ -309,14 +362,123 @@ export default function StudentWorkout() {
       return sets.filter(Boolean).length >= ex.sets;
     });
 
-  const toggleSet = (exerciseId: string, setIndex: number) => {
+  // ── Volume calculation ──────────────────────────────────────────────────
+  const totalVolume = useMemo(() => {
+    if (!isSelectedPlanActive) return 0;
+    let vol = 0;
+    for (const ex of planExercises) {
+      const sets = completedSets[ex.id] || [];
+      const completedCount = sets.filter(Boolean).length;
+      vol += completedCount * (ex.reps || 0) * (ex.weight || 0);
+    }
+    return vol;
+  }, [completedSets, planExercises, isSelectedPlanActive]);
+
+  const exerciseVolume = useCallback((exerciseId: string) => {
+    const ex = planExercises.find((e: any) => e.id === exerciseId);
+    if (!ex) return 0;
+    const sets = completedSets[exerciseId] || [];
+    const completedCount = sets.filter(Boolean).length;
+    return completedCount * (ex.reps || 0) * (ex.weight || 0);
+  }, [completedSets, planExercises]);
+
+  // ── Previous session data for an exercise ───────────────────────────────
+  const getPrevSession = useCallback((exerciseId: string) => {
+    const logs = prevSessionMap[exerciseId];
+    if (!logs || logs.length === 0) return null;
+    const byDate = new Map<string, { weight: number | null; reps: number | null }[]>();
+    for (const l of logs) {
+      const d = l.date || 'unknown';
+      if (!byDate.has(d)) byDate.set(d, []);
+      byDate.get(d)!.push({ weight: l.weight ?? null, reps: l.reps ?? null });
+    }
+    const dates = Array.from(byDate.keys()).sort((a, b) => b.localeCompare(a));
+    if (dates.length === 0) return null;
+    const lastDate = dates[0];
+    const lastSets = byDate.get(lastDate)!;
+    const maxWeight = Math.max(...lastSets.map((s) => s.weight || 0));
+    const maxReps = Math.max(...lastSets.map((s) => s.reps || 0));
+    return { date: lastDate, weight: maxWeight || null, reps: maxReps || null, sets: lastSets.length };
+  }, [prevSessionMap]);
+
+  const toggleSet = useCallback((exerciseId: string, setIndex: number, restSeconds?: number) => {
     setCompletedSets((prev) => {
       const sets = prev[exerciseId] || [];
       const updated = [...sets];
-      updated[setIndex] = !updated[setIndex];
+      const wasCompleted = updated[setIndex];
+      updated[setIndex] = !wasCompleted;
+      // Start rest timer when completing a set (not when unchecking)
+      if (!wasCompleted && restSeconds && restSeconds > 0 && isSelectedPlanActive) {
+        const ex = planExercises.find((e: any) => e.id === exerciseId);
+        const exerciseName = ex?.name || 'Exercício';
+        if (restIntervalRef.current) clearInterval(restIntervalRef.current);
+        setRestTimer({ seconds: restSeconds, total: restSeconds, exerciseName });
+      }
       return { ...prev, [exerciseId]: updated };
     });
-  };
+  }, [isSelectedPlanActive, planExercises]);
+
+  // ── Rest timer countdown ────────────────────────────────────────────────
+  const restTimerRef = useRef(restTimer);
+  useEffect(() => {
+    if (restTimer && restTimer.seconds > 0 && !restTimerRef.current) {
+      restIntervalRef.current = setInterval(() => {
+        setRestTimer((prev) => {
+          if (!prev || prev.seconds <= 1) {
+            if (restIntervalRef.current) clearInterval(restIntervalRef.current);
+            return null;
+          }
+          return { ...prev, seconds: prev.seconds - 1 };
+        });
+      }, 1000);
+    }
+    restTimerRef.current = restTimer;
+    return () => { if (restIntervalRef.current) clearInterval(restIntervalRef.current); };
+  }, [restTimer]);
+
+  const skipRest = useCallback(() => {
+    if (restIntervalRef.current) clearInterval(restIntervalRef.current);
+    setRestTimer(null);
+  }, []);
+
+  // ── Live workout timer ──────────────────────────────────────────────────
+  useEffect(() => {
+    if (isSelectedPlanActive && startTime) {
+      timerIntervalRef.current = setInterval(() => {
+        setElapsedSeconds(Math.floor((Date.now() - startTime.getTime()) / 1000));
+      }, 1000);
+    }
+    return () => { if (timerIntervalRef.current) clearInterval(timerIntervalRef.current); };
+  }, [isSelectedPlanActive, startTime]);
+
+  // ── Cleanup on unmount ──────────────────────────────────────────────────
+  useEffect(() => {
+    return () => {
+      if (restIntervalRef.current) clearInterval(restIntervalRef.current);
+      if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
+      if (prTimeoutRef.current) clearTimeout(prTimeoutRef.current);
+    };
+  }, []);
+
+  // ── PR detection ────────────────────────────────────────────────────────
+  const checkPR = useCallback((exerciseId: string, exerciseName: string, weight: number, reps: number) => {
+    const pr = prMap[exerciseId];
+    if (!pr) return;
+    const volume = weight * reps;
+    if (pr.maxWeight != null && weight > pr.maxWeight) {
+      setPrCelebration({ exerciseName, type: 'Carga', value: `${weight}kg (anterior: ${pr.maxWeight}kg)` });
+      if (prTimeoutRef.current) clearTimeout(prTimeoutRef.current);
+      prTimeoutRef.current = setTimeout(() => setPrCelebration(null), 4000);
+    } else if (pr.maxReps != null && reps > pr.maxReps && weight >= (pr.maxWeight || 0)) {
+      setPrCelebration({ exerciseName, type: 'Reps', value: `${reps} reps (anterior: ${pr.maxReps})` });
+      if (prTimeoutRef.current) clearTimeout(prTimeoutRef.current);
+      prTimeoutRef.current = setTimeout(() => setPrCelebration(null), 4000);
+    } else if (pr.maxVolume != null && volume > pr.maxVolume) {
+      setPrCelebration({ exerciseName, type: 'Volume', value: `${volume}kg (anterior: ${pr.maxVolume}kg)` });
+      if (prTimeoutRef.current) clearTimeout(prTimeoutRef.current);
+      prTimeoutRef.current = setTimeout(() => setPrCelebration(null), 4000);
+    }
+  }, [prMap]);
 
   const openVideo = useCallback((url: string, title: string) => setVideoModal({ url, title }), []);
   const closeVideo = useCallback(() => setVideoModal(null), []);
@@ -461,6 +623,59 @@ export default function StudentWorkout() {
   return (
     <>
       {videoModal && <VideoModal url={videoModal.url} title={videoModal.title} onClose={closeVideo} />}
+
+      {/* ── PR Celebration Overlay ───────────────────────────────────────── */}
+      <AnimatePresence>
+        {prCelebration && (
+          <motion.div
+            initial={{ opacity: 0, y: -40, scale: 0.9 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -20, scale: 0.95 }}
+            className="fixed top-4 left-1/2 -translate-x-1/2 z-50 glass-card bg-gradient-to-r from-amber-500/20 to-yellow-500/20 border border-amber-500/30 px-5 py-3 flex items-center gap-3 shadow-xl shadow-amber-500/10"
+          >
+            <div className="w-10 h-10 rounded-full bg-amber-500/20 flex items-center justify-center flex-shrink-0">
+              <Award className="w-5 h-5 text-amber-400" />
+            </div>
+            <div>
+              <div className="text-xs font-bold text-amber-300 uppercase tracking-wider">Novo Recorde!</div>
+              <div className="text-sm font-semibold">{prCelebration.exerciseName}</div>
+              <div className="text-xs text-muted-foreground">{prCelebration.type}: {prCelebration.value}</div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ── Rest Timer Overlay ───────────────────────────────────────────── */}
+      <AnimatePresence>
+        {restTimer && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 glass-card bg-gradient-to-br from-blue-600/20 to-indigo-600/20 border border-blue-500/30 px-6 py-4 flex flex-col items-center gap-2 shadow-xl shadow-blue-500/10 min-w-[220px]"
+          >
+            <div className="text-xs text-blue-300 font-semibold uppercase tracking-wider">Descanso</div>
+            <div className="text-xs text-muted-foreground truncate max-w-[180px]">{restTimer.exerciseName}</div>
+            <div className="text-4xl font-bold text-white tabular-nums">
+              {Math.floor(restTimer.seconds / 60)}:{String(restTimer.seconds % 60).padStart(2, '0')}
+            </div>
+            {/* Progress bar */}
+            <div className="w-full h-1.5 bg-white/10 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-gradient-to-r from-blue-400 to-indigo-400 rounded-full transition-all duration-1000 ease-linear"
+                style={{ width: `${(restTimer.seconds / restTimer.total) * 100}%` }}
+              />
+            </div>
+            <button
+              onClick={skipRest}
+              className="text-xs text-muted-foreground hover:text-foreground transition-colors mt-1"
+            >
+              Pular descanso
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {showSummary && startTime && activePlan && (
         <WorkoutSummaryModal
           workoutName={activePlan.workout?.name || 'Treino'}
@@ -568,8 +783,21 @@ export default function StudentWorkout() {
                 </p>
               </div>
             ) : (
-              <div className="flex items-center justify-center gap-2 py-3 text-emerald-400 font-semibold text-sm">
-                <Timer className="w-4 h-4" />Em andamento
+              <div className="flex items-center justify-between py-3 px-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
+                <div className="flex items-center gap-2 text-emerald-400 font-semibold text-sm">
+                  <Timer className="w-4 h-4" />
+                  Em andamento
+                  <span className="text-xs font-normal text-emerald-400/70 tabular-nums ml-1">
+                    {Math.floor(elapsedSeconds / 60)}:{String(elapsedSeconds % 60).padStart(2, '0')}
+                  </span>
+                </div>
+                {totalVolume > 0 && (
+                  <div className="flex items-center gap-1.5 text-xs">
+                    <TrendingUp className="w-3 h-3 text-blue-400" />
+                    <span className="text-blue-400 font-semibold">{totalVolume.toLocaleString('pt-BR')} kg</span>
+                    <span className="text-muted-foreground">volume</span>
+                  </div>
+                )}
               </div>
             )}
 
@@ -583,8 +811,12 @@ export default function StudentWorkout() {
                     exercise={ex}
                     isActive={isSelectedPlanActive}
                     completedSets={completedSets[ex.id] || []}
-                    onToggleSet={(i) => toggleSet(ex.id, i)}
+                    onToggleSet={(i) => toggleSet(ex.id, i, ex.restSeconds)}
                     onOpenVideo={openVideo}
+                    prevSession={getPrevSession(ex.id)}
+                    pr={prMap[ex.id]}
+                    exerciseVol={exerciseVolume(ex.id)}
+                    onPRCheck={isSelectedPlanActive ? (name, w, r) => checkPR(ex.id, name, w, r) : undefined}
                   />
                 ));
 
@@ -1152,12 +1384,17 @@ function WorkoutMusicPlayer() {
 
 function ExerciseRow({
   exercise, isActive, completedSets, onToggleSet, onOpenVideo,
+  prevSession, pr, exerciseVol, onPRCheck,
 }: {
   exercise: any;
   isActive: boolean;
   completedSets: boolean[];
   onToggleSet: (i: number) => void;
   onOpenVideo: (url: string, title: string) => void;
+  prevSession?: { date: string; weight: number | null; reps: number | null; sets: number } | null;
+  pr?: { maxWeight: number | null; maxReps: number | null; maxVolume: number | null } | null;
+  exerciseVol?: number;
+  onPRCheck?: (exerciseName: string, weight: number, reps: number) => void;
 }) {
   const videoUrl: string | undefined = exercise.videoUrl;
   const name: string = exercise.name || '';
@@ -1165,6 +1402,18 @@ function ExerciseRow({
   const thumbnail = rawThumb ? resolveImageUrl(rawThumb) : getVideoThumbnail(videoUrl || '');
   const doneCount = completedSets.filter(Boolean).length;
   const allDone = isActive && doneCount >= exercise.sets;
+  const lastCheckedRef = useRef<number>(-1);
+  const vol = exerciseVol || 0;
+
+  // Detect PR when a new set is completed
+  useEffect(() => {
+    if (!onPRCheck || !isActive) return;
+    const newDone = completedSets.filter(Boolean).length;
+    if (newDone > lastCheckedRef.current && newDone > 0) {
+      onPRCheck(name, exercise.weight || 0, exercise.reps || 0);
+    }
+    lastCheckedRef.current = newDone;
+  }, [completedSets, onPRCheck, isActive, name, exercise.weight, exercise.reps]);
 
   return (
     <div className={cn('glass-card transition-all', allDone && 'border border-emerald-600/20 bg-emerald-600/5')}>
@@ -1195,6 +1444,28 @@ function ExerciseRow({
               <span className="font-semibold text-foreground/70">Instruções:</span>{' '}{exercise.notes}
             </div>
           )}
+          {/* Previous session data */}
+          {prevSession && !isActive && (
+            <div className="mt-2 flex items-center gap-2 text-[11px] text-muted-foreground/70">
+              <RotateCcw className="w-3 h-3" />
+              <span>Última: {prevSession.weight != null ? `${prevSession.weight}kg` : '—'} × {prevSession.reps ?? '—'} reps · {prevSession.sets} séries</span>
+            </div>
+          )}
+          {/* PR badge */}
+          {pr && !isActive && (
+            <div className="mt-1 flex items-center gap-2 text-[11px]">
+              {pr.maxWeight != null && (
+                <span className="flex items-center gap-1 text-amber-400/80">
+                  <Award className="w-3 h-3" />PR: {pr.maxWeight}kg
+                </span>
+              )}
+              {pr.maxReps != null && (
+                <span className="flex items-center gap-1 text-amber-400/80">
+                  <Award className="w-3 h-3" />PR: {pr.maxReps} reps
+                </span>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Right: video thumbnail */}
@@ -1222,6 +1493,21 @@ function ExerciseRow({
       {/* Set checkboxes — only when workout is active */}
       {isActive && (
         <div className="mt-3 pt-3 border-t border-border/50">
+          {/* Prev session reference + volume (active mode) */}
+          <div className="flex items-center justify-between mb-2 px-1">
+            {prevSession ? (
+              <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                <RotateCcw className="w-3 h-3" />
+                Último: {prevSession.weight != null ? `${prevSession.weight}kg` : '—'} × {prevSession.reps ?? '—'}
+              </div>
+            ) : <div />}
+            {vol > 0 && (
+              <div className="flex items-center gap-1 text-[11px] text-blue-400 font-medium">
+                <TrendingUp className="w-3 h-3" />
+                {vol.toLocaleString('pt-BR')} kg
+              </div>
+            )}
+          </div>
           <div className="flex gap-2 flex-wrap">
             {[...Array(exercise.sets)].map((_, i) => (
               <button
