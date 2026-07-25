@@ -117,11 +117,23 @@ export class ChallengesService {
       select: { challengeId: true },
     });
     const joinedIds = joined.map((j) => j.challengeId);
+
+    const trainerLinks = await this.prisma.trainerStudent.findMany({
+      where: { studentId: student.id, isActive: true },
+      select: { trainerId: true },
+    });
+    const trainerIds = trainerLinks.map((t) => t.trainerId);
+
     return this.prisma.challenge.findMany({
       where: {
         isActive: true,
         id: { notIn: joinedIds },
         endDate: { gt: new Date() },
+        ...(trainerIds.length > 0 ? { trainerId: { in: trainerIds } } : {}),
+      },
+      include: {
+        trainer: { select: { userId: true, user: { select: { profile: { select: { firstName: true, lastName: true } } } } } },
+        _count: { select: { participants: true, lessons: true } },
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -413,6 +425,50 @@ export class ChallengesService {
 
   // ── STUDENT — CONTENT ACCESS + PROGRESS ──────────────────
 
+  async getChallengePreview(userId: string, challengeId: string) {
+    const student = await this.getStudent(userId);
+    const challenge = await this.prisma.challenge.findUnique({
+      where: { id: challengeId },
+      include: {
+        lessons: {
+          select: { id: true, order: true, title: true, type: true, duration: true, isFree: true },
+          orderBy: { order: 'asc' },
+        },
+        trainer: { select: { user: { select: { profile: { select: { firstName: true, lastName: true } } } } } },
+        _count: { select: { participants: true, lessons: true } },
+      },
+    });
+    if (!challenge) throw new NotFoundException('Desafio não encontrado');
+
+    const sc = await this.prisma.studentChallenge.findFirst({
+      where: { studentId: student.id, challengeId },
+    });
+
+    const trainerName = [challenge.trainer?.user?.profile?.firstName, challenge.trainer?.user?.profile?.lastName]
+      .filter(Boolean).join(' ') || 'Personal';
+
+    return {
+      id: challenge.id,
+      title: challenge.title,
+      description: challenge.description,
+      type: challenge.type,
+      duration: challenge.duration,
+      price: (challenge as any).price,
+      points: challenge.points,
+      coverUrl: (challenge as any).coverUrl,
+      startDate: challenge.startDate,
+      endDate: challenge.endDate,
+      trainerName,
+      participantCount: challenge._count.participants,
+      totalLessons: challenge._count.lessons,
+      lessons: challenge.lessons,
+      hasJoined: !!sc,
+      isPaid: sc?.isPaid ?? false,
+      progress: sc?.progress ?? 0,
+      isCompleted: sc?.isCompleted ?? false,
+    };
+  }
+
   async getChallengeContent(userId: string, challengeId: string) {
     const student = await this.getStudent(userId);
     const challenge = await this.prisma.challenge.findUnique({
@@ -546,5 +602,39 @@ export class ChallengesService {
       });
     }
     return updated;
+  }
+
+  // ── LEADERBOARD ─────────────────────────────────────────
+
+  async getChallengeLeaderboard(userId: string, challengeId: string) {
+    const student = await this.getStudent(userId);
+    const participants = await this.prisma.studentChallenge.findMany({
+      where: { challengeId },
+      include: {
+        student: {
+          include: {
+            user: { include: { profile: { select: { firstName: true, lastName: true, avatarUrl: true } } } },
+          },
+        },
+      },
+      orderBy: [
+        { isCompleted: 'desc' },
+        { progress: 'desc' },
+        { joinedAt: 'asc' },
+      ],
+    });
+
+    return participants.map((p, index) => ({
+      rank: index + 1,
+      studentId: p.studentId,
+      name: [p.student.user.profile?.firstName, p.student.user.profile?.lastName]
+        .filter(Boolean).join(' ') || 'Aluno',
+      avatarUrl: p.student.user.profile?.avatarUrl ?? null,
+      progress: p.progress,
+      isCompleted: p.isCompleted,
+      completedAt: p.completedAt,
+      joinedAt: p.joinedAt,
+      isMe: p.studentId === student.id,
+    }));
   }
 }

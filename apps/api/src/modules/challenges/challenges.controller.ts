@@ -84,6 +84,12 @@ export class ChallengesController {
     return this.service.updateProgress(user.id, id, body.progress);
   }
 
+  @Get(':id/leaderboard')
+  @ApiOperation({ summary: 'Ranking do desafio' })
+  getLeaderboard(@CurrentUser() user: any, @Param('id') id: string) {
+    return this.service.getChallengeLeaderboard(user.id, id);
+  }
+
   // ── TRAINER — LESSONS ────────────────────────────────────
 
   @Post(':id/lessons')
@@ -129,6 +135,12 @@ export class ChallengesController {
   }
 
   // ── STUDENT — CONTENT ────────────────────────────────────
+
+  @Get('preview/:id')
+  @ApiOperation({ summary: 'Pré-visualização do desafio (STUDENT)' })
+  getPreview(@CurrentUser() user: any, @Param('id') id: string) {
+    return this.service.getChallengePreview(user.id, id);
+  }
 
   @Get(':id/content')
   @ApiOperation({ summary: 'Obter conteúdo do desafio (STUDENT)' })

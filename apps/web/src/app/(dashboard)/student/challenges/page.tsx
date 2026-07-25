@@ -1,8 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
+import toast from 'react-hot-toast';
 import {
   Star, Trophy, Clock, Users, Zap, Dumbbell,
   Flame, Target, CheckCircle2, ArrowRight, Calendar,
@@ -14,6 +16,14 @@ import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
 
 const TABS = ['Marketplace', 'Meus desafios', 'Concluídos'];
+
+const CHALLENGE_TYPES = [
+  { key: 'all', label: 'Todos', icon: Trophy },
+  { key: 'workout', label: 'Treino', icon: Dumbbell },
+  { key: 'streak', label: 'Sequência', icon: Flame },
+  { key: 'nutrition', label: 'Nutrição', icon: Target },
+  { key: 'steps', label: 'Passos', icon: Zap },
+];
 
 const CHALLENGE_ICONS: Record<string, any> = {
   workout: Dumbbell, streak: Flame, nutrition: Target, steps: Zap, default: Trophy,
@@ -29,9 +39,28 @@ const CHALLENGE_COLORS = [
 
 export default function StudentChallenges() {
   const [tab, setTab] = useState(0);
+  const [typeFilter, setTypeFilter] = useState('all');
   const [payModal, setPayModal] = useState<any | null>(null);
   const [pixData, setPixData] = useState<{ qrCode: string; qrCodeBase64: string; amount: number } | null>(null);
   const qc = useQueryClient();
+  const searchParams = useSearchParams();
+  const router = useRouter();
+
+  useEffect(() => {
+    const payment = searchParams.get('payment');
+    if (payment === 'success') {
+      toast.success('Pagamento confirmado! Seu desafio foi desbloqueado.');
+      qc.invalidateQueries({ queryKey: ['challenges-available'] });
+      qc.invalidateQueries({ queryKey: ['challenges-active'] });
+      router.replace('/student/challenges');
+    } else if (payment === 'failure') {
+      toast.error('Pagamento não foi concluído. Tente novamente.');
+      router.replace('/student/challenges');
+    } else if (payment === 'pending') {
+      toast('Pagamento pendente. Você será notificado quando for confirmado.', { icon: '⏳' });
+      router.replace('/student/challenges');
+    }
+  }, [searchParams, qc, router]);
 
   const { data: available = [] } = useQuery({
     queryKey: ['challenges-available'],
@@ -72,7 +101,11 @@ export default function StudentChallenges() {
   const activeArr = Array.isArray(active) ? active : [];
   const doneArr = Array.isArray(done) ? done : [];
 
-  const lists = [availableArr, activeArr, doneArr];
+  const filteredAvailable = typeFilter === 'all'
+    ? availableArr
+    : availableArr.filter((c: any) => c.type === typeFilter);
+
+  const lists = [filteredAvailable, activeArr, doneArr];
   const totalPts = doneArr.reduce((s: number, c: any) => s + (c.challenge?.points ?? 0), 0);
 
   return (
@@ -116,6 +149,20 @@ export default function StudentChallenges() {
 
       {/* Content */}
       <div className={cn(tab === 0 ? 'grid sm:grid-cols-2 lg:grid-cols-3 gap-4' : 'space-y-4')}>
+        {tab === 0 && (
+          <div className="col-span-full flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
+            {CHALLENGE_TYPES.map((t) => (
+              <button key={t.key} onClick={() => setTypeFilter(t.key)}
+                className={cn('flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all',
+                  typeFilter === t.key
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-white/5 text-muted-foreground hover:bg-white/10')}>
+                <t.icon className="w-3 h-3" />
+                {t.label}
+              </button>
+            ))}
+          </div>
+        )}
         {lists[tab].length > 0 ? (
           lists[tab].map((item: any, i: number) => {
             const challenge = tab === 0 ? item : item.challenge;
@@ -154,6 +201,33 @@ export default function StudentChallenges() {
           </div>
         )}
       </div>
+
+      {/* ── Post-completion upsell ── */}
+      {tab === 2 && doneArr.length > 0 && filteredAvailable.length > 0 && (
+        <div className="space-y-3">
+          <h3 className="text-sm font-semibold text-muted-foreground">Próximo desafio</h3>
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {filteredAvailable.slice(0, 3).map((item: any, i: number) => (
+              <ChallengeCard
+                key={item.id}
+                challenge={item}
+                studentChallenge={null}
+                index={i}
+                isGrid={true}
+                onJoin={() => {
+                  if (item.price > 0) {
+                    setPayModal(item);
+                    setPixData(null);
+                  } else {
+                    joinMut.mutate(item.id);
+                  }
+                }}
+                isJoining={joinMut.isPending && joinMut.variables === item.id}
+              />
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* ── MODAL: PAGAMENTO ── */}
       <AnimatePresence>
@@ -258,11 +332,13 @@ function ChallengeCard({
       <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * 0.05 }}
         className="glass-card flex flex-col gap-3">
         {/* Cover */}
-        <div className={cn('w-full h-28 rounded-xl flex items-center justify-center bg-gradient-to-br relative overflow-hidden', color)}>
+        <Link href={`/student/challenges/${challenge.id}`} className={cn('block w-full h-28 rounded-xl relative overflow-hidden bg-gradient-to-br', color)}>
           {challenge.coverUrl ? (
             <img src={challenge.coverUrl} alt="" className="w-full h-full object-cover absolute inset-0" />
           ) : (
-            <Icon className="w-10 h-10 text-white/80" />
+            <div className="w-full h-full flex items-center justify-center">
+              <Icon className="w-10 h-10 text-white/80" />
+            </div>
           )}
           {challenge.price > 0 ? (
             <span className="absolute top-2 right-2 px-2 py-0.5 rounded-full bg-black/60 text-white text-xs font-semibold flex items-center gap-1">
@@ -274,16 +350,21 @@ function ChallengeCard({
               Grátis
             </span>
           )}
-        </div>
+        </Link>
 
-        <div className="flex-1">
-          <h3 className="font-semibold leading-tight mb-1 line-clamp-1">{challenge.title}</h3>
+        <div className="flex-1 px-1">
+          <Link href={`/student/challenges/${challenge.id}`}>
+            <h3 className="font-semibold leading-tight mb-1 line-clamp-1 hover:text-primary transition-colors">{challenge.title}</h3>
+          </Link>
           {challenge.description && (
             <p className="text-xs text-muted-foreground line-clamp-2 mb-2">{challenge.description}</p>
           )}
           <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
             <span className="flex items-center gap-1"><Star className="w-3 h-3 text-yellow-400" />{challenge.points} pts</span>
             <span className="flex items-center gap-1"><Calendar className="w-3 h-3" />{challenge.duration}d</span>
+            {challenge._count && (
+              <span className="flex items-center gap-1"><Users className="w-3 h-3" />{challenge._count.participants}</span>
+            )}
             {daysLeft !== null && (
               <span className="flex items-center gap-1"><Clock className="w-3 h-3" />
                 {daysLeft === 0 ? 'Último dia' : `${daysLeft}d restam`}
@@ -292,19 +373,25 @@ function ChallengeCard({
           </div>
         </div>
 
-        {onJoin && (
-          <button onClick={onJoin} disabled={isJoining}
-            className={cn('w-full py-2 rounded-xl text-sm font-medium flex items-center justify-center gap-2 transition-all',
-              challenge.price > 0
-                ? 'bg-primary/20 text-primary hover:bg-primary/30'
-                : 'bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600/30')}>
-            {isJoining ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : (
-              challenge.price > 0
-                ? <><ShoppingBag className="w-3.5 h-3.5" /> Comprar</>
-                : <><ArrowRight className="w-3.5 h-3.5" /> Participar</>
-            )}
-          </button>
-        )}
+        <div className="flex gap-2 px-1 pb-1">
+          <Link href={`/student/challenges/${challenge.id}`}
+            className="flex-1 py-2 rounded-xl text-sm font-medium text-center bg-white/5 hover:bg-white/10 transition-all">
+            Ver detalhes
+          </Link>
+          {onJoin && (
+            <button onClick={onJoin} disabled={isJoining}
+              className={cn('flex-1 py-2 rounded-xl text-sm font-medium flex items-center justify-center gap-2 transition-all',
+                challenge.price > 0
+                  ? 'bg-primary/20 text-primary hover:bg-primary/30'
+                  : 'bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600/30')}>
+              {isJoining ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : (
+                challenge.price > 0
+                  ? <><ShoppingBag className="w-3.5 h-3.5" /> Comprar</>
+                  : <><ArrowRight className="w-3.5 h-3.5" /> Participar</>
+              )}
+            </button>
+          )}
+        </div>
       </motion.div>
     );
   }
@@ -325,7 +412,9 @@ function ChallengeCard({
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-start justify-between gap-2 mb-1">
-            <h3 className="font-semibold leading-tight">{challenge.title}</h3>
+            <Link href={`/student/challenges/${challenge.id}`} className="font-semibold leading-tight hover:text-primary transition-colors">
+              {challenge.title}
+            </Link>
             {isCompleted && (
               <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 flex-shrink-0">Concluído</span>
             )}
@@ -343,8 +432,11 @@ function ChallengeCard({
                 {daysLeft === 0 ? 'Último dia!' : `${daysLeft} dias restantes`}
               </span>
             )}
+            {challenge.duration && (
+              <span className="flex items-center gap-1"><Calendar className="w-3 h-3" />{challenge.duration}d</span>
+            )}
           </div>
-          {isPaid && challenge.targetValue && (
+          {isPaid && (
             <div className="space-y-1">
               <div className="flex justify-between text-xs">
                 <span className="text-muted-foreground">Progresso</span>
@@ -371,13 +463,13 @@ function ChallengeCard({
             </div>
           )}
           {isPaid && (
-            <div className="mt-3">
+            <div className="mt-3 flex gap-2">
               <Link
                 href={`/student/challenges/${challenge.id}`}
                 className="btn-primary text-xs py-1.5 px-3 flex items-center gap-1.5 w-fit"
               >
                 <Play className="w-3.5 h-3.5" />
-                Acessar conteúdo
+                {isCompleted ? 'Rever conteúdo' : 'Continuar'}
               </Link>
             </div>
           )}
