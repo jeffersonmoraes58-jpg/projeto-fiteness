@@ -58,10 +58,12 @@ export class ProgressService {
     return this.prisma.progressPhoto.delete({ where: { id } });
   }
 
-  async addAssessment(userId: string, trainerId: string, data: any) {
+  async addAssessment(userId: string, trainerUserId: string, data: any) {
     const student = await this.getStudent(userId);
+    const trainer = await this.prisma.trainer.findUnique({ where: { userId: trainerUserId } });
+    if (!trainer) throw new ForbiddenException('Trainer não encontrado');
     const { studentUserId, ...assessmentData } = data;
-    return this.prisma.physicalAssessment.create({ data: { studentId: student.id, trainerId, ...assessmentData } });
+    return this.prisma.physicalAssessment.create({ data: { studentId: student.id, trainerId: trainer.id, ...assessmentData } });
   }
 
   async getCharts(userId: string) {

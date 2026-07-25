@@ -11,21 +11,46 @@ import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
 
 const ALL_ACHIEVEMENTS = [
+  // Treino
   { id: 'first_workout', title: 'Primeiro Treino', description: 'Complete seu primeiro treino', icon: Dumbbell, points: 50, category: 'treino', color: 'from-purple-500 to-indigo-500' },
-  { id: 'week_streak', title: '7 dias seguidos', description: 'Treine 7 dias consecutivos', icon: Flame, points: 150, category: 'sequencia', color: 'from-orange-500 to-red-500' },
-  { id: 'month_streak', title: '30 dias seguidos', description: 'Treine 30 dias consecutivos', icon: Flame, points: 500, category: 'sequencia', color: 'from-red-500 to-rose-600' },
+  { id: 'five_workouts', title: '5 Treinos', description: 'Complete 5 treinos', icon: Dumbbell, points: 75, category: 'treino', color: 'from-blue-500 to-indigo-500' },
   { id: 'ten_workouts', title: '10 Treinos', description: 'Complete 10 treinos', icon: Dumbbell, points: 100, category: 'treino', color: 'from-cyan-500 to-blue-500' },
+  { id: 'twentyfive_workouts', title: '25 Treinos', description: 'Complete 25 treinos', icon: Dumbbell, points: 200, category: 'treino', color: 'from-teal-500 to-cyan-500' },
   { id: 'fifty_workouts', title: '50 Treinos', description: 'Complete 50 treinos', icon: Trophy, points: 300, category: 'treino', color: 'from-yellow-500 to-orange-500' },
-  { id: 'goal_reached', title: 'Meta Atingida', description: 'Conclua uma meta', icon: Target, points: 200, category: 'metas', color: 'from-emerald-500 to-teal-500' },
-  { id: 'hydrated', title: 'Bem Hidratado', description: 'Beba 2L de água por 7 dias', icon: Droplets, points: 100, category: 'nutrição', color: 'from-cyan-400 to-blue-400' },
-  { id: 'diet_week', title: 'Dieta em Dia', description: 'Siga a dieta por 7 dias', icon: Salad, points: 150, category: 'nutrição', color: 'from-green-500 to-emerald-500' },
+  { id: 'century', title: '100 Treinos', description: 'Complete 100 treinos', icon: Trophy, points: 500, category: 'treino', color: 'from-amber-400 to-yellow-300' },
+  { id: 'two_hundred', title: '200 Treinos', description: 'Complete 200 treinos', icon: Trophy, points: 1000, category: 'treino', color: 'from-orange-500 to-red-500' },
+  { id: 'five_hundred', title: '500 Treinos', description: 'Complete 500 treinos', icon: Trophy, points: 2500, category: 'treino', color: 'from-red-500 to-rose-600' },
+
+  // Sequência
+  { id: 'three_streak', title: '3 dias seguidos', description: 'Treine 3 dias consecutivos', icon: Flame, points: 30, category: 'sequencia', color: 'from-orange-400 to-red-400' },
+  { id: 'week_streak', title: '7 dias seguidos', description: 'Treine 7 dias consecutivos', icon: Flame, points: 150, category: 'sequencia', color: 'from-orange-500 to-red-500' },
+  { id: 'two_week_streak', title: '14 dias seguidos', description: 'Treine 14 dias consecutivos', icon: Flame, points: 300, category: 'sequencia', color: 'from-red-500 to-pink-500' },
+  { id: 'three_week_streak', title: '21 dias seguidos', description: 'Treine 21 dias consecutivos', icon: Flame, points: 400, category: 'sequencia', color: 'from-red-500 to-rose-500' },
+  { id: 'month_streak', title: '30 dias seguidos', description: 'Treine 30 dias consecutivos', icon: Flame, points: 500, category: 'sequencia', color: 'from-red-500 to-rose-600' },
+  { id: 'two_month_streak', title: '60 dias seguidos', description: 'Treine 60 dias consecutivos', icon: Flame, points: 750, category: 'sequencia', color: 'from-rose-500 to-pink-600' },
+  { id: 'three_month_streak', title: '90 dias seguidos', description: 'Treine 90 dias consecutivos', icon: Flame, points: 1000, category: 'sequencia', color: 'from-pink-500 to-fuchsia-600' },
+  { id: 'half_year_streak', title: '180 dias seguidos', description: 'Treine 180 dias consecutivos', icon: Flame, points: 2000, category: 'sequencia', color: 'from-fuchsia-500 to-purple-600' },
+  { id: 'year_streak', title: '365 dias seguidos', description: 'Treine 365 dias consecutivos!', icon: Flame, points: 5000, category: 'sequencia', color: 'from-purple-500 to-indigo-600' },
+
+  // Semanal
+  { id: 'beast_mode', title: 'Beast Mode', description: 'Treine 5x em uma semana', icon: Zap, points: 200, category: 'semanal', color: 'from-purple-600 to-pink-600' },
+  { id: 'perfect_week', title: 'Semana Perfeita', description: 'Treine todos os dias da semana', icon: Zap, points: 500, category: 'semanal', color: 'from-pink-500 to-fuchsia-500' },
+
+  // Nível
   { id: 'level_5', title: 'Nível 5', description: 'Alcance o nível 5', icon: Star, points: 250, category: 'nivel', color: 'from-yellow-400 to-amber-500' },
   { id: 'level_10', title: 'Nível 10', description: 'Alcance o nível 10', icon: Star, points: 500, category: 'nivel', color: 'from-yellow-500 to-orange-500' },
-  { id: 'beast_mode', title: 'Beast Mode', description: 'Treine 5x em uma semana', icon: Zap, points: 200, category: 'treino', color: 'from-purple-600 to-pink-600' },
-  { id: 'century', title: '100 Treinos', description: 'Complete 100 treinos', icon: Trophy, points: 1000, category: 'treino', color: 'from-amber-400 to-yellow-300' },
+  { id: 'level_15', title: 'Nível 15', description: 'Alcance o nível 15', icon: Star, points: 750, category: 'nivel', color: 'from-amber-500 to-orange-500' },
+  { id: 'level_25', title: 'Nível 25', description: 'Alcance o nível 25', icon: Star, points: 1000, category: 'nivel', color: 'from-orange-500 to-red-500' },
+  { id: 'level_50', title: 'Nível 50', description: 'Alcance o nível 50', icon: Star, points: 2500, category: 'nivel', color: 'from-red-500 to-rose-600' },
+
+  // Pontos
+  { id: 'points_1k', title: '1.000 Pontos', description: 'Acumule 1.000 pontos', icon: Target, points: 100, category: 'pontos', color: 'from-emerald-500 to-teal-500' },
+  { id: 'points_5k', title: '5.000 Pontos', description: 'Acumule 5.000 pontos', icon: Target, points: 250, category: 'pontos', color: 'from-teal-500 to-cyan-500' },
+  { id: 'points_10k', title: '10.000 Pontos', description: 'Acumule 10.000 pontos', icon: Target, points: 500, category: 'pontos', color: 'from-cyan-500 to-blue-500' },
+  { id: 'points_50k', title: '50.000 Pontos', description: 'Acumule 50.000 pontos', icon: Target, points: 1000, category: 'pontos', color: 'from-blue-500 to-indigo-500' },
 ];
 
-const CATEGORIES = ['todos', 'treino', 'sequencia', 'metas', 'nutrição', 'nivel'];
+const CATEGORIES = ['todos', 'treino', 'sequencia', 'semanal', 'nivel', 'pontos'];
 
 export default function StudentAchievements() {
   const [filter, setFilter] = useState('todos');

@@ -1,12 +1,14 @@
 import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { GamificationService } from '../gamification/gamification.service';
 
 @Injectable()
 export class StudentsService {
   constructor(
     private prisma: PrismaService,
     private notifications: NotificationsService,
+    private gamification: GamificationService,
   ) {}
 
   /**
@@ -116,11 +118,15 @@ export class StudentsService {
       user: student.user,
       stats: {
         streak: student.streak,
+        longestStreak: student.longestStreak,
         level: student.level,
         points: student.points,
         workoutsThisWeek,
         waterToday: totalWaterToday,
         weekActivity,
+        xpToNextLevel: this.gamification.calculateXpForNextLevel(student.points || 0).required,
+        xpCurrentLevel: this.gamification.calculateXpForNextLevel(student.points || 0).current,
+        xpProgress: this.gamification.calculateXpForNextLevel(student.points || 0).progress,
       },
       todayWorkout: activePlan?.workout ?? null,
       activeDiet: activeDiet?.diet ?? null,
@@ -261,11 +267,8 @@ export class StudentsService {
         completedAt: new Date(),
       },
     });
-    await this.prisma.student.update({
-      where: { id: student.id },
-      data: { streak: { increment: 1 }, points: { increment: 10 } },
-    });
-    await this.checkAndAwardAchievements(student.id);
+
+    const gamification = await this.gamification.awardWorkoutXp(student.id, log.id);
 
     if (data.workoutPlanId) {
       try {
@@ -285,7 +288,7 @@ export class StudentsService {
             userId: plan.workout.trainer.userId,
             type: 'ACHIEVEMENT',
             title: '✅ Treino finalizado!',
-            body: `${studentName} concluiu o treino "${plan.workout.name}". 🎉`,
+            body: `${studentName} concluiu o treino "${plan.workout.name}" (+${gamification.xp} XP)${gamification.levelUp ? ` ⬆️ Nível ${gamification.newLevel}!` : ''}`,
           });
         }
       } catch (err) {
@@ -293,7 +296,7 @@ export class StudentsService {
       }
     }
 
-    return log;
+    return { ...log, gamification };
   }
 
   private async checkAndAwardAchievements(studentId: string): Promise<void> {

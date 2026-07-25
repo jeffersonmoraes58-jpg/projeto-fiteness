@@ -8,7 +8,7 @@ import {
   Dumbbell, Users, Apple, BarChart3, MessageCircle, Bell,
   Settings, LogOut, ChevronLeft, Trophy,
   Calendar, CreditCard, Brain, Home, Utensils, Wand2,
-  Activity, Target, Star, Building2, Shield, Zap, Clock,
+  Activity, Target, Star, Building2, Shield, Zap, Clock, Medal,
 } from 'lucide-react';
 
 import { useQuery } from '@tanstack/react-query';
@@ -61,6 +61,7 @@ const navByRole: Record<string, NavItem[]> = {
     { icon: Calendar, label: 'Agenda', href: '/student/schedule' },
     { icon: Target, label: 'Metas', href: '/student/goals' },
     { icon: Trophy, label: 'Conquistas', href: '/student/achievements' },
+    { icon: Medal, label: 'Ranking', href: '/student/leaderboard' },
     { icon: Star, label: 'Desafios', href: '/student/challenges' },
     { icon: MessageCircle, label: 'Chat', href: '/student/chat', isChat: true },
     { icon: CreditCard, label: 'Pagamentos', href: '/student/billing' },

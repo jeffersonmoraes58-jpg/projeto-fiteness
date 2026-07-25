@@ -1,5 +1,3 @@
-version: '3.9'
-
 services:
   postgres:
     image: postgres:16-alpine
@@ -89,7 +87,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 300M
+          memory: 2G
 
   web:
     image: ghcr.io/jeffersonmoraes58-jpg/fitsaas-web:${IMAGE_TAG:-latest}
@@ -112,7 +110,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 300M
+          memory: 2G
 
   nginx:
     image: nginx:1.25-alpine

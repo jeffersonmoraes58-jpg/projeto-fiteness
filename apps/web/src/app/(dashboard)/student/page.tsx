@@ -4,7 +4,7 @@ import { motion } from 'framer-motion';
 import {
   Dumbbell, Apple, Droplets, Flame, Trophy, Target,
   TrendingUp, ChevronRight, Play, CheckCircle2, Circle,
-  Zap, Star, ArrowUpRight, Calendar, Clock, Users,
+  Zap, Star, ArrowUpRight, Calendar, Clock, Users, Medal,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
@@ -93,6 +93,44 @@ export default function StudentDashboard() {
           <span className="text-xs text-muted-foreground">Nível {stats?.stats?.level ?? 1}</span>
         </div>
       </div>
+
+      {/* Level & XP Bar */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.35 }}
+        className="glass-card"
+      >
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-yellow-500 to-orange-500 flex items-center justify-center">
+              <span className="text-lg font-black text-white">L{s?.level ?? 1}</span>
+            </div>
+            <div>
+              <div className="text-sm font-semibold">Nível {s?.level ?? 1}</div>
+              <div className="text-xs text-muted-foreground">
+                {s?.xpCurrentLevel ?? 0} / {s?.xpToNextLevel ?? 200} XP
+              </div>
+            </div>
+          </div>
+          <div className="text-right">
+            <div className="text-lg font-bold text-yellow-400">{s?.points ?? 0}</div>
+            <div className="text-xs text-muted-foreground">pontos totais</div>
+          </div>
+        </div>
+        <div className="w-full h-2.5 bg-white/10 rounded-full overflow-hidden">
+          <motion.div
+            initial={{ width: 0 }}
+            animate={{ width: `${s?.xpProgress ?? 0}%` }}
+            transition={{ duration: 1, ease: 'easeOut' }}
+            className="h-full bg-gradient-to-r from-yellow-500 to-orange-500 rounded-full"
+          />
+        </div>
+        <div className="flex justify-between mt-1.5">
+          <span className="text-[10px] text-muted-foreground">Nível {s?.level ?? 1}</span>
+          <span className="text-[10px] text-muted-foreground">{s?.xpProgress ?? 0}% para Nível {(s?.level ?? 1) + 1}</span>
+        </div>
+      </motion.div>
 
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -301,7 +339,7 @@ export default function StudentDashboard() {
               {[
                 { label: 'Evolução', icon: TrendingUp, href: '/student/progress', color: 'text-emerald-400' },
                 { label: 'Conquistas', icon: Trophy, href: '/student/achievements', color: 'text-yellow-400' },
-                { label: 'Desafios', icon: Star, href: '/student/challenges', color: 'text-purple-400' },
+                { label: 'Ranking', icon: Medal, href: '/student/leaderboard', color: 'text-orange-400' },
                 { label: 'Agenda', icon: Calendar, href: '/student/workout', color: 'text-cyan-400' },
               ].map((a) => (
                 <Link

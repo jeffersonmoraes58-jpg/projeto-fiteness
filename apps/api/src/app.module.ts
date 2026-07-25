@@ -33,6 +33,7 @@ import { SubscriptionsModule } from './modules/subscriptions/subscription.module
 import { CloudinaryGifsModule } from './modules/cloudinary-gifs/cloudinary-gifs.module';
 import { PushModule } from './modules/push/push.module';
 import { MercadoPagoModule } from './modules/mercadopago/mercadopago.module';
+import { GamificationModule } from './modules/gamification/gamification.module';
 
 @Module({
   imports: [
@@ -85,6 +86,7 @@ import { MercadoPagoModule } from './modules/mercadopago/mercadopago.module';
     CloudinaryGifsModule,
     PushModule,
     MercadoPagoModule,
+    GamificationModule,
   ],
   providers: [
     {
