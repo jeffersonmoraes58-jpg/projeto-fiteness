@@ -334,16 +334,19 @@ export default function StudentWorkout() {
       CIRCUIT:   { label: 'Circuito',  borderColor: '#10b981', bgColor: '#ecfdf5', labelColor: '#10b981' },
     };
 
-    function exerciseRow(ex: any, num: number) {
+    function exerciseRow(ex: any, num: number, groupStyle?: { borderColor: string; bgColor: string }) {
+      const trStyle = groupStyle
+        ? `border-left:3px solid ${groupStyle.borderColor};background:${groupStyle.bgColor};`
+        : '';
       return `
-        <tr>
-          <td style="padding:8px 12px;font-size:13px;color:#111827;">${num}. ${ex.name ?? '—'}</td>
+        <tr style="${trStyle}">
+          <td style="padding:8px 12px;font-size:13px;color:#111827;${groupStyle ? 'font-weight:500;' : ''}">${num}. ${ex.name ?? '—'}</td>
           <td style="padding:8px 8px;text-align:center;font-size:13px;color:#374151;">${ex.sets}</td>
           <td style="padding:8px 8px;text-align:center;font-size:13px;color:#374151;">${ex.reps ?? '—'}</td>
           <td style="padding:8px 8px;text-align:center;font-size:13px;color:#374151;">${ex.weight ? ex.weight + ' kg' : '—'}</td>
           <td style="padding:8px 8px;text-align:center;font-size:13px;color:#374151;">${ex.restSeconds ? ex.restSeconds + 's' : '—'}</td>
         </tr>
-        ${ex.notes ? `<tr><td colspan="5" style="padding:0 12px 8px 28px;font-size:11px;color:#9ca3af;font-style:italic;">Obs: ${ex.notes}</td></tr>` : ''}
+        ${ex.notes ? `<tr style="${groupStyle ? 'border-left:3px solid ' + groupStyle.borderColor + ';' : ''}"><td colspan="5" style="padding:0 12px 8px 28px;font-size:11px;color:#9ca3af;font-style:italic;">Obs: ${ex.notes}</td></tr>` : ''}
       `;
     }
 
@@ -361,6 +364,7 @@ export default function StudentWorkout() {
           }
         } else {
           const tech = TECH_PDF[group.technique] || TECH_PDF.BI_SET;
+          const groupStyle = { borderColor: tech.borderColor, bgColor: tech.bgColor };
           exercisesHTML += `
             <tr><td colspan="5" style="padding:10px 12px 0;">
               <div style="border-left:4px solid ${tech.borderColor};background:${tech.bgColor};border-radius:0 8px 8px 0;padding:8px 12px;margin-bottom:4px;">
@@ -370,7 +374,7 @@ export default function StudentWorkout() {
             </td></tr>`;
           for (const ex of group.items) {
             counter++;
-            exercisesHTML += exerciseRow(ex, counter);
+            exercisesHTML += exerciseRow(ex, counter, groupStyle);
           }
         }
       }
