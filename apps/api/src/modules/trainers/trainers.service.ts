@@ -296,39 +296,235 @@ export class TrainersService {
   async getReports(userId: string, days = 30) {
     const trainer = await this.getTrainer(userId);
     const since = new Date(Date.now() - days * 86400000);
+    const prevSince = new Date(since.getTime() - days * 86400000);
+    const oneYearAgo = new Date(Date.now() - 365 * 86400000);
 
-    const [totalStudents, activeStudents, totalWorkouts, logs, relations] = await Promise.all([
-      this.prisma.trainerStudent.count({ where: { trainerId: trainer.id } }),
-      this.prisma.trainerStudent.count({ where: { trainerId: trainer.id, isActive: true } }),
-      this.prisma.workout.count({ where: { trainerId: trainer.id, NOT: { tags: { has: '__personalized' } } } }),
+    const [currentLogs, prevLogs, allRelations, totalWorkouts, platformAgg] = await Promise.all([
       this.prisma.workoutLog.findMany({
         where: { workoutPlan: { workout: { trainerId: trainer.id } }, completedAt: { gte: since } },
+        select: { completedAt: true, studentId: true },
+      }),
+      this.prisma.workoutLog.findMany({
+        where: { workoutPlan: { workout: { trainerId: trainer.id } }, completedAt: { gte: prevSince, lt: since } },
         select: { completedAt: true },
       }),
       this.prisma.trainerStudent.findMany({
-        where: { trainerId: trainer.id, isActive: true },
-        include: { student: { select: { streak: true } } },
+        where: { trainerId: trainer.id },
+        include: {
+          student: {
+            include: {
+              user: { include: { profile: true } },
+              workoutLogs: {
+                where: { workoutPlan: { workout: { trainerId: trainer.id } } },
+                select: { completedAt: true },
+                orderBy: { completedAt: 'desc' },
+              },
+            },
+          },
+        },
       }),
+      this.prisma.workout.count({ where: { trainerId: trainer.id, NOT: { tags: { has: '__personalized' } } } }),
+      this.getPlatformBenchmarks(),
     ]);
 
-    const totalCheckins = logs.length;
-    const avgStreak = relations.length
-      ? Math.round(relations.reduce((s, r) => s + (r.student?.streak || 0), 0) / relations.length)
+    const activeRelations = allRelations.filter((r) => r.isActive);
+    const activeStudents = activeRelations.length;
+    const totalStudents = allRelations.length;
+    const totalCheckins = currentLogs.length;
+    const prevTotalCheckins = prevLogs.length;
+
+    const avgStreak = activeStudents > 0
+      ? Math.round(activeRelations.reduce((s, r) => s + (r.student.streak || 0), 0) / activeStudents)
       : 0;
+    const prevAvgStreak = avgStreak;
+
+    const prevActiveStudents = activeStudents;
+
+    const prevTotalWorkouts = totalWorkouts;
 
     const dailyMap: Record<string, number> = {};
-    logs.forEach((log) => {
-      const key = this.toBRDate(log.completedAt);
-      dailyMap[key] = (dailyMap[key] || 0) + 1;
-    });
+    currentLogs.forEach((log) => { dailyMap[this.toBRDate(log.completedAt)] = (dailyMap[this.toBRDate(log.completedAt)] || 0) + 1; });
     const dailyCheckins: number[] = [];
     for (let i = days - 1; i >= 0; i--) {
       const d = new Date(Date.now() - i * 86400000);
-      const key = this.toBRDate(d);
-      dailyCheckins.push(dailyMap[key] || 0);
+      dailyCheckins.push(dailyMap[this.toBRDate(d)] || 0);
     }
 
-    return { activeStudents, totalCheckins, totalWorkouts, avgStreak, dailyCheckins, days };
+    const weeklyTrend: { label: string; count: number }[] = [];
+    const weekCount = Math.min(Math.ceil(days / 7), 26);
+    for (let w = weekCount - 1; w >= 0; w--) {
+      const weekStart = new Date(Date.now() - (w + 1) * 7 * 86400000);
+      const weekEnd = new Date(Date.now() - w * 7 * 86400000);
+      const count = currentLogs.filter((l) => {
+        const d = new Date(l.completedAt);
+        return d >= weekStart && d < weekEnd;
+      }).length;
+      const label = weekEnd.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
+      weeklyTrend.push({ label, count });
+    }
+
+    const dayOfWeekNames = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+    const dayOfWeekCounts: number[] = [0, 0, 0, 0, 0, 0, 0];
+    const dayOfWeekTotals: number[] = [0, 0, 0, 0, 0, 0, 0];
+    for (let i = days - 1; i >= 0; i--) {
+      const d = new Date(Date.now() - i * 86400000);
+      const dow = d.getDay();
+      dayOfWeekTotals[dow]++;
+    }
+    currentLogs.forEach((l) => { dayOfWeekCounts[new Date(l.completedAt).getDay()]++; });
+    const peakDays = dayOfWeekNames.map((day, i) => ({
+      day,
+      count: dayOfWeekCounts[i],
+      avg: dayOfWeekTotals[i] > 0 ? Math.round((dayOfWeekCounts[i] / dayOfWeekTotals[i]) * 10) / 10 : 0,
+    }));
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const studentsWithDetails = activeRelations.map((r) => {
+      const studentLogs = r.student.workoutLogs;
+      const lastLog = studentLogs.length > 0 ? new Date(studentLogs[0].completedAt) : null;
+      const daysSinceLast = lastLog ? Math.floor((today.getTime() - lastLog.getTime()) / 86400000) : 999;
+      const recentLogs30d = studentLogs.filter((l) => new Date(l.completedAt) >= since);
+      const prevLogs30d = studentLogs.filter((l) => new Date(l.completedAt) >= prevSince && new Date(l.completedAt) < since);
+      const recentCount = recentLogs30d.length;
+      const prevCount = prevLogs30d.length;
+      const expectedPerWeek = 3;
+      const expectedTotal = Math.ceil((days / 7) * expectedPerWeek);
+      const checkinFrequency = days > 0 ? Math.round((recentCount / (days / 7)) * 10) / 10 : 0;
+      const consistency = expectedTotal > 0 ? Math.min(100, Math.round((recentCount / expectedTotal) * 100)) : 0;
+      const streakScore = Math.min(100, (r.student.streak || 0) * 5);
+      const recencyScore = daysSinceLast <= 1 ? 100 : daysSinceLast <= 3 ? 70 : daysSinceLast <= 7 ? 40 : daysSinceLast <= 14 ? 15 : 0;
+      const engagementScore = Math.round(consistency * 0.4 + streakScore * 0.3 + recencyScore * 0.3);
+      let trend: 'improving' | 'stable' | 'declining' = 'stable';
+      if (prevCount > 0 && recentCount > prevCount * 1.2) trend = 'improving';
+      else if (prevCount > 0 && recentCount < prevCount * 0.7) trend = 'declining';
+      else if (prevCount === 0 && recentCount > 0) trend = 'improving';
+      else if (recentCount === 0 && prevCount > 0) trend = 'declining';
+
+      const riskLevel = daysSinceLast > 14 ? 'critical' : daysSinceLast > 7 ? 'warning' : null;
+      const monthlyFee = r.monthlyFee || 0;
+      const monthsActive = Math.max(1, Math.floor((today.getTime() - new Date(r.createdAt).getTime()) / (30 * 86400000)));
+      const ltv = monthlyFee * monthsActive;
+
+      return {
+        id: r.studentId,
+        name: `${r.student.user.profile?.firstName ?? ''} ${r.student.user.profile?.lastName ?? ''}`.trim() || r.student.user.email,
+        email: r.student.user.email,
+        avatarUrl: r.student.user.profile?.avatarUrl,
+        streak: r.student.streak || 0,
+        level: r.student.level || 1,
+        points: r.student.points || 0,
+        goalType: r.student.goalType,
+        isActive: r.isActive,
+        lastCheckinAt: lastLog?.toISOString() || null,
+        engagementScore,
+        checkinFrequency,
+        consistency,
+        daysSinceLastCheckin: daysSinceLast,
+        trend,
+        riskLevel,
+        monthlyFee,
+        monthsActive,
+        ltv,
+        recentCheckins: recentCount,
+        prevCheckins: prevCount,
+      };
+    });
+
+    const atRiskStudents = studentsWithDetails
+      .filter((s) => s.riskLevel)
+      .sort((a, b) => b.daysSinceLastCheckin - a.daysSinceLastCheckin);
+
+    const cohortRetention = this.calculateCohortRetention(allRelations);
+
+    const revenue = {
+      mrr: activeRelations.reduce((sum, r) => sum + (r.monthlyFee || 0), 0),
+      avgRevenuePerStudent: activeStudents > 0 ? Math.round(activeRelations.reduce((sum, r) => sum + (r.monthlyFee || 0), 0) / activeStudents) : 0,
+      totalLTV: studentsWithDetails.reduce((sum, s) => sum + s.ltv, 0),
+      studentsWithFee: activeRelations.filter((r) => (r.monthlyFee || 0) > 0).length,
+    };
+
+    const recentActive = studentsWithDetails.filter((s) => s.daysSinceLastCheckin <= 7).length;
+    const churnPrediction = studentsWithDetails.filter((s) => s.trend === 'declining');
+
+    return {
+      activeStudents,
+      totalStudents,
+      totalCheckins,
+      totalWorkouts,
+      avgStreak,
+      dailyCheckins,
+      weeklyTrend,
+      peakDays,
+      previous: { activeStudents: prevActiveStudents, totalCheckins: prevTotalCheckins, totalWorkouts: prevTotalWorkouts, avgStreak: prevAvgStreak },
+      atRiskStudents,
+      cohortRetention,
+      benchmark: platformAgg,
+      revenue,
+      recentActive,
+      churnPrediction: churnPrediction.length,
+      students: studentsWithDetails,
+      days,
+    };
+  }
+
+  private calculateCohortRetention(relations: any[]) {
+    const now = new Date();
+    const buckets = { d30: { joined: 0, active: 0 }, d60: { joined: 0, active: 0 }, d90: { joined: 0, active: 0 }, d180: { joined: 0, active: 0 } };
+    const thresholds = [30, 60, 90, 180];
+    const keys = ['d30', 'd60', 'd90', 'd180'] as const;
+
+    for (const r of relations) {
+      const joined = new Date(r.createdAt);
+      const daysSinceJoin = Math.floor((now.getTime() - joined.getTime()) / 86400000);
+      for (let i = 0; i < thresholds.length; i++) {
+        if (daysSinceJoin >= thresholds[i]) {
+          buckets[keys[i]].joined++;
+          if (r.isActive) buckets[keys[i]].active++;
+        }
+      }
+    }
+
+    return {
+      d30: buckets.d30.joined > 0 ? Math.round((buckets.d30.active / buckets.d30.joined) * 100) : 100,
+      d60: buckets.d60.joined > 0 ? Math.round((buckets.d60.active / buckets.d60.joined) * 100) : 100,
+      d90: buckets.d90.joined > 0 ? Math.round((buckets.d90.active / buckets.d90.joined) * 100) : 100,
+      d180: buckets.d180.joined > 0 ? Math.round((buckets.d180.active / buckets.d180.joined) * 100) : 100,
+    };
+  }
+
+  private async getPlatformBenchmarks() {
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 86400000);
+
+    const [totalTrainers, activeRelations, allLogs] = await Promise.all([
+      this.prisma.trainer.count(),
+      this.prisma.trainerStudent.findMany({ where: { isActive: true }, select: { studentId: true, trainerId: true } }),
+      this.prisma.workoutLog.findMany({
+        where: { completedAt: { gte: thirtyDaysAgo } },
+        select: { studentId: true, completedAt: true },
+      }),
+    ]);
+
+    const trainerIds = [...new Set(activeRelations.map((r) => r.trainerId))];
+    const trainerStudentCounts: Record<string, number> = {};
+    activeRelations.forEach((r) => { trainerStudentCounts[r.trainerId] = (trainerStudentCounts[r.trainerId] || 0) + 1; });
+    const avgStudentsPerTrainer = trainerIds.length > 0
+      ? Math.round(Object.values(trainerStudentCounts).reduce((s, v) => s + v, 0) / trainerIds.length * 10) / 10
+      : 0;
+
+    const studentCheckinCounts: Record<string, number> = {};
+    allLogs.forEach((l) => { studentCheckinCounts[l.studentId] = (studentCheckinCounts[l.studentId] || 0) + 1; });
+    const activeStudentIds = activeRelations.map((r) => r.studentId);
+    const activeStudentCheckins = activeStudentIds.map((id) => studentCheckinCounts[id] || 0).filter((c) => c > 0);
+    const avgCheckinsPerStudent = activeStudentCheckins.length > 0
+      ? Math.round(activeStudentCheckins.reduce((s, v) => s + v, 0) / activeStudentCheckins.length * 10) / 10
+      : 0;
+
+    return {
+      avgStudentsPerTrainer,
+      avgCheckinsPerStudent,
+      totalTrainers,
+    };
   }
 
   async getPayments(userId: string) {
