@@ -106,4 +106,35 @@ export class TrainersController {
   getStudentReport(@CurrentUser() user: any, @Param('studentId') studentId: string) {
     return this.service.getStudentReport(user.id, studentId);
   }
+
+  @Get('me/students/:studentId/checkins')
+  @ApiOperation({ summary: 'Check-ins semanais de um aluno' })
+  getStudentCheckins(
+    @CurrentUser() user: any,
+    @Param('studentId') studentId: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.service.getStudentCheckins(user.id, studentId, limit ? parseInt(limit) : 12);
+  }
+
+  @Patch('me/students/:studentId/checkins/:checkinId')
+  @ApiOperation({ summary: 'Atualizar nota do trainer no check-in' })
+  updateCheckinTrainerNote(
+    @CurrentUser() user: any,
+    @Param('studentId') studentId: string,
+    @Param('checkinId') checkinId: string,
+    @Body() body: { trainerNotes: string },
+  ) {
+    return this.service.updateCheckinTrainerNote(user.id, studentId, checkinId, body.trainerNotes);
+  }
+
+  @Get('me/students/:studentId/compliance')
+  @ApiOperation({ summary: 'Score de compliance de um aluno' })
+  getStudentCompliance(
+    @CurrentUser() user: any,
+    @Param('studentId') studentId: string,
+    @Query('weeks') weeks?: string,
+  ) {
+    return this.service.getStudentCompliance(user.id, studentId, weeks ? parseInt(weeks) : 4);
+  }
 }

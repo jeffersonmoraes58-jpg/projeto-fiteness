@@ -919,5 +919,75 @@ export class TrainersService {
       include: { user: { include: { profile: true } } },
     });
   }
+
+  async getStudentCheckins(trainerUserId: string, studentId: string, limit = 12) {
+    const trainer = await this.getTrainer(trainerUserId);
+    const relation = await this.prisma.trainerStudent.findFirst({
+      where: { trainerId: trainer.id, studentId, isActive: true },
+    });
+    if (!relation) throw new NotFoundException('Aluno não encontrado');
+
+    return this.prisma.weeklyCheckin.findMany({
+      where: { studentId },
+      orderBy: { weekStart: 'desc' },
+      take: limit,
+    });
+  }
+
+  async updateCheckinTrainerNote(trainerUserId: string, studentId: string, checkinId: string, trainerNotes: string) {
+    const trainer = await this.getTrainer(trainerUserId);
+    const relation = await this.prisma.trainerStudent.findFirst({
+      where: { trainerId: trainer.id, studentId, isActive: true },
+    });
+    if (!relation) throw new NotFoundException('Aluno não encontrado');
+
+    return this.prisma.weeklyCheckin.update({
+      where: { id: checkinId },
+      data: { trainerNotes },
+    });
+  }
+
+  async getStudentCompliance(trainerUserId: string, studentId: string, weeks = 4) {
+    const trainer = await this.getTrainer(trainerUserId);
+    const relation = await this.prisma.trainerStudent.findFirst({
+      where: { trainerId: trainer.id, studentId, isActive: true },
+    });
+    if (!relation) throw new NotFoundException('Aluno não encontrado');
+
+    const since = new Date(Date.now() - weeks * 7 * 86400000);
+
+    const [plans, logs] = await Promise.all([
+      this.prisma.workoutPlan.findMany({
+        where: { studentId, isActive: true },
+        select: { dayOfWeek: true },
+      }),
+      this.prisma.workoutLog.findMany({
+        where: { studentId, startedAt: { gte: since } },
+        select: { startedAt: true, completedAt: true },
+      }),
+    ]);
+
+    const daysPerWeek = plans.reduce((sum, p) => sum + (p.dayOfWeek?.length || 0), 0);
+    const totalExpected = Math.max(daysPerWeek * weeks, 1);
+    const totalCompleted = logs.filter((l) => l.completedAt).length;
+    const score = Math.min(100, Math.round((totalCompleted / totalExpected) * 100));
+
+    const weeklyBreakdown: { week: string; completed: number; expected: number }[] = [];
+    for (let w = 0; w < weeks; w++) {
+      const weekStart = new Date(Date.now() - (w + 1) * 7 * 86400000);
+      const weekEnd = new Date(Date.now() - w * 7 * 86400000);
+      const weekLogs = logs.filter((l) => {
+        const d = new Date(l.startedAt);
+        return d >= weekStart && d < weekEnd && l.completedAt;
+      });
+      weeklyBreakdown.unshift({
+        week: this.toBRDate(weekStart),
+        completed: weekLogs.length,
+        expected: daysPerWeek,
+      });
+    }
+
+    return { score, totalCompleted, totalExpected, daysPerWeek, weeks, weeklyBreakdown };
+  }
 }
 

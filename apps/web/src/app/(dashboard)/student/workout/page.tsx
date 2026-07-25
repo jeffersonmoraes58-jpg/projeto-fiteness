@@ -7,7 +7,7 @@ import {
   Flame, RotateCcw, Timer, ChevronRight,
   X, PlayCircle, Trophy, Share2, Download, Camera, SwitchCamera,
   Music, ChevronUp, ChevronDown, ExternalLink, Loader2, Search,
-  Lock, CreditCard, Zap, TrendingUp, Award,
+  Lock, CreditCard, Zap, TrendingUp, Award, History,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useAuthStore } from '@/store/auth';
@@ -1104,6 +1104,15 @@ export default function StudentWorkout() {
                 )}
               </div>
             )}
+
+            {/* Full history link */}
+            <Link
+              href="/student/workout/history"
+              className="flex items-center justify-center gap-2 py-3 rounded-xl border border-white/10 bg-white/5 text-sm text-gray-300 hover:bg-white/10 hover:text-white transition-all"
+            >
+              <History className="w-4 h-4" />
+              Ver histórico completo
+            </Link>
           </>
         )}
       </div>

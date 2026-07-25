@@ -217,14 +217,32 @@ export class StudentsService {
     }));
   }
 
-  async getWorkoutLogs(userId: string) {
+  async getWorkoutLogs(userId: string, page = 1, limit = 20) {
     const student = await this.getStudent(userId);
-    return this.prisma.workoutLog.findMany({
-      where: { studentId: student.id },
-      orderBy: { completedAt: 'desc' },
-      take: 20,
-      include: { workoutPlan: { include: { workout: true } } },
-    });
+    const skip = (page - 1) * limit;
+
+    const [logs, total] = await Promise.all([
+      this.prisma.workoutLog.findMany({
+        where: { studentId: student.id },
+        orderBy: { completedAt: 'desc' },
+        skip,
+        take: limit,
+        include: {
+          workoutPlan: { include: { workout: true } },
+          exerciseLogs: {
+            include: { workoutExercise: { include: { exercise: true } } },
+          },
+        },
+      }),
+      this.prisma.workoutLog.count({ where: { studentId: student.id } }),
+    ]);
+
+    return {
+      logs,
+      total,
+      page,
+      totalPages: Math.ceil(total / limit),
+    };
   }
 
   async startWorkout(userId: string, workoutPlanId: string) {
@@ -508,5 +526,124 @@ export class StudentsService {
       },
       include: { profile: true, student: true },
     });
+  }
+
+  private getMonday(date: Date): Date {
+    const d = new Date(date);
+    const day = d.getDay();
+    const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+    d.setDate(diff);
+    d.setHours(0, 0, 0, 0);
+    return d;
+  }
+
+  async getWeeklyCheckins(userId: string, limit = 12) {
+    const student = await this.getStudent(userId);
+    return this.prisma.weeklyCheckin.findMany({
+      where: { studentId: student.id },
+      orderBy: { weekStart: 'desc' },
+      take: limit,
+    });
+  }
+
+  async getCurrentWeekCheckin(userId: string) {
+    const student = await this.getStudent(userId);
+    const weekStart = this.getMonday(new Date());
+    return this.prisma.weeklyCheckin.findUnique({
+      where: { studentId_weekStart: { studentId: student.id, weekStart } },
+    });
+  }
+
+  async submitWeeklyCheckin(userId: string, data: {
+    rating?: number;
+    sleepHours?: number;
+    sleepQuality?: number;
+    stressLevel?: number;
+    nutrition?: number;
+    training?: number;
+    recovery?: number;
+    energy?: number;
+    notes?: string;
+  }) {
+    const student = await this.getStudent(userId);
+    const weekStart = this.getMonday(new Date());
+    const clamped = (v?: number) => (v != null ? Math.max(1, Math.min(5, Math.round(v))) : v);
+
+    return this.prisma.weeklyCheckin.upsert({
+      where: { studentId_weekStart: { studentId: student.id, weekStart } },
+      create: {
+        studentId: student.id,
+        weekStart,
+        status: 'completed',
+        rating: clamped(data.rating),
+        sleepHours: data.sleepHours,
+        sleepQuality: clamped(data.sleepQuality),
+        stressLevel: clamped(data.stressLevel),
+        nutrition: clamped(data.nutrition),
+        training: clamped(data.training),
+        recovery: clamped(data.recovery),
+        energy: clamped(data.energy),
+        notes: data.notes,
+      },
+      update: {
+        status: 'completed',
+        rating: clamped(data.rating),
+        sleepHours: data.sleepHours,
+        sleepQuality: clamped(data.sleepQuality),
+        stressLevel: clamped(data.stressLevel),
+        nutrition: clamped(data.nutrition),
+        training: clamped(data.training),
+        recovery: clamped(data.recovery),
+        energy: clamped(data.energy),
+        notes: data.notes,
+      },
+    });
+  }
+
+  async getCompliance(userId: string, weeks = 4) {
+    const student = await this.getStudent(userId);
+    const since = new Date(Date.now() - weeks * 7 * 86400000);
+
+    const [plans, logs] = await Promise.all([
+      this.prisma.workoutPlan.findMany({
+        where: { studentId: student.id, isActive: true },
+        select: { dayOfWeek: true, workoutId: true },
+      }),
+      this.prisma.workoutLog.findMany({
+        where: { studentId: student.id, startedAt: { gte: since } },
+        select: { startedAt: true, completedAt: true, status: true },
+      }),
+    ]);
+
+    // Expected workouts per week based on dayOfWeek
+    const daysPerWeek = plans.reduce((sum, p) => sum + (p.dayOfWeek?.length || 0), 0);
+    const totalExpected = Math.max(daysPerWeek * weeks, 1);
+    const totalCompleted = logs.filter((l) => l.completedAt).length;
+    const score = Math.min(100, Math.round((totalCompleted / totalExpected) * 100));
+
+    // Weekly breakdown
+    const weeklyBreakdown: { week: string; completed: number; expected: number }[] = [];
+    for (let w = 0; w < weeks; w++) {
+      const weekStart = new Date(Date.now() - (w + 1) * 7 * 86400000);
+      const weekEnd = new Date(Date.now() - w * 7 * 86400000);
+      const weekLogs = logs.filter((l) => {
+        const d = new Date(l.startedAt);
+        return d >= weekStart && d < weekEnd && l.completedAt;
+      });
+      weeklyBreakdown.unshift({
+        week: this.toBRDate(weekStart),
+        completed: weekLogs.length,
+        expected: daysPerWeek,
+      });
+    }
+
+    return {
+      score,
+      totalCompleted,
+      totalExpected,
+      daysPerWeek,
+      weeks,
+      weeklyBreakdown,
+    };
   }
 }

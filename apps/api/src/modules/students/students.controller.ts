@@ -38,8 +38,8 @@ export class StudentsController {
 
   @Get('me/workout-logs')
   @ApiOperation({ summary: 'Histórico de treinos' })
-  getWorkoutLogs(@CurrentUser() user: any) {
-    return this.service.getWorkoutLogs(user.id);
+  getWorkoutLogs(@CurrentUser() user: any, @Query('page') page?: string, @Query('limit') limit?: string) {
+    return this.service.getWorkoutLogs(user.id, page ? parseInt(page) : 1, limit ? parseInt(limit) : 20);
   }
 
   @Post('me/workout-start')
@@ -120,5 +120,29 @@ export class StudentsController {
   @ApiOperation({ summary: 'Submeter anamnese (público)' })
   submitAnamnese(@Param('userId') userId: string, @Body() body: any) {
     return this.service.submitAnamnese(userId, body);
+  }
+
+  @Get('me/weekly-checkins')
+  @ApiOperation({ summary: 'Lista de check-ins semanais do aluno' })
+  getWeeklyCheckins(@CurrentUser() user: any, @Query('limit') limit?: string) {
+    return this.service.getWeeklyCheckins(user.id, limit ? parseInt(limit) : 12);
+  }
+
+  @Get('me/weekly-checkins/current')
+  @ApiOperation({ summary: 'Check-in da semana atual' })
+  getCurrentWeekCheckin(@CurrentUser() user: any) {
+    return this.service.getCurrentWeekCheckin(user.id);
+  }
+
+  @Post('me/weekly-checkins')
+  @ApiOperation({ summary: 'Submeter check-in semanal' })
+  submitWeeklyCheckin(@CurrentUser() user: any, @Body() body: any) {
+    return this.service.submitWeeklyCheckin(user.id, body);
+  }
+
+  @Get('me/compliance')
+  @ApiOperation({ summary: 'Score de compliance do aluno' })
+  getCompliance(@CurrentUser() user: any, @Query('weeks') weeks?: string) {
+    return this.service.getCompliance(user.id, weeks ? parseInt(weeks) : 4);
   }
 }

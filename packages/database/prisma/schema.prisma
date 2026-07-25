@@ -484,6 +484,7 @@ model Student {
   clinicalNotes          ClinicalNote[]
   patientExams           PatientExam[]
   billings               StudentBilling[]
+  weeklyCheckins         WeeklyCheckin[]
 
   @@map("students")
 }
@@ -1182,6 +1183,35 @@ model XpLog {
 
   @@index([studentId, createdAt])
   @@map("xp_logs")
+}
+
+// ================================================
+// WEEKLY CHECK-IN
+// ================================================
+
+model WeeklyCheckin {
+  id          String   @id @default(cuid())
+  studentId   String
+  weekStart   DateTime // Monday of the week
+  status      String   @default("pending") // pending | completed | skipped
+  rating      Int?     // 1-5 overall week satisfaction
+  sleepHours  Float?   // avg hours per night
+  sleepQuality Int?    // 1-5
+  stressLevel Int?     // 1-5
+  nutrition   Int?     // 1-5 how well they followed diet
+  training    Int?     // 1-5 how well they trained
+  recovery    Int?     // 1-5 soreness/recovery quality
+  energy      Int?     // 1-5 daily energy level
+  notes       String?  // free text
+  trainerNotes String? // trainer feedback (filled by trainer)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([studentId, weekStart])
+  @@index([studentId, weekStart])
+  @@map("weekly_checkins")
 }
 
 // ================================================

@@ -5,6 +5,7 @@ import {
   Dumbbell, Apple, Droplets, Flame, Trophy, Target,
   TrendingUp, ChevronRight, Play, CheckCircle2, Circle,
   Zap, Star, ArrowUpRight, Calendar, Clock, Users, Medal,
+  ClipboardCheck,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
@@ -33,6 +34,11 @@ export default function StudentDashboard() {
   const { data: goals } = useQuery({
     queryKey: ['student-goals'],
     queryFn: () => api.get('/goals').then((r) => r.data.data),
+  });
+
+  const { data: compliance } = useQuery({
+    queryKey: ['student-compliance'],
+    queryFn: () => api.get('/students/me/compliance?weeks=4').then((r) => r.data.data ?? r.data),
   });
 
   const firstName = user?.profile?.firstName || 'Aluno';
@@ -273,6 +279,77 @@ export default function StudentDashboard() {
               ))}
             </div>
           </motion.div>
+
+          {/* Compliance Score */}
+          {compliance && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.65 }}
+              className="glass-card"
+            >
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="font-semibold flex items-center gap-2">
+                  <ClipboardCheck className="w-5 h-5 text-emerald-400" />
+                  Compliance
+                </h2>
+                <span className="text-xs text-muted-foreground">Últimas {compliance.weeks} semanas</span>
+              </div>
+              <div className="flex items-center gap-4">
+                <div className="relative w-20 h-20 flex-shrink-0">
+                  <svg className="w-20 h-20 -rotate-90" viewBox="0 0 100 100">
+                    <circle cx="50" cy="50" r="40" fill="none" stroke="currentColor" strokeWidth="8" className="text-white/10" />
+                    <motion.circle
+                      cx="50" cy="50" r="40"
+                      fill="none"
+                      stroke="url(#compGrad)"
+                      strokeWidth="8"
+                      strokeLinecap="round"
+                      strokeDasharray={2 * Math.PI * 40}
+                      initial={{ strokeDashoffset: 2 * Math.PI * 40 }}
+                      animate={{ strokeDashoffset: 2 * Math.PI * 40 * (1 - compliance.score / 100) }}
+                      transition={{ duration: 1, ease: 'easeOut' }}
+                    />
+                    <defs>
+                      <linearGradient id="compGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                        <stop offset="0%" stopColor="#10b981" />
+                        <stop offset="100%" stopColor="#06b6d4" />
+                      </linearGradient>
+                    </defs>
+                  </svg>
+                  <div className="absolute inset-0 flex flex-col items-center justify-center">
+                    <div className="text-lg font-bold">{compliance.score}%</div>
+                  </div>
+                </div>
+                <div className="flex-1 space-y-1">
+                  <p className="text-xs text-muted-foreground">
+                    <span className="text-emerald-400 font-semibold">{compliance.totalCompleted}</span> treinos feitos de{' '}
+                    <span className="font-semibold">{compliance.totalExpected}</span> esperados
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Meta: {compliance.daysPerWeek}x por semana
+                  </p>
+                </div>
+              </div>
+              {compliance.weeklyBreakdown && (
+                <div className="flex gap-1 mt-3">
+                  {compliance.weeklyBreakdown.map((w: any, i: number) => {
+                    const pct = w.expected > 0 ? Math.min((w.completed / w.expected) * 100, 100) : 0;
+                    return (
+                      <div key={i} className="flex-1 h-8 rounded bg-white/5 flex items-end overflow-hidden">
+                        <motion.div
+                          initial={{ height: 0 }}
+                          animate={{ height: `${pct}%` }}
+                          transition={{ duration: 0.5, delay: i * 0.1 }}
+                          className="w-full bg-gradient-to-t from-emerald-600 to-teal-500 rounded-t"
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </motion.div>
+          )}
 
           {/* Professionals contact */}
           {(() => {

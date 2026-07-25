@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { PushService } from '../push/push.service';
 
 const LEVEL_XP_BASE = 200;
 const LEVEL_MULTIPLIER = 1.5;
@@ -46,7 +47,10 @@ const ACHIEVEMENT_DEFINITIONS = [
 
 @Injectable()
 export class GamificationService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private pushService: PushService,
+  ) {}
 
   calculateLevel(points: number): number {
     let level = 1;
@@ -195,6 +199,20 @@ export class GamificationService {
 
     for (const a of toCreate) {
       await this.recordXp(studentId, a.points, 'achievement', null, `Conquista: ${a.title}`);
+    }
+
+    // Send push notifications for new achievements
+    const studentUser = await this.prisma.student.findUnique({
+      where: { id: studentId },
+      select: { userId: true },
+    });
+    if (studentUser) {
+      for (const a of toCreate) {
+        this.pushService.sendToUser(studentUser.userId, '🏆 Conquista desbloqueada!', `${a.title} — ${a.description}`, {
+          url: '/student/achievements',
+          tag: `achievement-${a.title}`,
+        }).catch(() => {});
+      }
     }
 
     return toCreate.map((a) => a.title);

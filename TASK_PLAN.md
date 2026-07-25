@@ -1,3 +1,25 @@
+# Onde Paramos — 21/07/2026
+
+## Sessão: Análise do site fitlynutri.com.br + Fixes
+
+### Feito (commit eb100170, CI/CD #421 OK)
+1. **Páginas legais criadas e deployadas**: `/about`, `/privacy`, `/terms`, `/lgpd`
+2. **FAQ anchor**: adicionado `id="faq"` na seção FAQ (nav `#faq` agora funciona)
+3. **Viewport**: removido `maximum-scale=1` (acessibilidade)
+4. **OG Image**: criado `og-image.png` 1200x630 + metadata openGraph/twitter
+
+### Pendente — aguardando Watchtower deployar (~5 min)
+- Verificar se `/about`, `/privacy`, `/terms`, `/lgpd` funcionam em produção
+- Verificar se `#faq` anchor funciona na nav
+- Verificar se og:image aparece ao compartilhar link
+
+### Pendente — melhorias futuras (não urgentes)
+- Links mortos `href="#"` no footer (redes sociais + Para Trainers/Nutricionistas/Alunos)
+- Páginas não existentes linkadas no footer: `/blog`, `/contact`, `/help`
+- Teste BAILOUT no `/register` (já tem Suspense, mas causa warning no SSR)
+
+---
+
 # Plano de Ação: Sistema de Assinaturas e Cobranças
 
 ## Problema

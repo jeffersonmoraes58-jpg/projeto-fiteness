@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { PushService } from '../push/push.service';
 import { CreateWorkoutDto } from './dto/create-workout.dto';
 import { UpdateWorkoutDto } from './dto/update-workout.dto';
 import { AssignWorkoutDto } from './dto/assign-workout.dto';
@@ -12,6 +13,7 @@ export class WorkoutsService {
   constructor(
     private prisma: PrismaService,
     private notifications: NotificationsService,
+    private pushService: PushService,
   ) {}
 
   async create(dto: CreateWorkoutDto, userId: string) {
@@ -208,7 +210,7 @@ export class WorkoutsService {
   async assignToStudent(workoutId: string, dto: AssignWorkoutDto) {
     const workout = await this.findOne(workoutId);
 
-    return this.prisma.workoutPlan.create({
+    const plan = await this.prisma.workoutPlan.create({
       data: {
         studentId: dto.studentId,
         workoutId,
@@ -221,6 +223,21 @@ export class WorkoutsService {
       },
       include: { workout: true, student: { include: { user: { include: { profile: true } } } } },
     });
+
+    const studentUserId = plan.student?.user?.id;
+    if (studentUserId) {
+      const title = '🏋️ Novo treino atribuído!';
+      const body = `Seu personal designou "${workout.name}" para você. Bora treinar!`;
+      this.notifications.create({
+        userId: studentUserId, type: 'SYSTEM', title, body,
+      }).catch(() => {});
+      this.pushService.sendToUser(studentUserId, title, body, {
+        url: '/student/workout',
+        tag: 'workout-assigned',
+      }).catch(() => {});
+    }
+
+    return plan;
   }
 
   async updatePlan(planId: string, data: { notes?: string; division?: string; startDate?: string; endDate?: string; isActive?: boolean }) {
