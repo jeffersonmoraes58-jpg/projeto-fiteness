@@ -655,14 +655,14 @@ export default function StudentWorkout() {
             initial={{ opacity: 0, y: 40, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 40, scale: 0.95 }}
-            className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 glass-card bg-gradient-to-br from-blue-600/20 to-indigo-600/20 border border-blue-500/30 px-5 py-3 flex items-center gap-4 shadow-xl shadow-blue-500/10"
+            className="fixed bottom-4 left-4 right-4 z-50 glass-card bg-gradient-to-br from-blue-600/20 to-indigo-600/20 border border-blue-500/30 px-4 py-3 flex items-center gap-4 shadow-xl shadow-blue-500/10 sm:left-1/2 sm:right-auto sm:-translate-x-1/2 sm:w-auto sm:max-w-[280px]"
           >
             <div className="text-3xl font-bold text-white tabular-nums leading-none">
               {Math.floor(restTimer.seconds / 60)}:{String(restTimer.seconds % 60).padStart(2, '0')}
             </div>
-            <div className="flex flex-col gap-1 min-w-0">
+            <div className="flex flex-col gap-1 min-w-0 flex-1">
               <div className="text-[10px] text-blue-300 font-semibold uppercase tracking-wider">Descanso</div>
-              <div className="text-xs text-muted-foreground truncate max-w-[140px]">{restTimer.exerciseName}</div>
+              <div className="text-xs text-muted-foreground truncate">{restTimer.exerciseName}</div>
               {/* Progress bar */}
               <div className="w-full h-1 bg-white/10 rounded-full overflow-hidden">
                 <div
