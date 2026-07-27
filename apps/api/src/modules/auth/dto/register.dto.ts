@@ -24,10 +24,10 @@ export class RegisterDto {
   @IsString()
   phone?: string;
 
-  @ApiPropertyOptional({ enum: ['TRAINER', 'NUTRITIONIST', 'STUDIO_OWNER'], description: 'Perfil do profissional. STUDENT é o padrão.' })
+  @ApiPropertyOptional({ enum: ['TRAINER', 'NUTRITIONIST', 'STUDIO_OWNER', 'STUDENT'], description: 'Perfil do usuário. STUDENT é o padrão quando omitido.' })
   @IsOptional()
-  @IsIn(['TRAINER', 'NUTRITIONIST', 'STUDIO_OWNER'], { message: 'role deve ser TRAINER, NUTRITIONIST ou STUDIO_OWNER' })
-  role?: 'TRAINER' | 'NUTRITIONIST' | 'STUDIO_OWNER';
+  @IsIn(['TRAINER', 'NUTRITIONIST', 'STUDIO_OWNER', 'STUDENT'], { message: 'role deve ser TRAINER, NUTRITIONIST, STUDIO_OWNER ou STUDENT' })
+  role?: 'TRAINER' | 'NUTRITIONIST' | 'STUDIO_OWNER' | 'STUDENT';
 
   @ApiPropertyOptional({ example: 'tenant-id-here' })
   @IsOptional()
