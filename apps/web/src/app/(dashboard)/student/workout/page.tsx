@@ -302,10 +302,11 @@ export default function StudentWorkout() {
     queryFn: () => api.get('/students/me/workout-plan').then((r) => r.data.data || []),
   });
 
-  const { data: workoutLogs } = useQuery({
+  const { data: workoutLogsData } = useQuery({
     queryKey: ['student-workout-logs'],
     queryFn: () => api.get('/students/me/workout-logs').then((r) => r.data.data),
   });
+  const workoutLogs = Array.isArray(workoutLogsData) ? workoutLogsData : workoutLogsData?.logs ?? [];
 
   const logMutation = useMutation({
     mutationFn: (data: any) => api.post('/students/me/workout-logs', data),
