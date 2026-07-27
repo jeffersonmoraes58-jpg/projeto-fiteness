@@ -24,7 +24,14 @@ export default function StudentDashboard() {
     queryKey: ['student-today-workout'],
     queryFn: () => api.get('/students/me/workout-plan').then((r) => r.data.data),
   });
-  const todayWorkout = _workoutPlans?.[0]?.workout ?? null;
+  const todayIndex = new Date().getDay();
+  const todayPlan = _workoutPlans?.find((p: any) => {
+    if (p.dayOfWeek && Array.isArray(p.dayOfWeek) && p.dayOfWeek.length > 0) {
+      return p.dayOfWeek.includes(todayIndex);
+    }
+    return true;
+  });
+  const todayWorkout = todayPlan?.workout ?? _workoutPlans?.[0]?.workout ?? null;
 
   const { data: todayDiet } = useQuery({
     queryKey: ['student-today-diet'],
@@ -455,7 +462,7 @@ export default function StudentDashboard() {
             Ver histórico <ArrowUpRight className="w-3 h-3" />
           </Link>
         </div>
-        <WeekActivity stats={stats} />
+        <WeekActivity stats={stats?.stats} />
       </motion.div>
     </div>
   );

@@ -1,4 +1,4 @@
-import { Controller, Get, Delete, Param, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Patch, Delete, Param, Query, Body, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { TenantsService } from './tenants.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -14,6 +14,14 @@ export class TenantsController {
   @Get('my/overview')
   getOverview(@CurrentUser('tenantId') tenantId: string) {
     return this.service.getOverview(tenantId);
+  }
+
+  @Patch('my')
+  updateMyTenant(
+    @CurrentUser('tenantId') tenantId: string,
+    @Body() body: { name?: string },
+  ) {
+    return this.service.updateTenant(tenantId, body);
   }
 
   @Get('my/members')

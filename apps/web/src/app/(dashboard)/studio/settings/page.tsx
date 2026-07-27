@@ -22,10 +22,10 @@ export default function StudioSettingsPage() {
 
   useEffect(() => {
     if (data?.tenant?.name && !editing) setName(data.tenant.name);
-  }, [data]);
+  }, [data, editing]);
 
   const saveMutation = useMutation({
-    mutationFn: () => api.patch('/users/me', { studioName: name }),
+    mutationFn: () => api.patch('/tenants/my', { name }),
     onSuccess: () => { toast.success('Configurações salvas!'); setEditing(false); },
     onError: () => toast.error('Erro ao salvar'),
   });

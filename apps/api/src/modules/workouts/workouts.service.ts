@@ -69,7 +69,7 @@ export class WorkoutsService {
     return workouts.map((w) => ({
       ...w,
       _count: {
-        exercises: w._count?.plans ?? 0,
+        exercises: w.exercises?.length ?? 0,
         assignedStudents: w._count?.plans ?? 0,
       },
     }));
@@ -102,6 +102,43 @@ export class WorkoutsService {
 
     if (!workout) throw new NotFoundException('Treino não encontrado');
     return workout;
+  }
+
+  async duplicate(id: string, userId: string) {
+    const original = await this.findOne(id);
+    const trainer = await this.prisma.trainer.findUnique({ where: { userId } });
+    if (!trainer) throw new ForbiddenException('Usuário não é trainer');
+
+    return this.prisma.workout.create({
+      data: {
+        name: `${original.name} (Cópia)`,
+        description: original.description,
+        status: original.status,
+        level: original.level,
+        duration: original.duration,
+        tags: original.tags,
+        isTemplate: original.isTemplate,
+        trainerId: trainer.id,
+        exercises: {
+          create: original.exercises.map((we) => ({
+            exerciseId: we.exerciseId,
+            order: we.order,
+            sets: we.sets,
+            reps: we.reps,
+            weight: we.weight,
+            restSeconds: we.restSeconds,
+            tempo: we.tempo,
+            notes: we.notes,
+            isDropSet: we.isDropSet,
+            isSuperSet: we.isSuperSet,
+            superSetGroupId: we.superSetGroupId,
+          })),
+        },
+      },
+      include: {
+        exercises: { include: { exercise: true }, orderBy: { order: 'asc' } },
+      },
+    });
   }
 
   async update(id: string, dto: UpdateWorkoutDto) {

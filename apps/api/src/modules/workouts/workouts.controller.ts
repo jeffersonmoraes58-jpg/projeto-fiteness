@@ -87,6 +87,13 @@ export class WorkoutsController {
     return this.workoutsService.remove(id);
   }
 
+  @Post(':id/duplicate')
+  @Roles(UserRole.TRAINER)
+  @ApiOperation({ summary: 'Duplicar treino' })
+  duplicate(@Param('id') id: string, @CurrentUser('id') userId: string) {
+    return this.workoutsService.duplicate(id, userId);
+  }
+
   @Post(':id/assign')
   @Roles(UserRole.TRAINER, UserRole.NUTRITIONIST)
   @ApiOperation({ summary: 'Atribuir treino a aluno' })

@@ -45,7 +45,7 @@ export default function TrainerDashboard() {
     refetchInterval: 5 * 60 * 1000,
   });
 
-  const isLoading = loadingDashboard && loadingStudents;
+  const isLoading = loadingDashboard || loadingStudents;
 
   return (
     <div className="space-y-8">

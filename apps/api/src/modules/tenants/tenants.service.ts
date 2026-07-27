@@ -60,4 +60,11 @@ export class TenantsService {
       data: { isActive: false },
     });
   }
+
+  async updateTenant(tenantId: string, data: { name?: string }) {
+    return this.prisma.tenant.update({
+      where: { id: tenantId },
+      data,
+    });
+  }
 }
