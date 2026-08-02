@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Dumbbell, Plus, Search, Copy, Archive, MoreVertical,
   ChevronRight, Clock, Users, Layers, Zap, FileText,
-  ChevronDown, ChevronUp, Sparkles, X, Wand2, CheckCircle,
+  ChevronDown, ChevronUp, Sparkles, X, Wand2, CheckCircle, RefreshCw,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -715,6 +715,41 @@ export default function TrainerWorkouts() {
                             </div>
                           ))}
                         </div>
+                      </div>
+                    )}
+
+                    {aiResult.replaced?.length > 0 && (
+                      <div className="space-y-1.5">
+                        <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Substituídos por similares da base</p>
+                        <ul className="space-y-1">
+                          {aiResult.replaced.map((r: any, i: number) => (
+                            <li key={i} className="text-xs text-muted-foreground flex items-start gap-1.5">
+                              <RefreshCw className="w-3 h-3 text-blue-400 mt-0.5 flex-shrink-0" />
+                              <span>
+                                <span className="line-through opacity-60">{r.originalName}</span> →{' '}
+                                <span className="text-foreground font-medium">{r.substituteName}</span>
+                                {r.reason && <span className="text-muted-foreground/70"> ({r.reason})</span>}
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
+                    {aiResult.created?.length > 0 && (
+                      <div className="space-y-1.5">
+                        <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Exercícios criados pela IA (não existiam)</p>
+                        <ul className="space-y-1">
+                          {aiResult.created.map((c: any, i: number) => (
+                            <li key={i} className="text-xs text-muted-foreground flex items-start gap-1.5">
+                              <Sparkles className="w-3 h-3 text-purple-400 mt-0.5 flex-shrink-0" />
+                              <span>
+                                <span className="text-foreground font-medium">{c.name}</span>
+                                <span className="text-[10px] text-muted-foreground/60"> ({c.category})</span>
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
                       </div>
                     )}
 

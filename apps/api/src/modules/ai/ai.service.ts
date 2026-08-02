@@ -4,6 +4,16 @@ import Anthropic from '@anthropic-ai/sdk';
 import { PrismaService } from '../prisma/prisma.service';
 import { GoalType, ActivityLevel } from '@prisma/client';
 import { PDFParse } from 'pdf-parse';
+import {
+  normalizeName,
+  scoreMatch,
+  matchExercise,
+  guessCategoryFromMuscles,
+  isCategoryValid,
+  VALID_MUSCLES,
+  ExerciseLike,
+  MatchResult,
+} from './exercise-matcher';
 
 @Injectable()
 export class AiService {
@@ -49,32 +59,17 @@ export class AiService {
     const trainer = await this.prisma.trainer.findUnique({ where: { userId } });
     if (!trainer) throw new ForbiddenException('Apenas trainers podem gerar treinos');
 
-    const exercises = await this.prisma.exercise.findMany({
-      where: { OR: [{ isPublic: true }, { trainerId: trainer.id }] },
-      select: { id: true, name: true, category: true, muscleGroups: true, gifUrl: true, videoUrl: true },
-      take: 100,
-      orderBy: { name: 'asc' },
-    });
+    const catalog = await this.fetchExerciseCatalog(trainer.id);
 
-    const isCloudinary = (url?: string | null) => !!url && url.includes('cloudinary.com');
-    const scoreEx = (e: (typeof exercises)[0]) =>
-      isCloudinary(e.gifUrl) ? 3 : isCloudinary(e.videoUrl) ? 2 : e.gifUrl ? 1 : 0;
-
-    const exerciseList = exercises
-      .map((e) => {
-        const cat = e.category || (e.muscleGroups?.length ? e.muscleGroups[0] : 'GERAL');
-        const media = e.gifUrl ? ' ✅GIF' : e.videoUrl ? ' ✅VID' : '';
-        return `"${e.name}" [${cat}]${media}`;
-      })
-      .join('\n');
+    const exerciseList = this.buildReferenceList(catalog, 500);
 
     const prompt = `Você é um PERSONAL TRAINER EXPERT com PhD em Ciências do Exercício e 20 anos de experiência internacional. Crie um treino COMPLETO e PROFISSIONAL baseado na solicitação abaixo.
 
 ## SOLICITAÇÃO DO PERSONAL TRAINER
 "${description}"
 
-## EXERCÍCIOS DISPONÍVEIS NO SISTEMA
-Use APENAS nomes EXATOS desta lista. Priorize exercícios com ✅GIF ou ✅VID.
+## EXERCÍCIOS DISPONÍVEIS NO SISTEMA (referência)
+Use estes nomes como REFERÊNCIA. Preencha "catalogName" com o nome EXATO da lista quando reconhecer o exercício. Priorize exercícios com ✅GIF ou ✅VID.
 
 ${exerciseList}
 
@@ -105,11 +100,13 @@ ${exerciseList}
 - Normal (maioria): "technique":"normal"
 
 ## FORMATO DE RESPOSTA (APENAS JSON puro, sem markdown, sem texto extra):
-{"name":"Nome do Treino","description":"Objetivo e metodologia em 1-2 frases","level":2,"duration":60,"tags":["hipertrofia","peito"],"exercises":[{"name":"Nome Exato","sets":4,"reps":"8-10","restSeconds":90,"weight":null,"technique":"normal","supersetGroup":null,"notes":"Retrair escápulas, cotovelos a 45°"}],"tips":["Dica técnica específica 1","Dica técnica específica 2","Dica técnica específica 3"]}
+{"name":"Nome do Treino","description":"Objetivo e metodologia em 1-2 frases","level":2,"duration":60,"tags":["hipertrofia","peito"],"exercises":[{"name":"Nome do exercício (como descrito na solicitação)","catalogName":"Nome Exato da lista (ou null se não existir na lista)","muscleGroup":"Chest","sets":4,"reps":"8-10","restSeconds":90,"weight":null,"technique":"normal","supersetGroup":null,"notes":"Retrair escápulas, cotovelos a 45°"}],"tips":["Dica técnica específica 1","Dica técnica específica 2","Dica técnica específica 3"]}
 
 REGRAS ABSOLUTAS:
 - Responda APENAS o JSON puro. Zero texto extra, zero markdown.
-- Use os nomes de exercícios EXATAMENTE como estão na lista acima
+- NO CAMPO "name" mantenha SEMPRE o nome do exercício conforme descrito na solicitação do trainer (não troque por outro nome).
+- "catalogName": o nome EXATO da lista de referência quando reconhecer o exercício; caso contrário null.
+- "muscleGroup": grupo muscular principal em português ou inglês simples (ex.: "Chest", "Legs", "Back", "Biceps").
 - level: 1=Iniciante 2=Básico 3=Intermediário 4=Avançado 5=Elite
 - reps pode ser string: "8-10", "12", "até a falha", "30s"
 - weight: null se não especificado
@@ -133,57 +130,43 @@ REGRAS ABSOLUTAS:
       },
     });
 
-    const findBestMatch = (name: string): string | null => {
-      const nl = name.toLowerCase().trim();
-      const exactPool = exercises.filter((e) => e.name.toLowerCase().trim() === nl);
-      if (exactPool.length > 0) return exactPool.sort((a, b) => scoreEx(b) - scoreEx(a))[0].id;
-      const partialPool = exercises.filter(
-        (e) => e.name.toLowerCase().includes(nl) || nl.includes(e.name.toLowerCase()),
-      );
-      if (partialPool.length > 0) return partialPool.sort((a, b) => scoreEx(b) - scoreEx(a))[0].id;
-      const firstWord = nl.split(/\s+/)[0];
-      if (firstWord && firstWord.length > 3) {
-        const fwPool = exercises.filter((e) => e.name.toLowerCase().includes(firstWord));
-        if (fwPool.length > 0) return fwPool.sort((a, b) => scoreEx(b) - scoreEx(a))[0].id;
-      }
-      return null;
-    };
+    const resolved = await this.resolveGeneratedExercises(generated.exercises || [], catalog, trainer.id);
 
     const supersetGroupMap = new Map<string, string>();
     const addedExercises: Array<{ name: string; sets: number; reps: string; technique: string | null }> = [];
 
-    const workoutExercises = (generated.exercises || [])
-      .map((ex: any, idx: number) => {
-        const exerciseId = findBestMatch(ex.name || '');
-        if (!exerciseId) return null;
-
-        const technique = (ex.technique || 'normal').toLowerCase();
+    const workoutExercises = resolved.items
+      .map((item, idx) => {
+        const rawEx = (generated.exercises || [])[item.index] || {};
+        const technique = (rawEx.technique || 'normal').toLowerCase();
         const isSuperSet = technique === 'superset';
         const isDropSet = technique === 'dropset';
         let superSetGroupId: string | null = null;
-        if (isSuperSet && ex.supersetGroup) {
-          if (!supersetGroupMap.has(ex.supersetGroup)) {
-            supersetGroupMap.set(ex.supersetGroup, `sg-${Math.random().toString(36).slice(2, 8)}`);
+        if (isSuperSet && rawEx.supersetGroup) {
+          if (!supersetGroupMap.has(rawEx.supersetGroup)) {
+            supersetGroupMap.set(rawEx.supersetGroup, `sg-${Math.random().toString(36).slice(2, 8)}`);
           }
-          superSetGroupId = supersetGroupMap.get(ex.supersetGroup) || null;
+          superSetGroupId = supersetGroupMap.get(rawEx.supersetGroup) || null;
         }
 
         addedExercises.push({
-          name: ex.name,
-          sets: Number(ex.sets) || 3,
-          reps: String(ex.reps || '10'),
+          name: item.name,
+          sets: item.sets,
+          reps: item.reps,
           technique: isSuperSet ? 'superset' : isDropSet ? 'dropset' : null,
         });
 
+        if (!item.exerciseId) return null;
+
         return {
           workoutId: workout.id,
-          exerciseId,
-          sets: Number(ex.sets) || 3,
-          reps: String(ex.reps || '10'),
-          restSeconds: Number(ex.restSeconds) || 60,
-          weight: ex.weight != null ? Number(ex.weight) : null,
+          exerciseId: item.exerciseId,
+          sets: item.sets,
+          reps: item.reps,
+          restSeconds: item.restSeconds,
+          weight: item.weight,
           order: idx,
-          notes: ex.notes || null,
+          notes: item.notes,
           isSuperSet,
           isDropSet,
           superSetGroupId,
@@ -202,6 +185,319 @@ REGRAS ABSOLUTAS:
       exercisesTotal: (generated.exercises || []).length,
       tips: generated.tips || [],
       exercises: addedExercises,
+      replaced: resolved.replaced,
+      created: resolved.created,
+    };
+  }
+
+  /**
+   * Busca TODO o catálogo de exercícios disponível para o trainer
+   * (públicos + os criados por ele), sem limite — para o matcher
+   * pesquisar em toda a base, incluindo exercícios com GIF/vídeo.
+   */
+  private async fetchExerciseCatalog(trainerId: string): Promise<ExerciseLike[]> {
+    return this.prisma.exercise.findMany({
+      where: { OR: [{ isPublic: true }, { trainerId }] },
+      select: { id: true, name: true, category: true, muscleGroups: true, gifUrl: true, videoUrl: true },
+      orderBy: { name: 'asc' },
+    });
+  }
+
+  /** Monta a lista de referência para o prompt (priorizando mídia, depois nome). */
+  private buildReferenceList(catalog: ExerciseLike[], limit: number): string {
+    const media = (e: ExerciseLike) => (e.gifUrl ? 2 : e.videoUrl ? 1 : 0);
+    const sorted = [...catalog]
+      .sort((a, b) => media(b) - media(a) || a.name.localeCompare(b.name))
+      .slice(0, limit);
+    return sorted
+      .map((e) => {
+        const cat = e.category || e.muscleGroups?.[0] || 'GERAL';
+        const m = e.gifUrl ? ' ✅GIF' : e.videoUrl ? ' ✅VID' : '';
+        return `"${e.name}" [${cat}]${m}`;
+      })
+      .join('\n');
+  }
+
+  /**
+   * Resolve os exercícios gerados pela IA contra o catálogo completo.
+   * 1) catalogName exato → 2) matching inteligente (normalização/sinônimos/fuzzy)
+   * 3) não achou: IA decide entre sugerir substituto da base OU criar o exercício.
+   */
+  private async resolveGeneratedExercises(
+    rawExercises: any[],
+    catalog: ExerciseLike[],
+    trainerId: string,
+  ): Promise<{
+    items: Array<{
+      index: number;
+      name: string;
+      exerciseId: string | null;
+      sets: number;
+      reps: string;
+      restSeconds: number;
+      weight: number | null;
+      notes: string | null;
+      status: 'matched' | 'replaced' | 'created' | 'unresolved';
+    }>;
+    replaced: Array<{ originalName: string; exerciseId: string; substituteName: string; reason: string }>;
+    created: Array<{ originalName: string; exerciseId: string; name: string; category: string; description: string | null }>;
+    unmatched: string[];
+  }> {
+    const items: Array<{
+      index: number;
+      name: string;
+      exerciseId: string | null;
+      sets: number;
+      reps: string;
+      restSeconds: number;
+      weight: number | null;
+      notes: string | null;
+      status: 'matched' | 'replaced' | 'created' | 'unresolved';
+    }> = [];
+    const unresolved: Array<{ index: number; name: string; muscleGroup?: string | null; candidates: MatchResult[] }> = [];
+
+    for (const [idx, ex] of (rawExercises || []).entries()) {
+      const name = String(ex?.name ?? '').trim();
+      const muscleGroup = ex?.muscleGroup ?? null;
+      const hintCategory = guessCategoryFromMuscles(muscleGroup ? [muscleGroup] : [], null);
+
+      const base = {
+        index: idx,
+        name,
+        sets: Number(ex?.sets) || 3,
+        reps: String(ex?.reps || '10'),
+        restSeconds: Number(ex?.restSeconds) || 60,
+        weight: ex?.weight != null ? Number(ex.weight) : null,
+        notes: ex?.notes || null,
+      };
+
+      let exercise: ExerciseLike | null = null;
+
+      // Camada 1: catalogName exato fornecido pelo modelo
+      if (ex?.catalogName) {
+        const cn = normalizeName(ex.catalogName);
+        if (cn) {
+          const exact = catalog.find((c) => normalizeName(c.name) === cn);
+          if (exact && (normalizeName(name) === cn || scoreMatch(name, exact) >= 50)) {
+            exercise = exact;
+          }
+        }
+      }
+
+      // Camada 2: matching inteligente em TODO o catálogo
+      if (!exercise && name) {
+        exercise = matchExercise(name, catalog, { category: hintCategory, muscleGroup }).best?.exercise ?? null;
+      }
+
+      if (exercise) {
+        items.push({ ...base, exerciseId: exercise.id, status: 'matched' });
+        continue;
+      }
+
+      // Sem match: guarda candidatos para a IA decidir substituir ou criar
+      const { candidates } = matchExercise(name, catalog, { category: hintCategory, muscleGroup });
+      const pool = candidates.filter((c) => c.score >= 25).slice(0, 4);
+      unresolved.push({ index: idx, name, muscleGroup, candidates: pool });
+      items.push({ ...base, exerciseId: null, status: 'unresolved' });
+    }
+
+    const replaced: Array<{ originalName: string; exerciseId: string; substituteName: string; reason: string }> = [];
+    const created: Array<{ originalName: string; exerciseId: string; name: string; category: string; description: string | null }> = [];
+
+    if (unresolved.length > 0) {
+      const resolutions = await this.resolveUnmatchedViaAI(unresolved);
+
+      for (const item of items) {
+        if (item.status !== 'unresolved') continue;
+
+        const res = resolutions.find((r) => r.index === item.index);
+        const candidates = unresolved.find((u) => u.index === item.index)?.candidates ?? [];
+
+        const applyFallbackCreate = async (name: string) => {
+          const createdEx = await this.ensureExercise(name, null, trainerId);
+          item.exerciseId = createdEx.id;
+          item.status = createdEx.wasCreated ? 'created' : 'matched';
+          created.push({
+            originalName: name,
+            exerciseId: createdEx.id,
+            name: createdEx.name,
+            category: createdEx.category,
+            description: createdEx.description,
+          });
+        };
+
+        if (res?.action === 'create') {
+          const createdEx = await this.ensureExercise(item.name, res, trainerId);
+          item.exerciseId = createdEx.id;
+          item.status = createdEx.wasCreated ? 'created' : 'matched';
+          created.push({
+            originalName: item.name,
+            exerciseId: createdEx.id,
+            name: createdEx.name,
+            category: createdEx.category,
+            description: createdEx.description,
+          });
+          continue;
+        }
+
+        // Substituição: candidato escolhido pela IA ou o melhor candidato (fallback)
+        const substitute =
+          candidates.find((c) => c.exercise.id === res?.exerciseId) ?? candidates[0];
+
+        if (substitute && substitute.score >= 30) {
+          item.exerciseId = substitute.exercise.id;
+          item.status = 'replaced';
+          replaced.push({
+            originalName: item.name,
+            exerciseId: substitute.exercise.id,
+            substituteName: substitute.exercise.name,
+            reason:
+              res?.reason ||
+              `Substituído pelo exercício mais próximo do catálogo (${substitute.matchedBy}, confiança ${substitute.score}%).`,
+          });
+        } else {
+          await applyFallbackCreate(item.name);
+        }
+      }
+    }
+
+    return { items, replaced, created, unmatched: [] };
+  }
+
+  /** Pede à IA para decidir, para cada exercício sem match, substituir ou criar. */
+  private async resolveUnmatchedViaAI(
+    unresolved: Array<{ index: number; name: string; muscleGroup?: string | null; candidates: MatchResult[] }>,
+  ): Promise<Array<{
+    index: number;
+    action: 'substitute' | 'create';
+    exerciseId?: string;
+    name?: string;
+    category?: string;
+    muscleGroups?: string[];
+    description?: string;
+    instructions?: string;
+    reason?: string;
+  }>> {
+    if (unresolved.length === 0) return [];
+
+    const sections = unresolved
+      .map((u) => {
+        const candidates = u.candidates.length
+          ? u.candidates
+              .map((c, i) => `  - [${i + 1}] "${c.exercise.name}" (${c.exercise.category})${c.exercise.gifUrl ? ' ✅GIF' : ''}${c.exercise.videoUrl ? ' ✅vídeo' : ''}`)
+              .join('\n')
+          : '  (nenhum candidato similar na base)';
+        return `[${u.index}] Original: "${u.name}"${u.muscleGroup ? ` | Músculos: ${u.muscleGroup}` : ''}\n${candidates}`;
+      })
+      .join('\n\n');
+
+    const prompt = `Você é um personal trainer expert. Alguns exercícios do treino NÃO existem na base de exercícios do sistema.
+
+Para CADA exercício sem match, decida:
+- "substitute": escolher o MELHOR candidato da base (mesmo grupo muscular, priorize ✅GIF/✅vídeo, padrão de movimento mais próximo); OU
+- "create": criar o exercício quando NENHUM candidato é realmente equivalente ao original.
+
+## EXERCÍCIOS SEM MATCH
+${sections}
+
+## FORMATO DE RESPOSTA (APENAS JSON, sem markdown, sem texto extra):
+{"resolutions":[{"index":0,"action":"substitute","exerciseId":"<ID de um candidato>","reason":"frase curta"},{"index":1,"action":"create","name":"Nome do exercício","category":"LEGS","muscleGroups":["QUADRICEPS"],"description":"Descrição em 1 frase","instructions":"Passo a passo em até 4 etapas","reason":"frase curta"}]}
+
+REGRAS ABSOLUTAS:
+- Retorne APENAS o JSON.
+- Use APENAS IDs de candidatos listados acima na ação substitute.
+- Ação "create" APENAS quando nenhum candidato for equivalente.
+- category DEVE ser um destes enums: CHEST, BACK, SHOULDERS, BICEPS, TRICEPS, LEGS, GLUTES, CORE, CARDIO, FULL_BODY, MOBILITY
+- muscleGroups (opcional) DEVE usar estes enums: PECTORALIS_MAJOR, PECTORALIS_MINOR, LATISSIMUS_DORSI, TRAPEZIUS, RHOMBOIDS, DELTOID, BICEPS_BRACHII, TRICEPS_BRACHII, FOREARMS, QUADRICEPS, HAMSTRINGS, GLUTES, CALVES, ABS, OBLIQUES, LOWER_BACK, HIP_FLEXORS
+- description e instructions em português, curtas e técnicas
+- Retorne resolução para TODOS os índices listados`;
+
+    try {
+      const raw = await this.complete(prompt, 3000);
+      const parsed = JSON.parse(this.extractJson(raw));
+      const resolutions = Array.isArray(parsed?.resolutions) ? parsed.resolutions : [];
+      return resolutions
+        .filter((r: any) => typeof r?.index === 'number')
+        .map((r: any) => ({
+          index: r.index,
+          action: r.action === 'create' ? ('create' as const) : ('substitute' as const),
+          exerciseId: r.exerciseId ?? undefined,
+          name: r.name ?? undefined,
+          category: r.category ?? undefined,
+          muscleGroups: Array.isArray(r.muscleGroups) ? r.muscleGroups : undefined,
+          description: r.description ?? undefined,
+          instructions: r.instructions ?? undefined,
+          reason: r.reason ?? undefined,
+        }));
+    } catch (err) {
+      console.error('[AI] Falha ao resolver exercícios sem match:', (err as Error).message);
+      return []; // fallback (substituto com maior score ou criação) é aplicado pelo chamador
+    }
+  }
+
+  /**
+   * Garante que o exercício exista. Se já houver na base (público ou do trainer),
+   * reutiliza; senão cria com isAIGenerated = true, vinculado ao trainer.
+   */
+  private async ensureExercise(
+    name: string,
+    res: {
+      name?: string;
+      category?: string;
+      muscleGroups?: string[];
+      description?: string;
+      instructions?: string;
+    } | null,
+    trainerId: string,
+  ): Promise<{ id: string; name: string; category: string; description: string | null; wasCreated: boolean }> {
+    const cleanName = (res?.name || name || 'Exercício').trim().slice(0, 120);
+    if (!cleanName) throw new BadRequestException('Nome de exercício inválido');
+
+    const existing = await this.prisma.exercise.findFirst({
+      where: {
+        name: { equals: cleanName, mode: 'insensitive' },
+        OR: [{ trainerId }, { isPublic: true }],
+      },
+      select: { id: true, name: true, category: true, description: true },
+    });
+    if (existing) {
+      return {
+        id: existing.id,
+        name: existing.name,
+        category: existing.category,
+        description: existing.description ?? null,
+        wasCreated: false,
+      };
+    }
+
+    const muscleGroups = (res?.muscleGroups ?? []).filter((m) => VALID_MUSCLES.has(m));
+    const category = isCategoryValid(res?.category) ? res.category : guessCategoryFromMuscles(muscleGroups, res?.category ?? null);
+    const description = res?.description || `Exercício criado automaticamente pela IA a partir de "${name}".`;
+    const instructions = res?.instructions || res?.description || null;
+
+    const created = await this.prisma.exercise.create({
+      data: {
+        trainerId,
+        name: cleanName,
+        category: category as any,
+        muscleGroups: muscleGroups as any,
+        description,
+        instructions,
+        difficulty: 2,
+        isPublic: false,
+        isAIGenerated: true,
+      },
+      select: { id: true, name: true, category: true, description: true },
+    });
+
+    console.log(`[AI] Exercício criado automaticamente: "${cleanName}" (${category}, ID: ${created.id})`);
+
+    return {
+      id: created.id,
+      name: created.name,
+      category: created.category,
+      description: created.description ?? null,
+      wasCreated: true,
     };
   }
 
@@ -742,17 +1038,9 @@ Se você não souber algo específico sobre os alunos que ${trainerName} está t
       throw new BadRequestException('O PDF está vazio ou não contém texto legível');
     }
 
-    // ─── 2. Buscar TODOS os exercícios disponíveis ────────────────────────────
-    const exercises = await this.prisma.exercise.findMany({
-      where: { OR: [{ isPublic: true }, { trainerId: trainer.id }] },
-      select: { id: true, name: true, category: true, muscleGroups: true, gifUrl: true, videoUrl: true },
-      take: 200,
-      orderBy: { name: 'asc' },
-    });
-
-    const exerciseList = exercises.map((e) =>
-      `"${e.name}" | categoria: ${e.category || (e.muscleGroups?.length ? e.muscleGroups[0] : 'geral')}${e.gifUrl ? ' ✅ tem GIF' : ''}${e.videoUrl ? ' ✅ tem vídeo' : ''}`
-    ).join('\n');
+    // ─── 2. Buscar TODO o catálogo de exercícios ─────────────────────────────
+    const catalog = await this.fetchExerciseCatalog(trainer.id);
+    const exerciseList = this.buildReferenceList(catalog, 500);
 
     // ─── 3. Log do texto extraído para debug ──────────────────────────────────
     console.log('[PDF] Texto bruto extraído:', pdfText.slice(0, 2000));
@@ -768,24 +1056,25 @@ Se você não souber algo específico sobre os alunos que ${trainerName} está t
 ## CONTEÚDO EXTRAÍDO DO PDF "${fileName}":
 ${pdfText.slice(0, 10000)}
 
-## BANCO DE EXERCÍCIOS DISPONÍVEIS NO SISTEMA (use APENAS estes nomes):
+## BANCO DE EXERCÍCIOS DO SISTEMA (referência):
 ${exerciseList}
 
 ## INSTRUÇÕES:
 1. Analise TODO o conteúdo do PDF e identifique os treinos descritos
-2. Para CADA exercício mencionado, encontre o nome MAIS PRÓXIMO na lista disponível
-3. Se um exercício do PDF não existir exatamente, escolha o MAIS SIMILAR (mesmo grupo muscular)
-4. Adapte séries, repetições, descanso conforme descrito no PDF
-5. ${extraInstructions}
+2. Preserve SEMPRE o nome do treino EXATAMENTE como está no PDF
+3. Para CADA exercício do PDF, preserve o nome ORIGINAL no campo "name" e, se reconhecer na lista de referência, preencha "catalogName" com o nome EXATO da lista
+4. "muscleGroup": grupo muscular principal em português/inglês simples (ex.: "Chest", "Legs", "Back")
+5. Adapte séries, repetições, descanso conforme descrito no PDF
+6. ${extraInstructions}
 
 ## FORMATO DE RESPOSTA (APENAS JSON válido, sem texto extra, sem markdown):
-{"workouts":[{"name":"Nome do Treino","description":"Descrição","level":2,"duration":60,"tags":["tag1"],"tips":["dica"],"exercises":[{"name":"Nome Exato do Exercício","sets":3,"reps":"10-12","restSeconds":60,"weight":0,"notes":""}]}]}
+{"workouts":[{"name":"Nome do Treino (exatamente como no PDF)","description":"Descrição","level":2,"duration":60,"tags":["tag1"],"tips":["dica"],"exercises":[{"name":"Nome Original do Exercício","catalogName":"Nome exato da lista se reconhecido, senão null","muscleGroup":"Legs","sets":3,"reps":"10-12","restSeconds":60,"weight":0,"notes":""}]}]}
 
 REGRAS ABSOLUTAS:
 - Retorne APENAS o JSON, nada mais
 - workouts DEVE ter pelo menos 1 item
 - Cada workout DEVE ter pelo menos 3 exercises
-- Use APENAS nomes de exercícios da lista disponível
+- NÃO renomeie exercícios: o campo "name" deve conter o nome EXATO lido no PDF
 - NÃO use markdown, NÃO use \`\`\`json, NÃO use explicações
 - Apenas o JSON puro`;
     };
@@ -817,10 +1106,10 @@ REGRAS ABSOLUTAS:
       throw new BadRequestException('A IA não identificou treinos válidos no PDF. Verifique se o PDF contém descrições de treinos legíveis.');
     }
 
-    // ─── 4. Mapear exercícios e criar treinos ─────────────────────────────────
-    const exerciseMap = new Map(exercises.map((e) => [e.name.toLowerCase().trim(), e]));
+    // ─── 5. Mapear exercícios e criar treinos ─────────────────────────────────
     const createdWorkouts: any[] = [];
-    const unmatchedExercises: string[] = [];
+    const allReplaced: any[] = [];
+    const allCreated: any[] = [];
 
     for (const w of workouts) {
       const workout = await this.prisma.workout.create({
@@ -835,58 +1124,25 @@ REGRAS ABSOLUTAS:
         },
       });
 
-      const workoutExercises: any[] = [];
+      const resolved = await this.resolveGeneratedExercises(w.exercises || [], catalog, trainer.id);
+      allReplaced.push(...resolved.replaced);
+      allCreated.push(...resolved.created);
 
-      for (const [idx, ex] of (w.exercises || []).entries()) {
-        let matched = exerciseMap.get((ex.name || '').toLowerCase().trim());
-
-        // Se não achou exato, busca aproximada por similaridade
-        if (!matched) {
-          const searchName = (ex.name || '').toLowerCase().trim();
-          // 1. Tenta por includes (parte do nome)
-          let found = exercises.find((e) =>
-            e.name.toLowerCase().includes(searchName) ||
-            searchName.includes(e.name.toLowerCase()),
-          );
-          // 2. Tenta por palavra-chave (primeira palavra)
-          if (!found) {
-            const firstWord = searchName.split(/\s+/)[0];
-            if (firstWord && firstWord.length > 3) {
-              found = exercises.find((e) =>
-                e.name.toLowerCase().includes(firstWord),
-              );
-            }
-          }
-          // 3. Tenta por grupo muscular (se a IA informou)
-          if (!found && ex.muscleGroup) {
-            found = exercises.find((e) =>
-              e.muscleGroups?.some((mg: string) =>
-                mg.toLowerCase().includes((ex.muscleGroup || '').toLowerCase()),
-              ),
-            );
-          }
-
-          if (found) {
-            matched = found;
-            console.log(`[PDF] Mapeado "${ex.name}" → "${found.name}" (ID: ${found.id})`);
-          } else {
-            unmatchedExercises.push(ex.name);
-            console.log(`[PDF] Exercício não encontrado: "${ex.name}"`);
-            continue; // Pula exercícios sem match
-          }
-        }
-
-        workoutExercises.push({
-          workoutId: workout.id,
-          exerciseId: matched.id,
-          sets: Number(ex.sets) || 3,
-          reps: String(ex.reps || '10'),
-          weight: ex.weight != null ? Number(ex.weight) : null,
-          restSeconds: Number(ex.restSeconds) || 60,
-          order: idx,
-          notes: ex.notes || null,
-        });
-      }
+      const workoutExercises = resolved.items
+        .map((item, idx) => {
+          if (!item.exerciseId) return null;
+          return {
+            workoutId: workout.id,
+            exerciseId: item.exerciseId,
+            sets: item.sets,
+            reps: item.reps,
+            weight: item.weight,
+            restSeconds: item.restSeconds,
+            order: idx,
+            notes: item.notes,
+          };
+        })
+        .filter(Boolean);
 
       if (workoutExercises.length > 0) {
         await this.prisma.workoutExercise.createMany({ data: workoutExercises });
@@ -901,13 +1157,17 @@ REGRAS ABSOLUTAS:
       });
     }
 
-    // ─── 5. Montar resposta ───────────────────────────────────────────────────
+    // ─── 6. Montar resposta ───────────────────────────────────────────────────
     const summary = createdWorkouts.map((w) =>
       `✅ **${w.name}** — ${w.exercisesAdded} de ${w.exercisesTotal} exercícios adicionados`,
     ).join('\n');
 
-    const unmatchedSection = unmatchedExercises.length > 0
-      ? `\n\n⚠️ **Exercícios não encontrados na base (foram ignorados):**\n${unmatchedExercises.map((n) => `• ${n}`).join('\n')}\n\n_Você pode criar esses exercícios manualmente e adicioná-los ao treino._`
+    const replacedSection = allReplaced.length > 0
+      ? `\n\n🔄 **Exercícios substituídos por similares da base:**\n${allReplaced.map((r) => `• "${r.originalName}" → **${r.substituteName}** ${r.reason ? `(${r.reason})` : ''}`).join('\n')}`
+      : '';
+
+    const createdSection = allCreated.length > 0
+      ? `\n\n✨ **Exercícios criados automaticamente na base (não existiam):**\n${allCreated.map((c) => `• **${c.name}** (${c.category})`).join('\n')}\n\n_Eles ficaram vinculados ao seu perfil e podem ser reutilizados em outros treinos._`
       : '';
 
     const allTips = createdWorkouts.flatMap((w) => w.tips || []);
@@ -916,9 +1176,11 @@ REGRAS ABSOLUTAS:
       : '';
 
     return {
-      reply: `📄 **PDF processado com sucesso!** Encontrei ${createdWorkouts.length} treino(s) no arquivo "${fileName}".\n\n${summary}${unmatchedSection}${tipsSection}\n\nOs treinos foram salvos como **Rascunho**. Você pode revisá-los e ativá-los na seção de Treinos.`,
+      reply: `📄 **PDF processado com sucesso!** Encontrei ${createdWorkouts.length} treino(s) no arquivo "${fileName}".\n\n${summary}${replacedSection}${createdSection}${tipsSection}\n\nOs treinos foram salvos como **Rascunho**. Você pode revisá-los e ativá-los na seção de Treinos.`,
       workouts: createdWorkouts,
-      unmatchedExercises,
+      replaced: allReplaced,
+      created: allCreated,
+      unmatchedExercises: [],
     };
   }
 
