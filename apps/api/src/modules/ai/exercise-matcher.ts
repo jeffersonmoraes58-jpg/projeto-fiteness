@@ -9,6 +9,7 @@ export interface ExerciseLike {
   muscleGroups?: string[] | null;
   gifUrl?: string | null;
   videoUrl?: string | null;
+  equipment?: string[] | null;
 }
 
 export interface MatchResult {
@@ -111,6 +112,31 @@ function tokenize(raw?: string | null): string[] {
     .filter((t) => !isStopword(t));
 }
 
+/**
+ * Verifica compatibilidade de equipamento: exercícios sem dado de equipamento
+ * são compatíveis; com lista de equipamentos informada, exige ao menos UM item
+ * em comum (sobreposição por substring, ex.: "banco" cobre "banco inclinado").
+ * Exercícios com zero sobreposição são considerados incompatíveis (ex.: exige
+ * barra quando o treino informa só halteres) e saem das opções — a IA cria
+ * uma variante compatível.
+ */
+export function isEquipmentCompatible(
+  exercise: Pick<ExerciseLike, 'equipment'> | null | undefined,
+  equipment?: string[] | null,
+): boolean {
+  const available = (equipment ?? []).map(normalizeName).filter(Boolean);
+  if (available.length === 0) return true;
+  const needs = (exercise?.equipment ?? []).map(normalizeName).filter(Boolean);
+  if (needs.length === 0) return true;
+  return needs.some((n) =>
+    available.some(
+      (a) =>
+        a === n ||
+        (a.length >= 3 && n.length >= 3 && (a.includes(n) || n.includes(a))),
+    ),
+  );
+}
+
 /** Expande um nome com sinônimos conhecidos (frases e tokens). */
 export function expandName(raw?: string | null): string[] {
   const norm = normalizeName(raw);
@@ -159,6 +185,8 @@ export interface MatchOptions {
   category?: string | null;
   /** Grupo muscular esperado (nome livre, ex.: "Legs", "Quadriceps"). */
   muscleGroup?: string | null;
+  /** Equipamentos disponíveis — bônus para quem só usa os disponíveis, penalidade para quem exige outros. */
+  equipment?: string[] | null;
   /** Pontuação mínima para considerar um "match bom" (default 62). */
   acceptThreshold?: number;
   /** Quantos candidatos retornar (default 5). */
@@ -269,6 +297,19 @@ function computeScore(ctx: QueryContext, candidate: ExerciseLike, opts: MatchOpt
   const expectedCat = normalizeEnumCategory(opts.category);
   if (expectedCat && candidate.category === expectedCat) score += 6;
 
+  // 9. Equipamento disponível: bônus se tudo que o exercício exige está
+  // disponível; forte penalidade se exige equipamento fora da lista — com
+  // equipamento informado, opção incompatível praticamente não é selecionada
+  // (cai abaixo do threshold e vai para substituição/criação via IA).
+  const available = (opts.equipment ?? []).map(normalizeName).filter(Boolean);
+  const needs = (candidate.equipment ?? []).map(normalizeName).filter(Boolean);
+  if (available.length > 0 && needs.length > 0) {
+    const covered = needs.filter((n) => available.includes(n)).length;
+    if (covered === needs.length) score += 6;
+    else if (covered === 0) score -= 40;
+    else score += 2;
+  }
+
   return { score: Math.round(score), matchedBy };
 }
 
@@ -349,9 +390,16 @@ export function findBestMatches(
     .map((candidate) => ({ ...computeScore(ctx, candidate, opts), exercise: candidate }))
     .filter((r) => r.score > 0);
 
-  scored.sort((a, b) => b.score - a.score);
+  // Com equipamentos informados, exclui exercícios incompatíveis (zero
+  // sobreposição) — mantém os de sobreposição parcial e os sem dado.
+  const results =
+    (opts.equipment ?? []).some((e) => normalizeName(e))
+      ? scored.filter((r) => isEquipmentCompatible(r.exercise, opts.equipment))
+      : scored;
 
-  return scored.map((r) => ({
+  results.sort((a, b) => b.score - a.score);
+
+  return results.map((r) => ({
     exercise: r.exercise,
     score: r.score,
     matchedBy: r.matchedBy,

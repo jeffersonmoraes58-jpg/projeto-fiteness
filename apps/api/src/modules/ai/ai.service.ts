@@ -10,6 +10,7 @@ import {
   matchExercise,
   guessCategoryFromMuscles,
   isCategoryValid,
+  isEquipmentCompatible,
   VALID_MUSCLES,
   ExerciseLike,
   MatchResult,
@@ -55,18 +56,43 @@ export class AiService {
     return stripped;
   }
 
-  async generateWorkout(description: string, userId: string) {
+  async generateWorkout(
+    userId: string,
+    body: { description: string; studentId?: string; equipment?: string[]; feedback?: string },
+  ) {
     const trainer = await this.prisma.trainer.findUnique({ where: { userId } });
     if (!trainer) throw new ForbiddenException('Apenas trainers podem gerar treinos');
 
-    const catalog = await this.fetchExerciseCatalog(trainer.id);
+    const description = String(body?.description ?? '').trim();
+    if (!description) throw new BadRequestException('Descrição do treino é obrigatória');
+    const equipment = Array.isArray(body?.equipment) ? body.equipment.filter(Boolean).slice(0, 30) : [];
 
+    const catalog = await this.fetchExerciseCatalog(trainer.id);
     const exerciseList = this.buildReferenceList(catalog, 500);
 
-    const prompt = `Você é um PERSONAL TRAINER EXPERT com PhD em Ciências do Exercício e 20 anos de experiência internacional. Crie um treino COMPLETO e PROFISSIONAL baseado na solicitação abaixo.
+    let studentContext = '';
+    if (body?.studentId) {
+      studentContext = await this.buildStudentContext(trainer.id, body.studentId);
+    }
+
+    const equipSection = equipment.length > 0
+      ? `\n## EQUIPAMENTOS DISPONÍVEIS (OBRIGATÓRIO)
+Apenas estes equipamentos estão disponíveis: ${equipment.join(', ')}.
+- Escolha exercícios cuja execução dependa APENAS desses equipamentos.
+- Para exercícios cuja execução exigiria outro equipamento, prefira variações ou substitua por similar compatível.
+- Se "catalogName" da lista exigir equipamento indisponível, NÃO use; deixe "catalogName": null para a IA de resolução escolher alternativa compatível.`
+      : '';
+
+    const feedbackSection = body?.feedback?.trim()
+      ? `\n## AJUSTES SOLICITADOS (sobre uma versão anterior)
+${body.feedback.trim()}`
+      : '';
+
+    const prompt = `Você é um PERSONAL TRAINER EXPERT com PhD em Ciências do Exercício e 20 anos de experiência internacional. Crie treino(s) COMPLETO(S) e PROFISSIONAL(IS) baseado(s) na solicitação abaixo.
 
 ## SOLICITAÇÃO DO PERSONAL TRAINER
-"${description}"
+"${description}"${studentContext ? `\n\n## ALUNO (dados reais do sistema — use como verdade)
+${studentContext}` : ''}${equipSection}${feedbackSection}
 
 ## EXERCÍCIOS DISPONÍVEIS NO SISTEMA (referência)
 Use estes nomes como REFERÊNCIA. Preencha "catalogName" com o nome EXATO da lista quando reconhecer o exercício. Priorize exercícios com ✅GIF ou ✅VID.
@@ -89,7 +115,7 @@ ${exerciseList}
 - Iniciante: -1 série do padrão, use reps no limite superior, cargas moderadas
 - Avançado: volume máximo, técnicas avançadas quando adequado
 
-### QUANTIDADE DE EXERCÍCIOS
+### QUANTIDADE DE EXERCÍCIOS POR TREINO
 - Full body: 6-9 exercícios
 - Grupos musculares específicos (ABC, push/pull/legs): 5-8 exercícios
 - Mínimo 5, máximo 10
@@ -100,93 +126,128 @@ ${exerciseList}
 - Normal (maioria): "technique":"normal"
 
 ## FORMATO DE RESPOSTA (APENAS JSON puro, sem markdown, sem texto extra):
-{"name":"Nome do Treino","description":"Objetivo e metodologia em 1-2 frases","level":2,"duration":60,"tags":["hipertrofia","peito"],"exercises":[{"name":"Nome do exercício (como descrito na solicitação)","catalogName":"Nome Exato da lista (ou null se não existir na lista)","muscleGroup":"Chest","sets":4,"reps":"8-10","restSeconds":90,"weight":null,"technique":"normal","supersetGroup":null,"notes":"Retrair escápulas, cotovelos a 45°"}],"tips":["Dica técnica específica 1","Dica técnica específica 2","Dica técnica específica 3"]}
+{"workouts":[{"name":"Nome do Treino","description":"Objetivo e metodologia em 1-2 frases","level":2,"duration":60,"tags":["hipertrofia","peito"],"exercises":[{"name":"Nome do exercício (como descrito na solicitação)","catalogName":"Nome Exato da lista (ou null se não existir na lista)","muscleGroup":"Chest","sets":4,"reps":"8-10","restSeconds":90,"weight":null,"tempo":"2010","technique":"normal","supersetGroup":null,"notes":"Retrair escápulas, cotovelos a 45°"}],"tips":["Dica técnica específica 1","Dica técnica específica 2","Dica técnica específica 3"]}]}
 
 REGRAS ABSOLUTAS:
 - Responda APENAS o JSON puro. Zero texto extra, zero markdown.
+- "workouts": array com 1 ou mais treinos. Se a solicitação descrever uma divisão (ABC, push/pull/legs, upper/lower, etc.), retorne UM workout por dia/sessão, em ordem. Máximo 6 workouts.
 - NO CAMPO "name" mantenha SEMPRE o nome do exercício conforme descrito na solicitação do trainer (não troque por outro nome).
 - "catalogName": o nome EXATO da lista de referência quando reconhecer o exercício; caso contrário null.
 - "muscleGroup": grupo muscular principal em português ou inglês simples (ex.: "Chest", "Legs", "Back", "Biceps").
 - level: 1=Iniciante 2=Básico 3=Intermediário 4=Avançado 5=Elite
 - reps pode ser string: "8-10", "12", "até a falha", "30s"
 - weight: null se não especificado
+- tempo: cadência em segundos como "2010" (negativa, pausa, concêntrica, topo) ou null
 - technique: "normal", "superset" ou "dropset"
 - supersetGroup: null ou letra ("A", "B") para identificar o par de superset
 - notes: dica de execução técnica e específica para este exercício
-- tips: 3-5 dicas TÉCNICAS e ESPECÍFICAS para este treino`;
+- tips: 3-5 dicas TÉCNICAS e ESPECÍFICAS para cada treino`;
 
-    const raw = await this.complete(prompt, 4096, 'claude-opus-4-7');
-    const generated = JSON.parse(this.extractJson(raw));
+    let generated: any = null;
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      try {
+        const raw = await this.complete(prompt, 6000, 'claude-opus-4-7');
+        generated = JSON.parse(this.extractJson(raw));
+        break;
+      } catch (err) {
+        console.error(`[AI] generateWorkout tentativa ${attempt} falhou:`, (err as Error).message);
+        if (attempt === 2) throw new Error('A IA retornou uma resposta inválida. Tente novamente.');
+      }
+    }
 
-    const workout = await this.prisma.workout.create({
-      data: {
-        name: generated.name || 'Treino gerado por IA',
-        description: generated.description,
-        level: Math.min(Math.max(Number(generated.level) || 1, 1), 5),
-        duration: Number(generated.duration) || 60,
-        tags: generated.tags || [],
-        status: 'DRAFT',
-        trainerId: trainer.id,
-      },
-    });
+    // Normaliza resposta: aceita {"workouts":[...]} ou objeto único de treino
+    const workouts = Array.isArray(generated?.workouts) && generated.workouts.length > 0
+      ? generated.workouts
+      : generated?.exercises || generated?.workout
+        ? [generated]
+        : [];
+    if (workouts.length === 0) {
+      throw new BadRequestException('A IA não retornou treinos válidos. Tente novamente.');
+    }
+    const list = workouts.slice(0, 6);
 
-    const resolved = await this.resolveGeneratedExercises(generated.exercises || [], catalog, trainer.id);
+    const allReplaced: any[] = [];
+    const allCreated: any[] = [];
+    const createdWorkouts: any[] = [];
 
-    const supersetGroupMap = new Map<string, string>();
-    const addedExercises: Array<{ name: string; sets: number; reps: string; technique: string | null }> = [];
+    for (const w of list) {
+      const workout = await this.prisma.workout.create({
+        data: {
+          name: w.name || 'Treino gerado por IA',
+          description: w.description,
+          level: Math.min(Math.max(Number(w.level) || 1, 1), 5),
+          duration: Number(w.duration) || 60,
+          tags: w.tags || [],
+          status: 'DRAFT',
+          trainerId: trainer.id,
+        },
+      });
 
-    const workoutExercises = resolved.items
-      .map((item, idx) => {
-        const rawEx = (generated.exercises || [])[item.index] || {};
-        const technique = (rawEx.technique || 'normal').toLowerCase();
-        const isSuperSet = technique === 'superset';
-        const isDropSet = technique === 'dropset';
-        let superSetGroupId: string | null = null;
-        if (isSuperSet && rawEx.supersetGroup) {
-          if (!supersetGroupMap.has(rawEx.supersetGroup)) {
-            supersetGroupMap.set(rawEx.supersetGroup, `sg-${Math.random().toString(36).slice(2, 8)}`);
+      const resolved = await this.resolveGeneratedExercises(w.exercises || [], catalog, trainer.id, equipment);
+      allReplaced.push(...resolved.replaced);
+      allCreated.push(...resolved.created);
+
+      const supersetGroupMap = new Map<string, string>();
+      const addedExercises: Array<{ name: string; sets: number; reps: string; technique: string | null }> = [];
+
+      const workoutExercises = resolved.items
+        .map((item, idx) => {
+          const rawEx = (w.exercises || [])[item.index] || {};
+          const technique = (rawEx.technique || 'normal').toLowerCase();
+          const isSuperSet = technique === 'superset';
+          const isDropSet = technique === 'dropset';
+          let superSetGroupId: string | null = null;
+          if (isSuperSet && rawEx.supersetGroup) {
+            if (!supersetGroupMap.has(rawEx.supersetGroup)) {
+              supersetGroupMap.set(rawEx.supersetGroup, `sg-${Math.random().toString(36).slice(2, 8)}`);
+            }
+            superSetGroupId = supersetGroupMap.get(rawEx.supersetGroup) || null;
           }
-          superSetGroupId = supersetGroupMap.get(rawEx.supersetGroup) || null;
-        }
 
-        addedExercises.push({
-          name: item.name,
-          sets: item.sets,
-          reps: item.reps,
-          technique: isSuperSet ? 'superset' : isDropSet ? 'dropset' : null,
-        });
+          addedExercises.push({
+            name: item.name,
+            sets: item.sets,
+            reps: item.reps,
+            technique: isSuperSet ? 'superset' : isDropSet ? 'dropset' : null,
+          });
 
-        if (!item.exerciseId) return null;
+          if (!item.exerciseId) return null;
 
-        return {
-          workoutId: workout.id,
-          exerciseId: item.exerciseId,
-          sets: item.sets,
-          reps: item.reps,
-          restSeconds: item.restSeconds,
-          weight: item.weight,
-          order: idx,
-          notes: item.notes,
-          isSuperSet,
-          isDropSet,
-          superSetGroupId,
-        };
-      })
-      .filter(Boolean);
+          return {
+            workoutId: workout.id,
+            exerciseId: item.exerciseId,
+            sets: item.sets,
+            reps: item.reps,
+            restSeconds: item.restSeconds,
+            weight: item.weight,
+            tempo: typeof rawEx.tempo === 'string' && rawEx.tempo.trim() ? rawEx.tempo.trim().slice(0, 10) : null,
+            order: idx,
+            notes: item.notes,
+            isSuperSet,
+            isDropSet,
+            superSetGroupId,
+          };
+        })
+        .filter(Boolean);
 
-    if (workoutExercises.length > 0) {
-      await this.prisma.workoutExercise.createMany({ data: workoutExercises });
+      if (workoutExercises.length > 0) {
+        await this.prisma.workoutExercise.createMany({ data: workoutExercises });
+      }
+
+      createdWorkouts.push({
+        workoutId: workout.id,
+        name: workout.name,
+        exercisesAdded: workoutExercises.length,
+        exercisesTotal: (w.exercises || []).length,
+        tips: w.tips || [],
+        exercises: addedExercises,
+      });
     }
 
     return {
-      workoutId: workout.id,
-      name: workout.name,
-      exercisesAdded: workoutExercises.length,
-      exercisesTotal: (generated.exercises || []).length,
-      tips: generated.tips || [],
-      exercises: addedExercises,
-      replaced: resolved.replaced,
-      created: resolved.created,
+      workouts: createdWorkouts,
+      replaced: allReplaced,
+      created: allCreated,
     };
   }
 
@@ -198,7 +259,7 @@ REGRAS ABSOLUTAS:
   private async fetchExerciseCatalog(trainerId: string): Promise<ExerciseLike[]> {
     return this.prisma.exercise.findMany({
       where: { OR: [{ isPublic: true }, { trainerId }] },
-      select: { id: true, name: true, category: true, muscleGroups: true, gifUrl: true, videoUrl: true },
+      select: { id: true, name: true, category: true, muscleGroups: true, gifUrl: true, videoUrl: true, equipment: true },
       orderBy: { name: 'asc' },
     });
   }
@@ -213,7 +274,8 @@ REGRAS ABSOLUTAS:
       .map((e) => {
         const cat = e.category || e.muscleGroups?.[0] || 'GERAL';
         const m = e.gifUrl ? ' ✅GIF' : e.videoUrl ? ' ✅VID' : '';
-        return `"${e.name}" [${cat}]${m}`;
+        const eq = Array.isArray(e.equipment) && e.equipment.length > 0 ? ` 🏋️${e.equipment.join('/')}` : '';
+        return `"${e.name}" [${cat}]${m}${eq}`;
       })
       .join('\n');
   }
@@ -227,6 +289,7 @@ REGRAS ABSOLUTAS:
     rawExercises: any[],
     catalog: ExerciseLike[],
     trainerId: string,
+    equipment?: string[],
   ): Promise<{
     items: Array<{
       index: number;
@@ -278,7 +341,11 @@ REGRAS ABSOLUTAS:
         const cn = normalizeName(ex.catalogName);
         if (cn) {
           const exact = catalog.find((c) => normalizeName(c.name) === cn);
-          if (exact && (normalizeName(name) === cn || scoreMatch(name, exact) >= 50)) {
+          if (
+            exact &&
+            isEquipmentCompatible(exact, equipment) &&
+            (normalizeName(name) === cn || scoreMatch(name, exact) >= 50)
+          ) {
             exercise = exact;
           }
         }
@@ -286,7 +353,7 @@ REGRAS ABSOLUTAS:
 
       // Camada 2: matching inteligente em TODO o catálogo
       if (!exercise && name) {
-        exercise = matchExercise(name, catalog, { category: hintCategory, muscleGroup }).best?.exercise ?? null;
+        exercise = matchExercise(name, catalog, { category: hintCategory, muscleGroup, equipment }).best?.exercise ?? null;
       }
 
       if (exercise) {
@@ -295,7 +362,7 @@ REGRAS ABSOLUTAS:
       }
 
       // Sem match: guarda candidatos para a IA decidir substituir ou criar
-      const { candidates } = matchExercise(name, catalog, { category: hintCategory, muscleGroup });
+      const { candidates } = matchExercise(name, catalog, { category: hintCategory, muscleGroup, equipment });
       const pool = candidates.filter((c) => c.score >= 25).slice(0, 4);
       unresolved.push({ index: idx, name, muscleGroup, candidates: pool });
       items.push({ ...base, exerciseId: null, status: 'unresolved' });
@@ -499,6 +566,35 @@ REGRAS ABSOLUTAS:
       description: created.description ?? null,
       wasCreated: true,
     };
+  }
+
+  /**
+   * Monta um contexto conciso do aluno (dados reais do banco) para enriquecer
+   * o prompt de geração. Verifica que o aluno pertence ao trainer.
+   */
+  private async buildStudentContext(trainerId: string, studentId: string): Promise<string> {
+    const relation = await this.prisma.trainerStudent.findFirst({
+      where: { trainerId, studentId, isActive: true },
+      include: {
+        student: {
+          include: { user: { include: { profile: true } }, anamnesis: true },
+        },
+      },
+    });
+    if (!relation) throw new ForbiddenException('Aluno não encontrado entre seus alunos');
+
+    const s = relation.student;
+    const lines = [
+      `Nome: ${s.user?.profile?.firstName ?? ''} ${s.user?.profile?.lastName ?? ''}`.trim(),
+      `Objetivo: ${s.goalType ?? 'Não definido'} | Nível: ${s.level ?? 'N/A'} | Atividade: ${s.activityLevel ?? 'N/A'}`,
+    ];
+    if (s.anamnesis) {
+      if (s.anamnesis.previousInjuries) lines.push(`Lesões: ${s.anamnesis.previousInjuries}`);
+      if (s.anamnesis.cardiovascularIssues) lines.push('Restrição cardiovascular presente');
+      if (s.anamnesis.sleepHours) lines.push(`Sono: ${s.anamnesis.sleepHours}h`);
+      if (s.anamnesis.stressLevel) lines.push(`Estresse: ${s.anamnesis.stressLevel}/10`);
+    }
+    return lines.join('\n');
   }
 
   async analyzeStudent(studentId: string, userId: string) {
@@ -851,7 +947,6 @@ Retorne APENAS JSON válido:
         ? { OR: [{ isPublic: true }, { trainerId: trainer.id }] }
         : { isPublic: true },
       select: { id: true, name: true, category: true, muscleGroups: true, gifUrl: true, videoUrl: true },
-      take: 200,
       orderBy: { name: 'asc' },
     });
 

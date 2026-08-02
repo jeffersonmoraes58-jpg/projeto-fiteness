@@ -34,12 +34,12 @@ export class AiController {
   }
 
   @Post('generate-workout')
-  @ApiOperation({ summary: 'Gerar treino completo com IA a partir de descrição do trainer' })
+  @ApiOperation({ summary: 'Gerar treino(s) completo(s) com IA a partir de descrição do trainer' })
   generateWorkout(
     @CurrentUser('id') userId: string,
-    @Body() body: { description: string },
+    @Body() body: { description: string; studentId?: string; equipment?: string[]; feedback?: string },
   ) {
-    return this.aiService.generateWorkout(body.description, userId);
+    return this.aiService.generateWorkout(userId, body);
   }
 
   @Post('exercise-alternative')

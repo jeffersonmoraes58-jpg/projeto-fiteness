@@ -199,6 +199,8 @@ export default function TrainerWorkouts() {
   const [aiLevel, setAiLevel] = useState('');
   const [aiFocus, setAiFocus] = useState('');
   const [aiDuration, setAiDuration] = useState('');
+  const [aiEquipment, setAiEquipment] = useState('');
+  const [aiStudentId, setAiStudentId] = useState('');
   const queryClient = useQueryClient();
 
   const composedDescription = useMemo(() => {
@@ -212,9 +214,25 @@ export default function TrainerWorkouts() {
   }, [aiObjective, aiLevel, aiFocus, aiDuration, aiDescription]);
   const router = useRouter();
 
+  const resetAiForm = () => {
+    setAiResult(null);
+    setAiDescription('');
+    setAiObjective('');
+    setAiLevel('');
+    setAiFocus('');
+    setAiDuration('');
+    setAiEquipment('');
+    setAiStudentId('');
+  };
+
   const { data: workouts, isLoading } = useQuery({
     queryKey: ['trainer-workouts'],
     queryFn: () => api.get('/workouts').then((r) => r.data.data),
+  });
+
+  const { data: aiStudents } = useQuery({
+    queryKey: ['trainer-students'],
+    queryFn: () => api.get('/trainers/me/students').then((r) => r.data.data),
   });
 
   const duplicateMutation = useMutation({
@@ -228,11 +246,20 @@ export default function TrainerWorkouts() {
   });
 
   const generateAiMutation = useMutation({
-    mutationFn: (description: string) =>
-      api.post('/ai/generate-workout', { description }, { timeout: 120000 }).then((r) => r.data?.data ?? r.data),
+    mutationFn: (payload: { description: string; equipment?: string[]; studentId?: string }) =>
+      api.post('/ai/generate-workout', {
+        description: payload.description,
+        equipment: payload.equipment?.length ? payload.equipment : undefined,
+        studentId: payload.studentId || undefined,
+      }, { timeout: 120000 }).then((r) => r.data?.data ?? r.data),
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['trainer-workouts'] });
-      setAiResult(data);
+      const workouts = Array.isArray(data?.workouts) && data.workouts.length > 0
+        ? data.workouts
+        : data?.workoutId
+          ? [data]
+          : [];
+      setAiResult({ ...data, workouts });
     },
     onError: (err: any) => {
       const status = err?.statusCode || err?.response?.status;
@@ -329,7 +356,7 @@ export default function TrainerWorkouts() {
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
           <button
-            onClick={() => { setAiModal(true); setAiResult(null); setAiDescription(''); setAiObjective(''); setAiLevel(''); setAiFocus(''); setAiDuration(''); }}
+            onClick={() => { setAiModal(true); resetAiForm(); }}
             className="flex items-center gap-1.5 text-xs sm:text-sm py-2 px-3 sm:px-4 rounded-xl border border-violet-500/40 bg-violet-500/10 hover:bg-violet-500/20 text-violet-400 font-medium transition-all"
           >
             <Wand2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
@@ -641,11 +668,41 @@ export default function TrainerWorkouts() {
                       </div>
                     </div>
 
-                    <div className="border-t border-border/40 pt-2.5">
+                    <div className="border-t border-border/40 pt-2.5 space-y-2.5">
+                      <div className="space-y-1">
+                        <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Equipamentos disponíveis</p>
+                        <input
+                          type="text"
+                          value={aiEquipment}
+                          onChange={(e) => setAiEquipment(e.target.value)}
+                          placeholder="Ex: halteres, polia, peso corporal (separados por vírgula)"
+                          disabled={generateAiMutation.isPending}
+                          className="input-field w-full text-sm"
+                        />
+                      </div>
+
+                      <div className="space-y-1">
+                        <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Aluno (opcional)</p>
+                        <select
+                          value={aiStudentId}
+                          onChange={(e) => setAiStudentId(e.target.value)}
+                          disabled={generateAiMutation.isPending}
+                          className="input-field w-full text-sm"
+                        >
+                          <option value="">— Treino genérico, sem aluno —</option>
+                          {(aiStudents || []).map((s: any) => (
+                            <option key={s.id} value={s.id}>
+                              {s.user?.profile?.firstName || ''} {s.user?.profile?.lastName || ''}
+                              {s.goalType ? ` — ${s.goalType}` : ''}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
                       <textarea
                         value={aiDescription}
                         onChange={(e) => setAiDescription(e.target.value)}
-                        placeholder="Detalhes adicionais (equipamentos, restrições, observações...)"
+                        placeholder="Detalhes adicionais (restrições, observações...)"
                         rows={2}
                         disabled={generateAiMutation.isPending}
                         className="input-field resize-none w-full text-sm"
@@ -678,7 +735,11 @@ export default function TrainerWorkouts() {
                       </button>
                       <button
                         disabled={!composedDescription.trim() || generateAiMutation.isPending}
-                        onClick={() => generateAiMutation.mutate(composedDescription.trim())}
+                        onClick={() => generateAiMutation.mutate({
+                          description: composedDescription.trim(),
+                          equipment: aiEquipment.split(',').map((s) => s.trim()).filter(Boolean),
+                          studentId: aiStudentId || undefined,
+                        })}
                         className="flex-1 text-sm py-2.5 bg-gradient-to-r from-violet-600 to-purple-600 text-white rounded-xl font-semibold hover:opacity-90 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
                       >
                         <Wand2 className="w-4 h-4" />
@@ -688,21 +749,37 @@ export default function TrainerWorkouts() {
                   </>
                 ) : (
                   <div className="space-y-3">
-                    <div className="flex items-center gap-3 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
-                      <CheckCircle className="w-5 h-5 text-emerald-400 flex-shrink-0" />
-                      <div>
-                        <p className="font-semibold text-sm text-emerald-400">{aiResult.name}</p>
-                        <p className="text-xs text-muted-foreground mt-0.5">
-                          {aiResult.exercisesAdded}/{aiResult.exercisesTotal || aiResult.exercisesAdded} exercícios vinculados · Rascunho
+                    {aiResult.workouts?.length > 0 && (
+                      <div className="space-y-1.5">
+                        <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
+                          Treino{aiResult.workouts.length > 1 ? 's criados' : ' criado'} ({aiResult.workouts.length})
                         </p>
+                        <div className="max-h-40 overflow-y-auto space-y-1.5 pr-1">
+                          {aiResult.workouts.map((w: any) => (
+                            <button
+                              key={w.workoutId}
+                              onClick={() => { setAiModal(false); router.push(`/trainer/workouts/${w.workoutId}`); }}
+                              className="w-full text-left flex items-center gap-3 p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 hover:bg-emerald-500/20 transition-all"
+                            >
+                              <CheckCircle className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+                              <div className="flex-1 min-w-0">
+                                <p className="font-semibold text-sm text-emerald-400 truncate">{w.name}</p>
+                                <p className="text-[11px] text-muted-foreground">
+                                  {w.exercisesAdded}/{w.exercisesTotal || w.exercisesAdded} exercícios vinculados · Rascunho
+                                </p>
+                              </div>
+                              <ChevronRight className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                            </button>
+                          ))}
+                        </div>
                       </div>
-                    </div>
+                    )}
 
-                    {aiResult.exercises?.length > 0 && (
+                    {aiResult.workouts?.length === 1 && aiResult.workouts[0]?.exercises?.length > 0 && (
                       <div className="space-y-1">
                         <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Exercícios criados</p>
                         <div className="max-h-36 overflow-y-auto space-y-0.5 pr-1">
-                          {aiResult.exercises.map((ex: any, i: number) => (
+                          {aiResult.workouts[0].exercises.map((ex: any, i: number) => (
                             <div key={i} className="flex items-center gap-2 text-xs py-0.5">
                               <span className="text-muted-foreground w-4 text-right flex-shrink-0 font-mono text-[10px]">{i + 1}</span>
                               <span className="flex-1 truncate">{ex.name}</span>
@@ -753,31 +830,39 @@ export default function TrainerWorkouts() {
                       </div>
                     )}
 
-                    {aiResult.tips?.length > 0 && (
-                      <div className="space-y-1.5">
-                        <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Dicas técnicas</p>
-                        <ul className="space-y-1">
-                          {aiResult.tips.map((tip: string, i: number) => (
-                            <li key={i} className="text-xs text-muted-foreground flex items-start gap-1.5">
-                              <span className="text-violet-400 mt-0.5 flex-shrink-0">•</span>{tip}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
+                    {(() => {
+                      const allTips = (aiResult.workouts || []).flatMap((w: any) => w.tips || []).filter(Boolean);
+                      if (!allTips.length) return null;
+                      return (
+                        <div className="space-y-1.5">
+                          <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Dicas técnicas</p>
+                          <ul className="space-y-1">
+                            {allTips.map((tip: string, i: number) => (
+                              <li key={i} className="text-xs text-muted-foreground flex items-start gap-1.5">
+                                <span className="text-violet-400 mt-0.5 flex-shrink-0">•</span>{tip}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      );
+                    })()}
 
                     <div className="flex gap-2">
                       <button
-                        onClick={() => { setAiResult(null); setAiDescription(''); setAiObjective(''); setAiLevel(''); setAiFocus(''); setAiDuration(''); }}
+                        onClick={resetAiForm}
                         className="btn-secondary flex-1 text-sm py-2.5"
                       >
                         Gerar outro
                       </button>
                       <button
-                        onClick={() => { setAiModal(false); router.push(`/trainer/workouts/${aiResult.workoutId}`); }}
+                        onClick={() => {
+                          const w = aiResult.workouts?.[0];
+                          setAiModal(false);
+                          if (w?.workoutId && aiResult.workouts?.length === 1) router.push(`/trainer/workouts/${w.workoutId}`);
+                        }}
                         className="flex-1 text-sm py-2.5 bg-gradient-to-r from-violet-600 to-purple-600 text-white rounded-xl font-semibold hover:opacity-90 transition-all flex items-center justify-center gap-2"
                       >
-                        Ver treino <ChevronRight className="w-4 h-4" />
+                        {aiResult.workouts?.length === 1 ? 'Ver treino' : 'Fechar'} <ChevronRight className="w-4 h-4" />
                       </button>
                     </div>
                   </div>
