@@ -273,7 +273,7 @@ export default function TrainerPayments() {
                           <Plus className="w-3 h-3" /> Nova cobrança
                         </button>
                       )}
-                      {(b.status === 'OVERDUE' || b.status === 'SUSPENDED') && !b.accessReleasedAt && (
+                      {(b.status === 'OVERDUE' || b.status === 'SUSPENDED' || b.latestInvoice?.status === 'OVERDUE') && !b.accessReleasedAt && (
                         <button
                           onClick={() => toggleAccessMut.mutate({ id: b.id, released: true })}
                           disabled={toggleAccessMut.isPending}
