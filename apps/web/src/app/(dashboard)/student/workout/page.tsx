@@ -293,8 +293,8 @@ export default function StudentWorkout() {
   });
 
   const blockingBilling = Array.isArray(billingStatus)
-    ? billingStatus.find((b: any) => b.status === 'OVERDUE' || b.status === 'SUSPENDED')
-    : null;
+    ? billingStatus.find((b: any) => b.blocked)
+    : undefined;
   const isBlocked = !!blockingBilling;
 
   const { data: workoutPlans } = useQuery({

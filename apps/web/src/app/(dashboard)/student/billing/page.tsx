@@ -72,7 +72,8 @@ function BillingContent() {
   }
 
   const arr = Array.isArray(billings) ? billings : [];
-  const suspended = arr.some((b: any) => b.status === 'SUSPENDED');
+  const suspended = arr.some((b: any) => b.status === 'SUSPENDED' && !b.accessReleasedAt);
+  const released = arr.find((b: any) => b.accessReleasedAt);
 
   if (isLoading) {
     return (
@@ -121,6 +122,20 @@ function BillingContent() {
             <p className="font-semibold text-red-400">Acesso suspenso por inadimplência</p>
             <p className="text-sm text-muted-foreground mt-0.5">
               Regularize o pagamento abaixo para reativar seu acesso.
+            </p>
+          </div>
+        </motion.div>
+      )}
+
+      {/* Release-on-trust banner */}
+      {released && !suspended && (
+        <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}
+          className="flex items-start gap-3 p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30">
+          <CheckCircle2 className="w-5 h-5 text-emerald-400 flex-shrink-0 mt-0.5" />
+          <div>
+            <p className="font-semibold text-emerald-400">Acesso liberado pelo seu personal</p>
+            <p className="text-sm text-muted-foreground mt-0.5">
+              Seu acesso está liberado. As faturas abaixo continuam em aberto para pagamento.
             </p>
           </div>
         </motion.div>

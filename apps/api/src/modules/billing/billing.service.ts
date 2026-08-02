@@ -185,6 +185,8 @@ export class BillingService {
       status: b.status,
       nextDueDate: b.nextDueDate,
       startDate: b.startDate,
+      accessReleasedAt: b.accessReleasedAt,
+      accessReleaseNote: b.accessReleaseNote,
       latestInvoice: b.invoices[0] ?? null,
       invoices: b.invoices,
     }));
@@ -275,6 +277,67 @@ export class BillingService {
     return { ok: true };
   }
 
+  /**
+   * Liberação "na confiança": o trainer libera (ou revoga) o acesso do aluno
+   * SEM alterar o financeiro — faturas pendentes/vencidas permanecem em aberto
+   * e o billing não muda de status. O aluno deixa de ser bloqueado pelo acesso.
+   */
+  async toggleStudentAccess(
+    userId: string,
+    billingId: string,
+    dto: { released?: boolean; note?: string } = {},
+  ) {
+    const trainer = await this.getTrainer(userId);
+    const billing = await this.prisma.studentBilling.findUnique({
+      where: { id: billingId },
+      include: {
+        student: { include: { user: { include: { profile: true } } } },
+      },
+    });
+    if (!billing || billing.trainerId !== trainer.id) {
+      throw new NotFoundException('Cobrança não encontrada');
+    }
+
+    const released = dto.released !== false;
+    const updated = await this.prisma.studentBilling.update({
+      where: { id: billingId },
+      data: released
+        ? {
+            accessReleasedAt: new Date(),
+            accessReleaseNote: dto.note?.trim() || null,
+          }
+        : { accessReleasedAt: null, accessReleaseNote: null },
+    });
+
+    if (released) {
+      const studentName = [
+        billing.student.user.profile?.firstName,
+        billing.student.user.profile?.lastName,
+      ]
+        .filter(Boolean)
+        .join(' ') || billing.student.user.email;
+      await this.notifications.create({
+        userId: billing.student.userId,
+        type: 'PAYMENT',
+        title: '🔓 Acesso liberado',
+        body: dto.note?.trim()
+          ? `Seu personal liberou seu acesso: ${dto.note.trim()}`
+          : `Seu personal ${trainer.user?.profile?.firstName || ''} liberou seu acesso.`,
+      });
+    }
+
+    return {
+      ok: true,
+      released,
+      releasedAt: updated.accessReleasedAt,
+      note: updated.accessReleaseNote,
+      studentName:
+        [billing.student.user.profile?.firstName, billing.student.user.profile?.lastName]
+          .filter(Boolean)
+          .join(' ') || billing.student.user.email,
+    };
+  }
+
   // ── STUDENT ──────────────────────────────────────────────
 
   async getStudentBilling(userId: string) {
@@ -302,6 +365,13 @@ export class BillingService {
       status: b.status,
       nextDueDate: b.nextDueDate,
       pendingInvoice: b.invoices[0] ?? null,
+      // Liberação "na confiança": o trainer libera o acesso sem quitar o
+      // financeiro — as faturas continuam em aberto, mas o aluno não é bloqueado.
+      accessReleasedAt: b.accessReleasedAt,
+      accessReleaseNote: b.accessReleaseNote,
+      blocked:
+        (b.status === 'OVERDUE' || b.status === 'SUSPENDED') &&
+        !b.accessReleasedAt,
     }));
   }
 

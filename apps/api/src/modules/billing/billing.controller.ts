@@ -107,6 +107,18 @@ export class BillingController {
     return this.service.cancelBilling(user.id, id);
   }
 
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @Patch('trainer/billings/:id/access')
+  @ApiOperation({ summary: 'Liberar/revogar acesso do aluno na confiança (sem alterar faturas)' })
+  toggleStudentAccess(
+    @CurrentUser() user: any,
+    @Param('id') id: string,
+    @Body() body: { released?: boolean; note?: string },
+  ) {
+    return this.service.toggleStudentAccess(user.id, id, body);
+  }
+
   // ── STUDENT ──────────────────────────────────────────────
 
   @ApiBearerAuth()

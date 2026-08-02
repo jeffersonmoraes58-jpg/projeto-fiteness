@@ -11,6 +11,7 @@ import {
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
+import toast from 'react-hot-toast';
 
 type Tab = 'cobrancas' | 'faturas' | 'precos';
 
@@ -110,6 +111,16 @@ export default function TrainerPayments() {
   const cancelBillingMut = useMutation({
     mutationFn: (id: string) => api.delete(`/billing/trainer/billings/${id}`),
     onSuccess: () => { invalidate(); setDeleteBillingId(null); },
+  });
+
+  const toggleAccessMut = useMutation({
+    mutationFn: ({ id, released, note }: { id: string; released: boolean; note?: string }) =>
+      api.patch(`/billing/trainer/billings/${id}/access`, { released, note }),
+    onSuccess: (_, { released }) => {
+      invalidate();
+      toast.success(released ? 'Acesso do aluno liberado' : 'Acesso do aluno bloqueado');
+    },
+    onError: () => toast.error('Erro ao atualizar acesso'),
   });
 
   function openEditInvoice(inv: any) {
@@ -238,6 +249,11 @@ export default function TrainerPayments() {
                       <div className="text-xs text-muted-foreground">
                         {b.interval === 'ANNUAL' ? 'Plano Anual' : 'Plano Mensal'}
                         {b.nextDueDate ? ` · vence ${new Date(b.nextDueDate).toLocaleDateString('pt-BR')}` : ''}
+                        {b.accessReleasedAt && (
+                          <span className="ml-1.5 px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 text-[10px] font-semibold">
+                            Acesso liberado
+                          </span>
+                        )}
                       </div>
                     </div>
                     <div className="text-right flex-shrink-0 hidden sm:block">
@@ -255,6 +271,24 @@ export default function TrainerPayments() {
                           onClick={() => { setSubscribeModal({ userId: b.studentUserId, name: b.studentName }); setSubscribeDueDate(defaultDueDate()); }}
                           className="text-xs px-2.5 py-1.5 rounded-lg bg-primary/20 text-primary hover:bg-primary/30 transition-all flex items-center gap-1">
                           <Plus className="w-3 h-3" /> Nova cobrança
+                        </button>
+                      )}
+                      {(b.status === 'OVERDUE' || b.status === 'SUSPENDED') && !b.accessReleasedAt && (
+                        <button
+                          onClick={() => toggleAccessMut.mutate({ id: b.id, released: true })}
+                          disabled={toggleAccessMut.isPending}
+                          className="text-xs px-2.5 py-1.5 rounded-lg bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600/30 transition-all flex items-center gap-1"
+                          title="Libera o acesso na confiança sem alterar as faturas em aberto">
+                          <CheckCircle2 className="w-3 h-3" /> Liberar acesso
+                        </button>
+                      )}
+                      {b.accessReleasedAt && (
+                        <button
+                          onClick={() => toggleAccessMut.mutate({ id: b.id, released: false })}
+                          disabled={toggleAccessMut.isPending}
+                          className="text-xs px-2.5 py-1.5 rounded-lg bg-amber-600/20 text-amber-400 hover:bg-amber-600/30 transition-all flex items-center gap-1"
+                          title="Revoga a liberação — o aluno volta a ser bloqueado se tiver fatura em aberto">
+                          <Ban className="w-3 h-3" /> Bloquear
                         </button>
                       )}
                       {(b.latestInvoice?.status === 'PENDING' || b.latestInvoice?.status === 'OVERDUE') && (

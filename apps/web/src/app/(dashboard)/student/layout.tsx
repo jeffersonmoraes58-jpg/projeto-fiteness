@@ -17,12 +17,7 @@ export default function StudentLayout({ children }: { children: React.ReactNode 
   });
 
   const overdueItems = Array.isArray(billings)
-    ? billings.filter(
-        (b: any) =>
-          b.status === 'OVERDUE' ||
-          b.status === 'SUSPENDED' ||
-          b.pendingInvoice?.status === 'OVERDUE',
-      )
+    ? billings.filter((b: any) => b.blocked)
     : [];
 
   const showBanner = overdueItems.length > 0 && !dismissed;

@@ -1368,16 +1368,18 @@ model TrainerPricing {
 }
 
 model StudentBilling {
-  id          String               @id @default(cuid())
-  studentId   String
-  trainerId   String
-  interval    BillingInterval      @default(MONTHLY)
-  amount      Float
-  status      StudentBillingStatus @default(PENDING)
-  startDate   DateTime             @default(now())
-  nextDueDate DateTime
-  createdAt   DateTime             @default(now())
-  updatedAt   DateTime             @updatedAt
+  id                String               @id @default(cuid())
+  studentId         String
+  trainerId         String
+  interval          BillingInterval      @default(MONTHLY)
+  amount            Float
+  status            StudentBillingStatus @default(PENDING)
+  startDate         DateTime             @default(now())
+  nextDueDate       DateTime
+  accessReleasedAt  DateTime?            // liberação "na confiança" feita pelo trainer (não altera faturas)
+  accessReleaseNote String?
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
 
   student  Student   @relation(fields: [studentId], references: [id], onDelete: Cascade)
   trainer  Trainer   @relation(fields: [trainerId], references: [id])
