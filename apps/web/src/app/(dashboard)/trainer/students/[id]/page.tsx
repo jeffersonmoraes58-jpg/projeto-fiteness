@@ -1,13 +1,13 @@
 'use client';
 
-import { useState, useRef, useMemo } from 'react';
+import { useState, useRef, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Users, ChevronLeft, Flame, Dumbbell, Star, Calendar,
+  Users, ChevronLeft, Flame, Dumbbell, Star, Calendar, UserCheck,
   MessageCircle, Trash2, Link2,
   Clock, Zap, ChevronRight, ClipboardList, TrendingUp,
   Heart, Activity, Moon, Brain, Target, Info,
-  Plus, X, Search, Pencil, Scale, Save, Mail, Share2, Send,
+  Plus, X, Search, Pencil, Scale, Save, Mail, Share2, Send, Settings2,
   FileText, Download, Camera, Upload, ChevronDown, Smile,
   Minus, Sparkles, AlertTriangle, TrendingDown, BarChart3,
   CheckCircle2, RefreshCw, Trophy, ArrowUp, ArrowDown,
@@ -27,6 +27,7 @@ const GOAL_LABELS: Record<string, string> = {
 };
 
 const LEVEL_LABELS = ['', 'Iniciante', 'Básico', 'Intermediário', 'Avançado', 'Elite'];
+const DAYS_SHORT = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 const TABS = [
   { id: 'treinos', label: 'Treinos', icon: Dumbbell },
   { id: 'anamnese', label: 'Anamnese', icon: ClipboardList },
@@ -52,6 +53,8 @@ export default function StudentDetailPage() {
   const qc = useQueryClient();
   const [tab, setTab] = useState('treinos');
   const [editingPlan, setEditingPlan] = useState<any | null>(null);
+  const [settingsPlan, setSettingsPlan] = useState<any | null>(null);
+  const [showAssign, setShowAssign] = useState(false);
   const [showAssessForm, setShowAssessForm] = useState(false);
 
   const { data: students, isLoading } = useQuery({
@@ -106,6 +109,7 @@ export default function StudentDetailPage() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['student-plans', id] });
       setEditingPlan(null);
+      setSettingsPlan(null);
       toast.success('Plano atualizado!');
     },
     onError: () => toast.error('Erro ao atualizar plano'),
@@ -334,9 +338,17 @@ export default function StudentDetailPage() {
               <h2 className="font-semibold flex items-center gap-2">
                 <Dumbbell className="w-4 h-4 text-purple-400" />
                 Treinos atribuídos
-                {(plans || []).length > 0 && (
-                  <span className="ml-auto text-xs text-muted-foreground font-normal">{plans.length} plano{plans.length !== 1 ? 's' : ''}</span>
-                )}
+                <span className="ml-auto flex items-center gap-3">
+                  {(plans || []).length > 0 && (
+                    <span className="text-xs text-muted-foreground font-normal">{plans.length} plano{plans.length !== 1 ? 's' : ''}</span>
+                  )}
+                  <button
+                    onClick={() => setShowAssign(true)}
+                    className="text-xs text-primary flex items-center gap-1 hover:underline"
+                  >
+                    <Plus className="w-3 h-3" /> Atribuir novo treino
+                  </button>
+                </span>
               </h2>
               {plansLoading ? (
                 <div className="space-y-2">{[...Array(3)].map((_, i) => <div key={i} className="h-14 glass rounded-xl animate-pulse" />)}</div>
@@ -344,49 +356,90 @@ export default function StudentDetailPage() {
                 <div className="text-center py-8 text-muted-foreground">
                   <Dumbbell className="w-10 h-10 mx-auto mb-2 opacity-40" />
                   <p className="text-sm">Nenhum treino atribuído ainda.</p>
-                  <p className="text-xs mt-1">Atribua treinos na página do treino.</p>
+                  <p className="text-xs mt-1">Use o botão "Atribuir novo treino" acima ou a página do treino.</p>
                 </div>
               ) : (
                 <div className="space-y-2">
-                  {(plans || []).map((plan: any) => (
-                    <div key={plan.id} className="glass rounded-xl overflow-hidden">
-                      <div className="p-3 flex items-center gap-3">
-                        <Dumbbell className="w-4 h-4 text-purple-400 flex-shrink-0" />
-                        <div className="flex-1 min-w-0">
-                          <div className="text-sm font-medium truncate">{plan.workout?.name}</div>
-                          <div className="flex items-center gap-3 mt-0.5 text-xs text-muted-foreground">
-                            {plan.workout?.duration && <span className="flex items-center gap-0.5"><Clock className="w-3 h-3" />{plan.workout.duration}min</span>}
-                            {plan.workout?.level && <span className="flex items-center gap-0.5"><Zap className="w-3 h-3" />{LEVEL_LABELS[plan.workout.level] || ''}</span>}
-                            {plan.notes && <span>• {plan.notes}</span>}
-                            {plan.division && <span>• {plan.division}</span>}
+                  {(plans || []).map((plan: any) => {
+                    const isEditingEx = editingPlan?.id === plan.id;
+                    const isEditingSettings = settingsPlan?.id === plan.id;
+                    const displayName = plan.division || plan.workout?.name;
+                    const daysLabel = (plan.dayOfWeek?.length ?? 0) > 0
+                      ? plan.dayOfWeek.map((d: number) => DAYS_SHORT[d]).join(', ')
+                      : 'Todos os dias';
+                    return (
+                      <div key={plan.id} className="glass rounded-xl overflow-hidden">
+                        <div className="p-3 flex items-center gap-3">
+                          <div className="w-9 h-9 rounded-xl bg-purple-500/10 flex items-center justify-center flex-shrink-0">
+                            <Dumbbell className="w-4 h-4 text-purple-400" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="text-sm font-semibold truncate">{displayName}</div>
+                            {plan.division && plan.workout?.name && plan.division !== plan.workout?.name && (
+                              <div className="text-xs text-muted-foreground truncate">{plan.workout.name}</div>
+                            )}
+                            <div className="flex items-center gap-3 mt-0.5 text-xs text-muted-foreground">
+                              {plan.workout?.duration && <span className="flex items-center gap-0.5"><Clock className="w-3 h-3" />{plan.workout.duration}min</span>}
+                              {plan.workout?.level && <span className="flex items-center gap-0.5"><Zap className="w-3 h-3" />{LEVEL_LABELS[plan.workout.level] || ''}</span>}
+                              <span className="flex items-center gap-0.5"><Calendar className="w-3 h-3" />{daysLabel}</span>
+                              {plan.notes && <span className="truncate">• {plan.notes}</span>}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-1 flex-shrink-0">
+                            <button
+                              onClick={() => {
+                                setSettingsPlan(isEditingSettings ? null : plan);
+                                setEditingPlan(isEditingSettings ? null : null);
+                              }}
+                              className={`w-7 h-7 rounded-lg flex items-center justify-center transition-all ${isEditingSettings ? 'bg-primary/20 text-primary' : 'hover:bg-accent text-muted-foreground'}`}
+                              title="Configurar exibição (nome e dias)"
+                            >
+                              <Settings2 className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={() => {
+                                setEditingPlan(isEditingEx ? null : plan);
+                                setSettingsPlan(isEditingEx ? null : null);
+                              }}
+                              className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 transition-all ${isEditingEx ? 'bg-primary/20 text-primary' : 'hover:bg-accent text-muted-foreground'}`}
+                              title="Editar exercícios"
+                            >
+                              <ChevronRight className={`w-3.5 h-3.5 transition-transform ${isEditingEx ? 'rotate-90' : ''}`} />
+                            </button>
+                            <button onClick={() => { if (confirm('Remover este plano?')) removePlanMutation.mutate(plan.id); }} className="w-7 h-7 rounded-lg hover:bg-red-500/10 flex items-center justify-center flex-shrink-0">
+                              <Trash2 className="w-3.5 h-3.5 text-red-400" />
+                            </button>
                           </div>
                         </div>
-                        <button
-                          onClick={() => setEditingPlan(editingPlan?.id === plan.id ? null : plan)}
-                          className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 transition-all ${editingPlan?.id === plan.id ? 'bg-primary/20 text-primary' : 'hover:bg-accent text-muted-foreground'}`}
-                          title="Editar atribuição"
-                        >
-                          <ChevronRight className={`w-3.5 h-3.5 transition-transform ${editingPlan?.id === plan.id ? 'rotate-90' : ''}`} />
-                        </button>
-                        <button onClick={() => { if (confirm('Remover este plano?')) removePlanMutation.mutate(plan.id); }} className="w-7 h-7 rounded-lg hover:bg-red-500/10 flex items-center justify-center flex-shrink-0">
-                          <Trash2 className="w-3.5 h-3.5 text-red-400" />
-                        </button>
-                      </div>
 
-                      {editingPlan?.id === plan.id && (
-                        <PlanEditForm
-                          plan={plan}
-                          isPending={updatePlanMutation.isPending}
-                          onSave={(data) => updatePlanMutation.mutate({ planId: plan.id, data })}
-                          onCancel={() => setEditingPlan(null)}
-                          onPlansChange={() => qc.invalidateQueries({ queryKey: ['student-plans', id] })}
-                        />
-                      )}
-                    </div>
-                  ))}
+                        {isEditingEx && (
+                          <PlanExerciseEditor
+                            plan={plan}
+                            onPlansChange={() => qc.invalidateQueries({ queryKey: ['student-plans', id] })}
+                          />
+                        )}
+                        {isEditingSettings && (
+                          <PlanSettingsForm
+                            plan={plan}
+                            isPending={updatePlanMutation.isPending}
+                            onSave={(data) => updatePlanMutation.mutate({ planId: plan.id, data })}
+                            onCancel={() => setSettingsPlan(null)}
+                          />
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </div>
+
+            {showAssign && (
+              <QuickAssignModal
+                student={student}
+                onClose={() => setShowAssign(false)}
+                onDone={() => qc.invalidateQueries({ queryKey: ['student-plans', id] })}
+              />
+            )}
 
           </motion.div>
         )}
@@ -1651,51 +1704,36 @@ function EvolutionReport({ student, assessments, measurements }: { student: any;
 }
 
 /* ═══════════════════════════════════════════════════
-   Plan Edit Form (existing)
+   Plan Exercise Editor — abre direto ao clicar na setinha
    ═══════════════════════════════════════════════════ */
-function PlanEditForm({ plan, isPending, onSave, onCancel, onPlansChange }: {
-  plan: any;
-  isPending: boolean;
-  onSave: (data: any) => void;
-  onCancel: () => void;
-  onPlansChange: () => void;
-}) {
-  const [notes, setNotes] = useState(plan.notes || '');
-  const [division, setDivision] = useState(plan.division || '');
-  const [startDate, setStartDate] = useState(
-    plan.startDate ? new Date(plan.startDate).toISOString().split('T')[0] : '',
-  );
-  const [endDate, setEndDate] = useState(
-    plan.endDate ? new Date(plan.endDate).toISOString().split('T')[0] : '',
-  );
-
-  // Exercise editor state
-  const [exMode, setExMode] = useState(false);
+function PlanExerciseEditor({ plan, onPlansChange }: { plan: any; onPlansChange: () => void }) {
+  const [loading, setLoading] = useState(true);
   const [workoutId, setWorkoutId] = useState<string>(plan.workoutId);
   const [exercises, setExercises] = useState<any[]>([]);
   const [exSearch, setExSearch] = useState('');
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [searching, setSearching] = useState(false);
   const [savingEx, setSavingEx] = useState(false);
-  const [forking, setForking] = useState(false);
 
-  async function openExercises() {
-    if (exMode) { setExMode(false); return; }
-    if (exercises.length > 0) { setExMode(true); return; }
-    setForking(true);
-    try {
-      const res = await api.post(`/workouts/plans/${plan.id}/fork`);
-      const data = res.data?.data ?? res.data;
-      setWorkoutId(data.workoutId);
-      setExercises((data.workout?.exercises || []).map(toExRow));
-      setExMode(true);
-      if (data.forked) onPlansChange();
-    } catch {
-      toast.error('Erro ao carregar exercícios');
-    } finally {
-      setForking(false);
-    }
-  }
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      try {
+        const res = await api.post(`/workouts/plans/${plan.id}/fork`);
+        const data = res.data?.data ?? res.data;
+        if (!active) return;
+        setWorkoutId(data.workoutId);
+        setExercises((data.workout?.exercises || []).map(toExRow));
+        if (data.forked) onPlansChange();
+      } catch {
+        toast.error('Erro ao carregar exercícios');
+      } finally {
+        if (active) setLoading(false);
+      }
+    })();
+    return () => { active = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [plan.id]);
 
   async function searchExercises(q: string) {
     setExSearch(q);
@@ -1777,188 +1815,423 @@ function PlanEditForm({ plan, isPending, onSave, onCancel, onPlansChange }: {
   }
 
   return (
-    <div className="border-t border-border/50 p-3 space-y-3 bg-white/3">
-      <p className="text-xs text-muted-foreground font-medium">Editar atribuição — {plan.workout?.name}</p>
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <label className="text-xs text-muted-foreground mb-1 block">Início</label>
-          <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="input-field text-sm py-1.5" />
-        </div>
-        <div>
-          <label className="text-xs text-muted-foreground mb-1 block">Término</label>
-          <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} min={startDate} className="input-field text-sm py-1.5" />
-        </div>
-      </div>
-      <div>
-        <label className="text-xs text-muted-foreground mb-1 block">Divisão</label>
-        <input type="text" value={division} onChange={(e) => setDivision(e.target.value)} placeholder="Ex: Treino A, Segunda/Quarta..." className="input-field text-sm py-1.5" />
-      </div>
-      <div>
-        <label className="text-xs text-muted-foreground mb-1 block">Observações</label>
-        <input type="text" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Ex: Foco em progressão de carga" className="input-field text-sm py-1.5" />
-      </div>
-      <div className="flex gap-2">
-        <button
-          onClick={() => onSave({ notes, division, startDate, endDate: endDate || null })}
-          disabled={isPending}
-          className="btn-primary flex-1 text-sm py-1.5 flex items-center justify-center gap-1.5 disabled:opacity-50"
-        >
-          {isPending ? 'Salvando...' : 'Salvar'}
-        </button>
-        <button onClick={onCancel} className="btn-secondary text-sm py-1.5 px-4">
-          Cancelar
-        </button>
+    <div className="border-t border-border/50 p-3 space-y-2 bg-white/3">
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-xs text-muted-foreground font-medium">Editar exercícios — {plan.division || plan.workout?.name}</p>
+        <p className="text-[10px] text-muted-foreground flex-shrink-0">Alterações afetam apenas este aluno.</p>
       </div>
 
-      {/* Exercise editor */}
-      <div className="border-t border-border/40 pt-3">
-        <button
-          onClick={openExercises}
-          disabled={forking}
-          className="flex items-center gap-2 text-xs font-medium text-primary hover:underline disabled:opacity-50"
-        >
-          <Pencil className="w-3 h-3" />
-          {forking ? 'Carregando...' : exMode ? 'Fechar editor de exercícios' : 'Editar exercícios deste aluno'}
-        </button>
-        <p className="text-xs text-muted-foreground mt-0.5">Alterações aqui afetam apenas este aluno.</p>
+      {loading ? (
+        <div className="space-y-2">{[...Array(3)].map((_, i) => <div key={i} className="h-12 glass rounded-xl animate-pulse" />)}</div>
+      ) : (
+        <div className="space-y-2">
+          {exercises.length === 0 && (
+            <p className="text-xs text-muted-foreground text-center py-3">Nenhum exercício. Adicione abaixo.</p>
+          )}
+          {exercises.map((ex, idx) => {
+            const groupSize = ex.groupId ? exercises.filter(e => e.groupId === ex.groupId).length : 0;
+            const groupLabel = ex.isDropSet ? 'Drop Set'
+              : ex.groupId ? (groupSize === 2 ? 'Bi-set' : groupSize === 3 ? 'Tri-set' : groupSize >= 4 ? 'Giant Set' : 'Super Set')
+              : '';
+            const groupColor = ex.isDropSet
+              ? { badge: 'bg-red-500/10 text-red-400', card: 'border-l-4 border-red-500/60', connector: 'text-red-400', connectorBg: 'bg-red-500/10 border-red-500/30' }
+              : groupSize === 2
+              ? { badge: 'bg-orange-500/10 text-orange-400', card: 'border-l-4 border-orange-500/60', connector: 'text-orange-400', connectorBg: 'bg-orange-500/10 border-orange-500/30' }
+              : groupSize === 3
+              ? { badge: 'bg-purple-500/10 text-purple-400', card: 'border-l-4 border-purple-500/60', connector: 'text-purple-400', connectorBg: 'bg-purple-500/10 border-purple-500/30' }
+              : { badge: 'bg-pink-500/10 text-pink-400', card: 'border-l-4 border-pink-500/60', connector: 'text-pink-400', connectorBg: 'bg-pink-500/10 border-pink-500/30' };
 
-        {exMode && (
-          <div className="mt-3 space-y-2">
-            {exercises.length === 0 && (
-              <p className="text-xs text-muted-foreground text-center py-3">Nenhum exercício. Adicione abaixo.</p>
-            )}
-            {exercises.map((ex, idx) => {
-              const groupSize = ex.groupId ? exercises.filter(e => e.groupId === ex.groupId).length : 0;
-              const groupLabel = ex.isDropSet ? 'Drop Set'
-                : ex.groupId ? (groupSize === 2 ? 'Bi-set' : groupSize === 3 ? 'Tri-set' : groupSize >= 4 ? 'Giant Set' : 'Super Set')
-                : '';
-              const groupColor = ex.isDropSet
-                ? { badge: 'bg-red-500/10 text-red-400', card: 'border-l-4 border-red-500/60', connector: 'text-red-400', connectorBg: 'bg-red-500/10 border-red-500/30' }
-                : groupSize === 2
-                ? { badge: 'bg-orange-500/10 text-orange-400', card: 'border-l-4 border-orange-500/60', connector: 'text-orange-400', connectorBg: 'bg-orange-500/10 border-orange-500/30' }
-                : groupSize === 3
-                ? { badge: 'bg-purple-500/10 text-purple-400', card: 'border-l-4 border-purple-500/60', connector: 'text-purple-400', connectorBg: 'bg-purple-500/10 border-purple-500/30' }
-                : { badge: 'bg-pink-500/10 text-pink-400', card: 'border-l-4 border-pink-500/60', connector: 'text-pink-400', connectorBg: 'bg-pink-500/10 border-pink-500/30' };
+            const nextEx = exercises[idx + 1];
+            const isLinkedToNext = !!(ex.groupId && nextEx?.groupId === ex.groupId);
 
-              const nextEx = exercises[idx + 1];
-              const isLinkedToNext = !!(ex.groupId && nextEx?.groupId === ex.groupId);
-
-              return (
-                <div key={ex._key ?? idx}>
-                  <div className={cn('glass rounded-xl p-2.5 space-y-2', groupLabel && groupColor.card)}>
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-1.5 flex-1 mr-2 min-w-0">
-                        <span className="text-xs font-medium truncate">{idx + 1}. {ex.name}</span>
-                        {groupLabel && (
-                          <span className={cn('text-[10px] font-semibold px-1.5 py-0.5 rounded-full flex-shrink-0', groupColor.badge)}>
-                            {groupLabel}
-                          </span>
+            return (
+              <div key={ex._key ?? idx}>
+                <div className={cn('glass rounded-xl p-2.5 space-y-2', groupLabel && groupColor.card)}>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5 flex-1 mr-2 min-w-0">
+                      <span className="text-xs font-medium truncate">{idx + 1}. {ex.name}</span>
+                      {groupLabel && (
+                        <span className={cn('text-[10px] font-semibold px-1.5 py-0.5 rounded-full flex-shrink-0', groupColor.badge)}>
+                          {groupLabel}
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-1 flex-shrink-0">
+                      <button
+                        onClick={() => toggleDropSet(idx)}
+                        title={ex.isDropSet ? 'Remover Drop Set' : 'Marcar como Drop Set'}
+                        className={cn(
+                          'text-[10px] px-2 py-0.5 rounded-full border transition-all font-medium',
+                          ex.isDropSet
+                            ? 'bg-red-500/10 border-red-500/30 text-red-400'
+                            : 'border-border/30 text-muted-foreground/50 hover:border-red-500/30 hover:text-red-400',
                         )}
-                      </div>
-                      <div className="flex items-center gap-1 flex-shrink-0">
-                        <button
-                          onClick={() => toggleDropSet(idx)}
-                          title={ex.isDropSet ? 'Remover Drop Set' : 'Marcar como Drop Set'}
-                          className={cn(
-                            'text-[10px] px-2 py-0.5 rounded-full border transition-all font-medium',
-                            ex.isDropSet
-                              ? 'bg-red-500/10 border-red-500/30 text-red-400'
-                              : 'border-border/30 text-muted-foreground/50 hover:border-red-500/30 hover:text-red-400',
-                          )}
-                        >
-                          Drop
-                        </button>
-                        <button onClick={() => removeExercise(idx)} className="w-5 h-5 rounded flex items-center justify-center hover:bg-red-500/10">
-                          <X className="w-3 h-3 text-red-400" />
-                        </button>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-4 gap-1.5">
-                      <div>
-                        <label className="text-[10px] text-muted-foreground block mb-0.5">Séries</label>
-                        <input type="number" value={ex.sets} onChange={(e) => updateExField(idx, 'sets', e.target.value)} className="input-field text-xs py-1 px-2 text-center" min={1} />
-                      </div>
-                      <div>
-                        <label className="text-[10px] text-muted-foreground block mb-0.5">Reps</label>
-                        <input type="text" value={ex.reps ?? ''} onChange={(e) => updateExField(idx, 'reps', e.target.value)} placeholder="8-12" className="input-field text-xs py-1 px-2" />
-                      </div>
-                      <div>
-                        <label className="text-[10px] text-muted-foreground block mb-0.5">Carga (kg)</label>
-                        <input type="number" value={ex.weight ?? ''} onChange={(e) => updateExField(idx, 'weight', e.target.value)} placeholder="0" className="input-field text-xs py-1 px-2 text-center" min={0} step={0.5} />
-                      </div>
-                      <div>
-                        <label className="text-[10px] text-muted-foreground block mb-0.5">Desc. (s)</label>
-                        <input type="number" value={ex.restSeconds ?? ''} onChange={(e) => updateExField(idx, 'restSeconds', e.target.value)} placeholder="60" className="input-field text-xs py-1 px-2 text-center" min={0} />
-                      </div>
-                    </div>
-                    <div>
-                      <label className="text-[10px] text-muted-foreground block mb-0.5">Obs</label>
-                      <input type="text" value={ex.notes ?? ''} onChange={(e) => updateExField(idx, 'notes', e.target.value)} placeholder="Técnica, variação..." className="input-field text-xs py-1 px-2" />
+                      >
+                        Drop
+                      </button>
+                      <button onClick={() => removeExercise(idx)} className="w-5 h-5 rounded flex items-center justify-center hover:bg-red-500/10">
+                        <X className="w-3 h-3 text-red-400" />
+                      </button>
                     </div>
                   </div>
 
-                  {/* Link connector between exercises */}
-                  {idx < exercises.length - 1 && (
-                    <button
-                      onClick={() => toggleLink(idx)}
-                      className={cn(
-                        'w-full flex items-center justify-center gap-1.5 py-1.5 text-[10px] font-semibold transition-all rounded-lg my-0.5',
-                        isLinkedToNext
-                          ? cn('border', groupColor.connectorBg, groupColor.connector)
-                          : 'text-muted-foreground/40 hover:text-primary hover:bg-primary/5',
-                      )}
-                    >
-                      <Link2 className="w-3 h-3" />
-                      {isLinkedToNext
-                        ? `${groupLabel} — clique para desconectar`
-                        : 'Vincular ao próximo (bi-set / super set)'}
-                    </button>
-                  )}
+                  <div className="grid grid-cols-4 gap-1.5">
+                    <div>
+                      <label className="text-[10px] text-muted-foreground block mb-0.5">Séries</label>
+                      <input type="number" value={ex.sets} onChange={(e) => updateExField(idx, 'sets', e.target.value)} className="input-field text-xs py-1 px-2 text-center" min={1} />
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-muted-foreground block mb-0.5">Reps</label>
+                      <input type="text" value={ex.reps ?? ''} onChange={(e) => updateExField(idx, 'reps', e.target.value)} placeholder="8-12" className="input-field text-xs py-1 px-2" />
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-muted-foreground block mb-0.5">Carga (kg)</label>
+                      <input type="number" value={ex.weight ?? ''} onChange={(e) => updateExField(idx, 'weight', e.target.value)} placeholder="0" className="input-field text-xs py-1 px-2 text-center" min={0} step={0.5} />
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-muted-foreground block mb-0.5">Desc. (s)</label>
+                      <input type="number" value={ex.restSeconds ?? ''} onChange={(e) => updateExField(idx, 'restSeconds', e.target.value)} placeholder="60" className="input-field text-xs py-1 px-2 text-center" min={0} />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-muted-foreground block mb-0.5">Obs</label>
+                    <input type="text" value={ex.notes ?? ''} onChange={(e) => updateExField(idx, 'notes', e.target.value)} placeholder="Técnica, variação..." className="input-field text-xs py-1 px-2" />
+                  </div>
                 </div>
-              );
-            })}
 
-            {/* Add exercise */}
-            <div className="space-y-1.5">
-              <div className="relative">
-                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-muted-foreground" />
-                <input
-                  type="text"
-                  value={exSearch}
-                  onChange={(e) => searchExercises(e.target.value)}
-                  placeholder="Buscar exercício para adicionar..."
-                  className="input-field text-xs py-1.5 pl-7"
-                />
+                {/* Link connector between exercises */}
+                {idx < exercises.length - 1 && (
+                  <button
+                    onClick={() => toggleLink(idx)}
+                    className={cn(
+                      'w-full flex items-center justify-center gap-1.5 py-1.5 text-[10px] font-semibold transition-all rounded-lg my-0.5',
+                      isLinkedToNext
+                        ? cn('border', groupColor.connectorBg, groupColor.connector)
+                        : 'text-muted-foreground/40 hover:text-primary hover:bg-primary/5',
+                    )}
+                  >
+                    <Link2 className="w-3 h-3" />
+                    {isLinkedToNext
+                      ? `${groupLabel} — clique para desconectar`
+                      : 'Vincular ao próximo (bi-set / super set)'}
+                  </button>
+                )}
               </div>
-              {searching && <p className="text-xs text-muted-foreground text-center py-1">Buscando...</p>}
-              {searchResults.length > 0 && (
-                <div className="glass rounded-xl overflow-hidden divide-y divide-border/30">
-                  {searchResults.map((ex: any) => (
-                    <button
-                      key={ex.id}
-                      onClick={() => addExercise(ex)}
-                      className="w-full flex items-center gap-2 px-3 py-2 hover:bg-accent text-left transition-all"
-                    >
-                      <Plus className="w-3 h-3 text-primary flex-shrink-0" />
-                      <span className="text-xs truncate">{ex.name}</span>
-                      {ex.category && <span className="text-[10px] text-muted-foreground ml-auto">{ex.category}</span>}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
+            );
+          })}
 
-            <button
-              onClick={saveExercises}
-              disabled={savingEx}
-              className="btn-primary w-full text-sm py-1.5 flex items-center justify-center gap-1.5 disabled:opacity-50"
-            >
-              <Dumbbell className="w-3.5 h-3.5" />
-              {savingEx ? 'Salvando...' : 'Salvar exercícios'}
-            </button>
+          {/* Add exercise */}
+          <div className="space-y-1.5">
+            <div className="relative">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-muted-foreground" />
+              <input
+                type="text"
+                value={exSearch}
+                onChange={(e) => searchExercises(e.target.value)}
+                placeholder="Buscar exercício para adicionar..."
+                className="input-field text-xs py-1.5 pl-7"
+              />
+            </div>
+            {searching && <p className="text-xs text-muted-foreground text-center py-1">Buscando...</p>}
+            {searchResults.length > 0 && (
+              <div className="glass rounded-xl overflow-hidden divide-y divide-border/30">
+                {searchResults.map((ex: any) => (
+                  <button
+                    key={ex.id}
+                    onClick={() => addExercise(ex)}
+                    className="w-full flex items-center gap-2 px-3 py-2 hover:bg-accent text-left transition-all"
+                  >
+                    <Plus className="w-3 h-3 text-primary flex-shrink-0" />
+                    <span className="text-xs truncate">{ex.name}</span>
+                    {ex.category && <span className="text-[10px] text-muted-foreground ml-auto">{ex.category}</span>}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
-        )}
+
+          <button
+            onClick={saveExercises}
+            disabled={savingEx}
+            className="btn-primary w-full text-sm py-1.5 flex items-center justify-center gap-1.5 disabled:opacity-50"
+          >
+            <Dumbbell className="w-3.5 h-3.5" />
+            {savingEx ? 'Salvando...' : 'Salvar exercícios'}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════
+   Plan Settings — nome de exibição + dias opcionais
+   ═══════════════════════════════════════════════════ */
+function PlanSettingsForm({ plan, isPending, onSave, onCancel }: {
+  plan: any;
+  isPending: boolean;
+  onSave: (data: any) => void;
+  onCancel: () => void;
+}) {
+  const [notes, setNotes] = useState(plan.notes || '');
+  const [division, setDivision] = useState(plan.division || '');
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [startDate, setStartDate] = useState(
+    plan.startDate ? new Date(plan.startDate).toISOString().split('T')[0] : '',
+  );
+  const [endDate, setEndDate] = useState(
+    plan.endDate ? new Date(plan.endDate).toISOString().split('T')[0] : '',
+  );
+  const [days, setDays] = useState<number[]>(
+    plan.dayOfWeek && Array.isArray(plan.dayOfWeek) ? plan.dayOfWeek : [],
+  );
+
+  function toggleDay(day: number) {
+    setDays((prev) => prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day]);
+  }
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    onSave({
+      notes,
+      division,
+      dayOfWeek: days,
+      startDate,
+      endDate: endDate || null,
+    });
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="border-t border-border/50 p-3 space-y-3 bg-white/3">
+      <p className="text-xs text-muted-foreground font-medium">Configurar exibição — {plan.workout?.name}</p>
+
+      <div>
+        <label className="text-xs text-muted-foreground mb-1 block">Nome que o aluno vê</label>
+        <input
+          type="text"
+          value={division}
+          onChange={(e) => setDivision(e.target.value)}
+          placeholder="Ex: Peito, Treino A, Dia de Costas..."
+          className="input-field text-sm py-1.5"
+        />
+        <p className="text-[10px] text-muted-foreground mt-1">Se vazio, usa o nome do treino ({plan.workout?.name || '—'}).</p>
+      </div>
+
+      <div>
+        <div className="flex items-center justify-between mb-1.5">
+          <label className="text-xs text-muted-foreground block">Dias da semana (opcional)</label>
+          <button
+            type="button"
+            onClick={() => setDays([])}
+            className={cn(
+              'text-[10px] px-2 py-0.5 rounded-full border transition-all font-medium',
+              days.length === 0
+                ? 'bg-primary/10 border-primary/30 text-primary'
+                : 'border-border/30 text-muted-foreground/60 hover:text-muted-foreground',
+            )}
+          >
+            Todos os dias
+          </button>
+        </div>
+        <div className="flex gap-1.5 flex-wrap">
+          {DAYS_SHORT.map((label, i) => (
+            <button
+              key={i}
+              type="button"
+              onClick={() => toggleDay(i)}
+              className={cn(
+                'w-9 h-9 rounded-xl text-xs font-medium transition-all border',
+                days.includes(i)
+                  ? 'bg-primary text-primary-foreground border-primary'
+                  : 'glass border-transparent hover:bg-accent text-muted-foreground',
+              )}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        <p className="text-[10px] text-muted-foreground mt-1">Deixe em "Todos os dias" para não filtrar por dia (ex: só pelo grupo/divisão).</p>
+      </div>
+
+      <button
+        type="button"
+        onClick={() => setShowAdvanced(!showAdvanced)}
+        className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors w-full"
+      >
+        <ChevronDown className={`w-3 h-3 transition-transform ${showAdvanced ? 'rotate-180' : ''}`} />
+        {showAdvanced ? 'Ocultar datas e observações' : 'Datas e observações (opcional)'}
+      </button>
+
+      {showAdvanced && (
+        <>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs text-muted-foreground mb-1 block">Início</label>
+              <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="input-field text-sm py-1.5" />
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground mb-1 block">Término</label>
+              <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} min={startDate} className="input-field text-sm py-1.5" />
+            </div>
+          </div>
+          <div>
+            <label className="text-xs text-muted-foreground mb-1 block">Observações</label>
+            <input type="text" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Ex: Foco em progressão de carga" className="input-field text-sm py-1.5" />
+          </div>
+        </>
+      )}
+
+      <div className="flex gap-2">
+        <button type="submit" disabled={isPending} className="btn-primary flex-1 text-sm py-1.5 flex items-center justify-center gap-1.5 disabled:opacity-50">
+          <Save className="w-3.5 h-3.5" />
+          {isPending ? 'Salvando...' : 'Salvar'}
+        </button>
+        <button type="button" onClick={onCancel} className="btn-secondary text-sm py-1.5 px-4">
+          Cancelar
+        </button>
+      </div>
+    </form>
+  );
+}
+
+/* ═══════════════════════════════════════════════════
+   Quick Assign — atribuir novo treino direto da página
+   ═══════════════════════════════════════════════════ */
+function QuickAssignModal({ student, onClose, onDone }: { student: any; onClose: () => void; onDone: () => void }) {
+  const { data: workouts, isLoading } = useQuery({
+    queryKey: ['trainer-workouts'],
+    queryFn: () => api.get('/workouts').then((r) => r.data.data || []),
+  });
+
+  const [workoutId, setWorkoutId] = useState('');
+  const [division, setDivision] = useState('');
+  const [startDate, setStartDate] = useState(() => new Date().toISOString().split('T')[0]);
+  const [endDate, setEndDate] = useState('');
+  const [days, setDays] = useState<number[]>([]);
+  const [notes, setNotes] = useState('');
+
+  const assignMutation = useMutation({
+    mutationFn: (data: any) => api.post(`/workouts/${workoutId}/assign`, data),
+    onSuccess: () => {
+      toast.success('Treino atribuído!');
+      onDone();
+      onClose();
+    },
+    onError: (e: any) => {
+      const msg = e?.response?.data?.message;
+      toast.error(Array.isArray(msg) ? msg.join(', ') : (msg || 'Erro ao atribuir treino'));
+    },
+  });
+
+  function toggleDay(day: number) {
+    setDays((prev) => prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day]);
+  }
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!workoutId) { toast.error('Selecione um treino'); return; }
+    if (!startDate) { toast.error('Informe a data de início'); return; }
+    assignMutation.mutate({
+      studentId: student.id,
+      division: division || undefined,
+      startDate,
+      endDate: endDate || undefined,
+      notes: notes || undefined,
+      dayOfWeek: days.length ? days : undefined,
+    });
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm" onClick={onClose}>
+      <div className="w-full max-w-md glass-card max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="font-semibold flex items-center gap-2">
+            <UserCheck className="w-4 h-4 text-cyan-400" />Atribuir novo treino
+          </h2>
+          <button onClick={onClose} className="w-8 h-8 rounded-lg hover:bg-accent flex items-center justify-center">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="text-xs text-muted-foreground mb-1 block">Treino *</label>
+            <select value={workoutId} onChange={(e) => setWorkoutId(e.target.value)} className="input-field text-sm py-1.5 w-full">
+              <option value="">Selecione um treino...</option>
+              {(workouts || []).map((w: any) => (
+                <option key={w.id} value={w.id}>{w.name}</option>
+              ))}
+            </select>
+            {isLoading && <p className="text-xs text-muted-foreground mt-1">Carregando treinos...</p>}
+          </div>
+
+          <div>
+            <label className="text-xs text-muted-foreground mb-1 block">Nome que o aluno vê (opcional)</label>
+            <input
+              type="text"
+              value={division}
+              onChange={(e) => setDivision(e.target.value)}
+              placeholder="Ex: Peito, Treino A..."
+              className="input-field text-sm py-1.5 w-full"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs text-muted-foreground mb-1 block">Data de início *</label>
+              <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="input-field text-sm py-1.5" required />
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground mb-1 block">Término</label>
+              <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} min={startDate} className="input-field text-sm py-1.5" />
+            </div>
+          </div>
+
+          <div>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="text-xs text-muted-foreground block">Dias da semana (opcional)</label>
+              <button
+                type="button"
+                onClick={() => setDays([])}
+                className={cn(
+                  'text-[10px] px-2 py-0.5 rounded-full border transition-all font-medium',
+                  days.length === 0
+                    ? 'bg-primary/10 border-primary/30 text-primary'
+                    : 'border-border/30 text-muted-foreground/60 hover:text-muted-foreground',
+                )}
+              >
+                Todos os dias
+              </button>
+            </div>
+            <div className="flex gap-1.5 flex-wrap">
+              {DAYS_SHORT.map((label, i) => (
+                <button
+                  key={i}
+                  type="button"
+                  onClick={() => toggleDay(i)}
+                  className={cn(
+                    'w-9 h-9 rounded-xl text-xs font-medium transition-all border',
+                    days.includes(i)
+                      ? 'bg-primary text-primary-foreground border-primary'
+                      : 'glass border-transparent hover:bg-accent text-muted-foreground',
+                  )}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <label className="text-xs text-muted-foreground mb-1 block">Observações</label>
+            <input type="text" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Ex: Foco em progressão de carga" className="input-field text-sm py-1.5 w-full" />
+          </div>
+
+          <button type="submit" disabled={assignMutation.isPending} className="btn-primary w-full text-sm py-2 flex items-center justify-center gap-2 disabled:opacity-50">
+            <UserCheck className="w-4 h-4" />
+            {assignMutation.isPending ? 'Atribuindo...' : 'Atribuir treino'}
+          </button>
+        </form>
       </div>
     </div>
   );

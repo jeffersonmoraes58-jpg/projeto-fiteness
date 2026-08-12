@@ -719,8 +719,10 @@ export default function StudentWorkout() {
                 <ChevronLeft className="w-4 h-4" />
               </button>
               <div className="flex-1 min-w-0">
-                {selectedPlan.division && <div className="text-xs text-muted-foreground">{selectedPlan.division}</div>}
-                <h1 className="text-xl font-bold truncate">{selectedPlan.workout?.name}</h1>
+                <h1 className="text-xl font-bold truncate">{selectedPlan.division || selectedPlan.workout?.name}</h1>
+                {selectedPlan.division && selectedPlan.workout?.name && selectedPlan.division !== selectedPlan.workout?.name && (
+                  <div className="text-xs text-muted-foreground">{selectedPlan.workout.name}</div>
+                )}
                 <div className="flex items-center gap-3 mt-0.5 text-xs text-muted-foreground">
                   <span className="flex items-center gap-1"><Clock className="w-3 h-3" />{selectedPlan.workout?.duration || 45} min</span>
                   <span className="flex items-center gap-1"><Dumbbell className="w-3 h-3" />{planExercises.length} exercícios</span>
@@ -974,8 +976,10 @@ export default function StudentWorkout() {
                     >
                       <div className="flex items-center justify-between gap-3">
                         <div className="min-w-0">
-                          {plan.division && <div className="text-xs text-muted-foreground mb-0.5">{plan.division}</div>}
-                          <div className="font-bold text-base truncate">{plan.workout?.name}</div>
+                          <div className="font-bold text-base truncate">{plan.division || plan.workout?.name}</div>
+                          {plan.division && plan.workout?.name && plan.division !== plan.workout?.name && (
+                            <div className="text-xs text-muted-foreground">{plan.workout.name}</div>
+                          )}
                           <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
                             <span className="flex items-center gap-1"><Clock className="w-3 h-3" />{plan.workout?.duration || 45} min</span>
                             <span className="flex items-center gap-1"><Dumbbell className="w-3 h-3" />{plan.workout?.exercises?.length || 0} exercícios</span>
@@ -1012,8 +1016,10 @@ export default function StudentWorkout() {
                   >
                     <div className="flex items-center justify-between gap-3">
                       <div className="min-w-0">
-                        {plan.division && <div className="text-xs text-muted-foreground mb-0.5">{plan.division}</div>}
-                        <div className="font-bold text-base truncate">{plan.workout?.name}</div>
+                        <div className="font-bold text-base truncate">{plan.division || plan.workout?.name}</div>
+                        {plan.division && plan.workout?.name && plan.division !== plan.workout?.name && (
+                          <div className="text-xs text-muted-foreground">{plan.workout.name}</div>
+                        )}
                         <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
                           <span className="flex items-center gap-1"><Clock className="w-3 h-3" />{plan.workout?.duration || 45} min</span>
                           <span className="flex items-center gap-1"><Dumbbell className="w-3 h-3" />{plan.workout?.exercises?.length || 0} exercícios</span>

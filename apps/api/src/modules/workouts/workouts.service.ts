@@ -277,7 +277,7 @@ export class WorkoutsService {
     return plan;
   }
 
-  async updatePlan(planId: string, data: { notes?: string; division?: string; startDate?: string; endDate?: string; isActive?: boolean }) {
+  async updatePlan(planId: string, data: { notes?: string; division?: string; startDate?: string; endDate?: string; isActive?: boolean; dayOfWeek?: number[] }) {
     return this.prisma.workoutPlan.update({
       where: { id: planId },
       data: {
@@ -286,6 +286,7 @@ export class WorkoutsService {
         ...(data.startDate && { startDate: new Date(data.startDate) }),
         ...(data.endDate !== undefined && { endDate: data.endDate ? new Date(data.endDate) : null }),
         ...(data.isActive !== undefined && { isActive: data.isActive }),
+        ...(data.dayOfWeek !== undefined && { dayOfWeek: data.dayOfWeek }),
       },
       include: { workout: true },
     });
