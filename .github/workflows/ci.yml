@@ -50,7 +50,7 @@ jobs:
   # ------------------------------------------------
   build-api:
     name: Build API
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04-arm
     if: github.event_name == 'push'
     permissions:
       contents: read
@@ -79,7 +79,7 @@ jobs:
           context: .
           file: apps/api/Dockerfile
           push: true
-          platforms: linux/amd64
+          platforms: linux/arm64
           tags: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-api:${{ steps.tag.outputs.sha }}
             ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-api:latest
@@ -96,7 +96,7 @@ jobs:
   # ------------------------------------------------
   build-web:
     name: Build Web
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04-arm
     if: github.event_name == 'push'
     permissions:
       contents: read
@@ -125,7 +125,7 @@ jobs:
           context: .
           file: apps/web/Dockerfile
           push: true
-          platforms: linux/amd64
+          platforms: linux/arm64
           tags: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-web:${{ steps.tag.outputs.sha }}
             ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-web:latest
