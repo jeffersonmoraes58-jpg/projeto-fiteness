@@ -20,7 +20,7 @@ export default function StudentDashboard() {
     queryFn: () => api.get('/students/me/dashboard').then((r) => r.data.data),
   });
 
-  const { data: _workoutPlans } = useQuery({
+  const { data: _workoutPlans, isLoading: loadingTodayWorkout } = useQuery({
     queryKey: ['student-today-workout'],
     queryFn: () => api.get('/students/me/workout-plan').then((r) => r.data.data),
   });
@@ -31,7 +31,7 @@ export default function StudentDashboard() {
     }
     return true;
   });
-  const todayWorkout = todayPlan?.workout ?? _workoutPlans?.[0]?.workout ?? null;
+  const todayWorkout = todayPlan?.workout ?? null;
 
   const { data: todayDiet } = useQuery({
     queryKey: ['student-today-diet'],
@@ -218,8 +218,17 @@ export default function StudentDashboard() {
                   ))}
                 </div>
               </>
-            ) : (
+            ) : loadingTodayWorkout ? (
               <TodayWorkoutSkeleton />
+            ) : (
+              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col items-center py-6 text-center gap-2">
+                <Dumbbell className="w-8 h-8 text-muted-foreground/30" />
+                <p className="text-sm font-semibold">Nenhum treino para hoje</p>
+                <p className="text-xs text-muted-foreground">Seu treino do dia aparecerá aqui quando for atribuído</p>
+                <Link href="/student/workout" className="btn-primary text-sm py-2 px-4 mt-2 flex items-center gap-2">
+                  Ver meus treinos <ChevronRight className="w-3 h-3" />
+                </Link>
+              </motion.div>
             )}
           </motion.div>
 

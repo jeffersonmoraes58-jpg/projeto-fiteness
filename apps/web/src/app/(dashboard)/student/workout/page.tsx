@@ -223,6 +223,7 @@ function VideoModal({ url, title, onClose }: { url: string; title: string; onClo
 
 export default function StudentWorkout() {
   const [selectedTrainerId, setSelectedTrainerId] = useState<string | null>(null);
+  const [selectedDay, setSelectedDay] = useState<number>(TODAY);
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
   const [activePlanId, setActivePlanId] = useState<string | null>(null);
   const [activeWorkout, setActiveWorkout] = useState(false);
@@ -330,18 +331,17 @@ export default function StudentWorkout() {
   const effectiveTrainerId = selectedTrainerId ?? (trainers.length === 1 ? trainers[0]?.id : null);
 
   const filteredPlans = useMemo(() => {
-    const today = new Date().getDay();
     return (workoutPlans || []).filter((p: any) => {
       // Filtra por trainer
       if (effectiveTrainerId && p.workout?.trainer?.id !== effectiveTrainerId) return false;
-      // Filtra por dia da semana: se dayOfWeek estiver definido, só mostra se inclui hoje
+      // Filtra por dia da semana: se dayOfWeek estiver definido, só mostra no(s) dia(s) marcado(s)
       if (p.dayOfWeek && Array.isArray(p.dayOfWeek) && p.dayOfWeek.length > 0) {
-        return p.dayOfWeek.includes(today);
+        return p.dayOfWeek.includes(selectedDay);
       }
-      // Se não tem dayOfWeek definido, mostra (compatibilidade com planos antigos)
+      // Sem dayOfWeek definido, aparece todos os dias (compatibilidade com planos antigos)
       return true;
     });
-  }, [workoutPlans, effectiveTrainerId]);
+  }, [workoutPlans, effectiveTrainerId, selectedDay]);
 
   const selectedPlan = (workoutPlans || []).find((p: any) => p.id === selectedPlanId);
   const activePlan = (workoutPlans || []).find((p: any) => p.id === activePlanId);
@@ -939,23 +939,47 @@ export default function StudentWorkout() {
               )}
             </div>
 
-            {/* Week frequency strip */}
+            {/* Day selector — click a day to filter the workouts */}
             <div className="glass-card">
               <div className="flex items-center justify-between mb-3">
-                <span className="text-sm font-semibold">Frequência semanal</span>
+                <span className="text-sm font-semibold">Dias da semana</span>
                 <span className="text-xs text-muted-foreground">
-                  {completedDaysThisWeek.size} treino{completedDaysThisWeek.size !== 1 ? 's' : ''} essa semana
+                  {completedDaysThisWeek.size} treino{completedDaysThisWeek.size !== 1 ? 's' : ''} concluído{completedDaysThisWeek.size !== 1 ? 's' : ''} essa semana
                 </span>
               </div>
               <div className="flex gap-1">
                 {DAYS.map((day, i) => {
                   const done = completedDaysThisWeek.has(i);
                   const isToday = i === TODAY;
+                  const isSelected = i === selectedDay;
+                  const count = (workoutPlans || []).filter((p: any) => {
+                    if (effectiveTrainerId && p.workout?.trainer?.id !== effectiveTrainerId) return false;
+                    if (p.dayOfWeek && Array.isArray(p.dayOfWeek) && p.dayOfWeek.length > 0) return p.dayOfWeek.includes(i);
+                    return true;
+                  }).length;
                   return (
-                    <div key={day} className={cn('flex-1 flex flex-col items-center gap-1.5 py-2 rounded-xl text-xs', isToday && 'bg-primary/10')}>
-                      <span className={cn('font-medium', isToday ? 'text-primary' : 'text-muted-foreground')}>{day}</span>
-                      <div className={cn('w-2 h-2 rounded-full', done ? 'bg-emerald-400' : isToday ? 'bg-primary/40' : 'bg-white/10')} />
-                    </div>
+                    <button
+                      key={day}
+                      type="button"
+                      onClick={() => setSelectedDay(i)}
+                      className={cn(
+                        'flex-1 flex flex-col items-center gap-1 py-2 rounded-xl text-xs transition-all',
+                        isSelected
+                          ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/20'
+                          : isToday
+                            ? 'bg-primary/10 hover:bg-primary/15'
+                            : 'hover:bg-accent/50',
+                      )}
+                    >
+                      <span className={cn('font-semibold leading-none', isSelected ? 'text-primary-foreground' : isToday ? 'text-primary' : 'text-muted-foreground')}>{day}</span>
+                      {count > 0 ? (
+                        <span className={cn('text-[10px] font-bold leading-none', isSelected ? 'text-primary-foreground/80' : 'text-primary')}>
+                          {count} {count === 1 ? 'treino' : 'treinos'}
+                        </span>
+                      ) : (
+                        <span className={cn('w-1.5 h-1.5 rounded-full', done ? 'bg-emerald-400' : isToday ? 'bg-primary/40' : 'bg-white/10')} />
+                      )}
+                    </button>
                   );
                 })}
               </div>
@@ -999,39 +1023,11 @@ export default function StudentWorkout() {
                 })}
               </div>
             ) : workoutPlans && workoutPlans.length > 0 ? (
-              // Has plans but none for today — show all with day labels
-              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-3">
-                <div className="glass-card flex flex-col items-center py-6 text-center gap-2 border border-amber-500/20">
-                  <Dumbbell className="w-7 h-7 text-amber-400/70" />
-                  <p className="text-sm font-semibold">Nenhum treino para hoje</p>
-                  <p className="text-xs text-muted-foreground">Confira seus treinos agendados abaixo</p>
-                </div>
-                {(workoutPlans as any[]).map((plan: any) => (
-                  <motion.button
-                    key={plan.id}
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    onClick={() => setSelectedPlanId(plan.id)}
-                    className="glass-card w-full text-left hover:bg-accent/50 transition-all cursor-pointer opacity-70"
-                  >
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="min-w-0">
-                        <div className="font-bold text-base truncate">{plan.division || plan.workout?.name}</div>
-                        {plan.division && plan.workout?.name && plan.division !== plan.workout?.name && (
-                          <div className="text-xs text-muted-foreground">{plan.workout.name}</div>
-                        )}
-                        <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
-                          <span className="flex items-center gap-1"><Clock className="w-3 h-3" />{plan.workout?.duration || 45} min</span>
-                          <span className="flex items-center gap-1"><Dumbbell className="w-3 h-3" />{plan.workout?.exercises?.length || 0} exercícios</span>
-                          {plan.dayOfWeek?.length > 0 && (
-                            <span>{plan.dayOfWeek.map((d: number) => DAYS[d]).join(', ')}</span>
-                          )}
-                        </div>
-                      </div>
-                      <ChevronRight className="w-5 h-5 text-muted-foreground" />
-                    </div>
-                  </motion.button>
-                ))}
+              // Has plans but none for the selected day
+              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="glass-card flex flex-col items-center py-6 text-center gap-2 border border-amber-500/20">
+                <Dumbbell className="w-7 h-7 text-amber-400/70" />
+                <p className="text-sm font-semibold">Nenhum treino para {DAY_NAMES[selectedDay]}</p>
+                <p className="text-xs text-muted-foreground">Selecione outro dia da semana acima para ver os treinos</p>
               </motion.div>
             ) : (
               <motion.div
