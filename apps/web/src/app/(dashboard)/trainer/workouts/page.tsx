@@ -22,6 +22,7 @@ const STATUS_LABELS: Record<string, { label: string; color: string }> = {
   ARCHIVED: { label: 'Arquivado', color: 'bg-muted text-muted-foreground' },
 };
 const LEVEL_LABELS = ['', 'Iniciante', 'Básico', 'Intermediário', 'Avançado', 'Elite'];
+const DAYS_SHORT = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 
 interface TemplateExercise {
   name: string;
@@ -1042,6 +1043,16 @@ function WorkoutCard({ workout, index, onDuplicate, onArchive }: {
         <div className="flex gap-1 mt-2 flex-wrap">
           {workout.tags.slice(0, 3).map((tag: string) => (
             <span key={tag} className="text-[9px] px-1.5 py-0.5 rounded-full glass text-muted-foreground">{tag}</span>
+          ))}
+          {workout.dayOfWeek?.length > 0 && workout.dayOfWeek.map((d: number) => (
+            <span key={d} className="text-[9px] px-1.5 py-0.5 rounded-full bg-primary/10 text-primary font-medium">{DAYS_SHORT[d]}</span>
+          ))}
+        </div>
+      )}
+      {workout.tags?.length === 0 && workout.dayOfWeek?.length > 0 && (
+        <div className="flex gap-1 mt-2 flex-wrap">
+          {workout.dayOfWeek.map((d: number) => (
+            <span key={d} className="text-[9px] px-1.5 py-0.5 rounded-full bg-primary/10 text-primary font-medium">{DAYS_SHORT[d]}</span>
           ))}
         </div>
       )}

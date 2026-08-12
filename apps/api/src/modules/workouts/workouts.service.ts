@@ -117,6 +117,7 @@ export class WorkoutsService {
         level: original.level,
         duration: original.duration,
         tags: original.tags,
+        dayOfWeek: original.dayOfWeek,
         isTemplate: original.isTemplate,
         trainerId: trainer.id,
         exercises: {
@@ -167,6 +168,7 @@ export class WorkoutsService {
         level: dto.level,
         duration: dto.duration,
         tags: dto.tags,
+        dayOfWeek: dto.dayOfWeek,
         ...(dto.exercises !== undefined && {
           exercises: {
             create: dto.exercises.map((ex, index) => ({
@@ -212,6 +214,7 @@ export class WorkoutsService {
         level: dto?.level ?? template.level,
         duration: dto?.duration ?? template.duration,
         tags: dto?.tags ?? template.tags,
+        dayOfWeek: template.dayOfWeek,
         isTemplate: false,
         trainerId: trainer.id,
         exercises: {
@@ -252,7 +255,7 @@ export class WorkoutsService {
         studentId: dto.studentId,
         workoutId,
         division: dto.division,
-        dayOfWeek: dto.dayOfWeek ?? [],
+        dayOfWeek: dto.dayOfWeek ?? workout.dayOfWeek ?? [],
         startDate: new Date(dto.startDate),
         endDate: dto.endDate ? new Date(dto.endDate) : undefined,
         notes: dto.notes,
@@ -375,6 +378,7 @@ export class WorkoutsService {
           level: workout.level,
           duration: workout.duration,
           tags: [...(workout.tags || []), '__personalized'],
+          dayOfWeek: workout.dayOfWeek,
           isTemplate: false,
           trainerId: workout.trainerId,
           exercises: {

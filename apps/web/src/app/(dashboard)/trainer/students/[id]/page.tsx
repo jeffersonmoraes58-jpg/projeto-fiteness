@@ -53,7 +53,6 @@ export default function StudentDetailPage() {
   const qc = useQueryClient();
   const [tab, setTab] = useState('treinos');
   const [editingPlan, setEditingPlan] = useState<any | null>(null);
-  const [settingsPlan, setSettingsPlan] = useState<any | null>(null);
   const [showAssign, setShowAssign] = useState(false);
   const [showAssessForm, setShowAssessForm] = useState(false);
 
@@ -108,8 +107,6 @@ export default function StudentDetailPage() {
       api.patch(`/workouts/plans/${planId}`, data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['student-plans', id] });
-      setEditingPlan(null);
-      setSettingsPlan(null);
       toast.success('Plano atualizado!');
     },
     onError: () => toast.error('Erro ao atualizar plano'),
@@ -362,14 +359,16 @@ export default function StudentDetailPage() {
                 <div className="space-y-2">
                   {(plans || []).map((plan: any) => {
                     const isEditingEx = editingPlan?.id === plan.id;
-                    const isEditingSettings = settingsPlan?.id === plan.id;
                     const displayName = plan.division || plan.workout?.name;
                     const daysLabel = (plan.dayOfWeek?.length ?? 0) > 0
                       ? plan.dayOfWeek.map((d: number) => DAYS_SHORT[d]).join(', ')
                       : 'Todos os dias';
                     return (
                       <div key={plan.id} className="glass rounded-xl overflow-hidden">
-                        <div className="p-3 flex items-center gap-3">
+                        <div
+                          className="p-3 flex items-center gap-3 cursor-pointer transition-colors hover:bg-accent/30"
+                          onClick={() => setEditingPlan(isEditingEx ? null : plan)}
+                        >
                           <div className="w-9 h-9 rounded-xl bg-purple-500/10 flex items-center justify-center flex-shrink-0">
                             <Dumbbell className="w-4 h-4 text-purple-400" />
                           </div>
@@ -387,26 +386,13 @@ export default function StudentDetailPage() {
                           </div>
                           <div className="flex items-center gap-1 flex-shrink-0">
                             <button
-                              onClick={() => {
-                                setSettingsPlan(isEditingSettings ? null : plan);
-                                setEditingPlan(isEditingSettings ? null : null);
-                              }}
-                              className={`w-7 h-7 rounded-lg flex items-center justify-center transition-all ${isEditingSettings ? 'bg-primary/20 text-primary' : 'hover:bg-accent text-muted-foreground'}`}
-                              title="Configurar exibição (nome e dias)"
-                            >
-                              <Settings2 className="w-3.5 h-3.5" />
-                            </button>
-                            <button
-                              onClick={() => {
-                                setEditingPlan(isEditingEx ? null : plan);
-                                setSettingsPlan(isEditingEx ? null : null);
-                              }}
+                              onClick={(e) => { e.stopPropagation(); setEditingPlan(isEditingEx ? null : plan); }}
                               className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 transition-all ${isEditingEx ? 'bg-primary/20 text-primary' : 'hover:bg-accent text-muted-foreground'}`}
-                              title="Editar exercícios"
+                              title={isEditingEx ? 'Fechar editor' : 'Editar exercícios'}
                             >
                               <ChevronRight className={`w-3.5 h-3.5 transition-transform ${isEditingEx ? 'rotate-90' : ''}`} />
                             </button>
-                            <button onClick={() => { if (confirm('Remover este plano?')) removePlanMutation.mutate(plan.id); }} className="w-7 h-7 rounded-lg hover:bg-red-500/10 flex items-center justify-center flex-shrink-0">
+                            <button onClick={(e) => { e.stopPropagation(); if (confirm('Remover este plano?')) removePlanMutation.mutate(plan.id); }} className="w-7 h-7 rounded-lg hover:bg-red-500/10 flex items-center justify-center flex-shrink-0">
                               <Trash2 className="w-3.5 h-3.5 text-red-400" />
                             </button>
                           </div>
@@ -416,14 +402,8 @@ export default function StudentDetailPage() {
                           <PlanExerciseEditor
                             plan={plan}
                             onPlansChange={() => qc.invalidateQueries({ queryKey: ['student-plans', id] })}
-                          />
-                        )}
-                        {isEditingSettings && (
-                          <PlanSettingsForm
-                            plan={plan}
-                            isPending={updatePlanMutation.isPending}
-                            onSave={(data) => updatePlanMutation.mutate({ planId: plan.id, data })}
-                            onCancel={() => setSettingsPlan(null)}
+                            onSaveSettings={(data) => updatePlanMutation.mutate({ planId: plan.id, data })}
+                            saveSettingsPending={updatePlanMutation.isPending}
                           />
                         )}
                       </div>
@@ -1706,8 +1686,14 @@ function EvolutionReport({ student, assessments, measurements }: { student: any;
 /* ═══════════════════════════════════════════════════
    Plan Exercise Editor — abre direto ao clicar na setinha
    ═══════════════════════════════════════════════════ */
-function PlanExerciseEditor({ plan, onPlansChange }: { plan: any; onPlansChange: () => void }) {
+function PlanExerciseEditor({ plan, onPlansChange, onSaveSettings, saveSettingsPending }: {
+  plan: any;
+  onPlansChange: () => void;
+  onSaveSettings: (data: any) => void;
+  saveSettingsPending: boolean;
+}) {
   const [loading, setLoading] = useState(true);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [workoutId, setWorkoutId] = useState<string>(plan.workoutId);
   const [exercises, setExercises] = useState<any[]>([]);
   const [exSearch, setExSearch] = useState('');
@@ -1960,6 +1946,28 @@ function PlanExerciseEditor({ plan, onPlansChange }: { plan: any; onPlansChange:
           </button>
         </div>
       )}
+
+      {/* Plan settings — collapsible */}
+      <button
+        type="button"
+        onClick={() => setSettingsOpen(!settingsOpen)}
+        className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors w-full"
+      >
+        <Settings2 className="w-3 h-3" />
+        {settingsOpen ? 'Ocultar configurações do plano' : 'Configurações do plano (nome, dias, datas)'}
+        <ChevronDown className={`w-3 h-3 ml-auto transition-transform ${settingsOpen ? 'rotate-180' : ''}`} />
+      </button>
+      {settingsOpen && (
+        <PlanSettingsForm
+          plan={plan}
+          isPending={saveSettingsPending}
+          onSave={(data) => {
+            onSaveSettings(data);
+            setSettingsOpen(false);
+          }}
+          onCancel={() => setSettingsOpen(false)}
+        />
+      )}
     </div>
   );
 }
@@ -2126,6 +2134,11 @@ function QuickAssignModal({ student, onClose, onDone }: { student: any; onClose:
   function toggleDay(day: number) {
     setDays((prev) => prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day]);
   }
+
+  useEffect(() => {
+    const w = workouts?.find((x: any) => x.id === workoutId);
+    setDays(w?.dayOfWeek ?? []);
+  }, [workoutId, workouts]);
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();

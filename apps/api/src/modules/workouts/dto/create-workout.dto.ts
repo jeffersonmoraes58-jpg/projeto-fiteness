@@ -101,6 +101,12 @@ export class CreateWorkoutDto {
   @IsArray()
   tags?: string[];
 
+  @ApiPropertyOptional({ example: [1, 3, 5], description: 'Dias da semana em que o treino será realizado (0=Dom ... 6=Sáb). Vazio = todos os dias.' })
+  @IsOptional()
+  @IsArray()
+  @IsNumber({}, { each: true })
+  dayOfWeek?: number[];
+
   @ApiPropertyOptional({ type: [WorkoutExerciseDto] })
   @IsOptional()
   @IsArray()

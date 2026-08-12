@@ -7,6 +7,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useMutation } from '@tanstack/react-query';
 import { api } from '@/lib/api';
+import { cn } from '@/lib/utils';
 
 const LEVELS = [
   { value: 1, label: 'Iniciante' },
@@ -16,6 +17,8 @@ const LEVELS = [
   { value: 5, label: 'Elite' },
 ];
 
+const DAYS_SHORT = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+
 export default function NewWorkoutPage() {
   const router = useRouter();
   const [name, setName] = useState('');
@@ -23,7 +26,12 @@ export default function NewWorkoutPage() {
   const [duration, setDuration] = useState('45');
   const [level, setLevel] = useState(1);
   const [tags, setTags] = useState('');
+  const [days, setDays] = useState<number[]>([]);
   const [error, setError] = useState('');
+
+  function toggleDay(day: number) {
+    setDays((prev) => prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day]);
+  }
 
   const createMutation = useMutation({
     mutationFn: (data: any) => api.post('/workouts', data),
@@ -43,6 +51,7 @@ export default function NewWorkoutPage() {
       duration: Number(duration) || 45,
       level,
       tags: tags ? tags.split(',').map((t) => t.trim()).filter(Boolean) : [],
+      dayOfWeek: days,
       status: 'ACTIVE',
     });
   };
@@ -119,6 +128,44 @@ export default function NewWorkoutPage() {
               placeholder="peito, tríceps, hipertrofia (separe por vírgula)"
               className="input-field"
             />
+          </div>
+
+          <div>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="text-sm font-medium block">Dias da semana (opcional)</label>
+              <button
+                type="button"
+                onClick={() => setDays([])}
+                className={cn(
+                  'text-[10px] px-2 py-0.5 rounded-full border transition-all font-medium',
+                  days.length === 0
+                    ? 'bg-primary/10 border-primary/30 text-primary'
+                    : 'border-border/30 text-muted-foreground/60 hover:text-muted-foreground',
+                )}
+              >
+                Todos os dias
+              </button>
+            </div>
+            <div className="flex gap-1.5 flex-wrap">
+              {DAYS_SHORT.map((label, i) => (
+                <button
+                  key={i}
+                  type="button"
+                  onClick={() => toggleDay(i)}
+                  className={cn(
+                    'w-10 h-10 rounded-xl text-xs font-medium transition-all border',
+                    days.includes(i)
+                      ? 'bg-primary text-primary-foreground border-primary'
+                      : 'glass border-transparent hover:bg-accent text-muted-foreground',
+                  )}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            <p className="text-xs text-muted-foreground mt-1.5">
+              Se preenchido, esse será o padrão ao atribuir o treino a um aluno (pode ajustar na hora da atribuição).
+            </p>
           </div>
         </motion.div>
 

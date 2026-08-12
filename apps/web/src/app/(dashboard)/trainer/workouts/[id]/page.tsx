@@ -126,6 +126,14 @@ export default function WorkoutDetailPage() {
       }),
   });
 
+  const workoutDaysPrefilled = useRef(false);
+  useEffect(() => {
+    if (workout && !workoutDaysPrefilled.current) {
+      workoutDaysPrefilled.current = true;
+      setSelectedDays(workout.dayOfWeek ?? []);
+    }
+  }, [workout]);
+
   const { data: students } = useQuery({
     queryKey: ['trainer-students'],
     queryFn: () => api.get('/trainers/me/students').then(r => r.data.data || []),
@@ -696,7 +704,21 @@ export default function WorkoutDetailPage() {
         </div>
 
         <div>
-          <label className="text-sm font-medium mb-1.5 block">Dias da semana</label>
+          <div className="flex items-center justify-between mb-1.5">
+            <label className="text-sm font-medium block">Dias da semana</label>
+            <button
+              type="button"
+              onClick={() => setSelectedDays([])}
+              className={cn(
+                'text-[10px] px-2 py-0.5 rounded-full border transition-all font-medium',
+                selectedDays.length === 0
+                  ? 'bg-primary/10 border-primary/30 text-primary'
+                  : 'border-border/30 text-muted-foreground/60 hover:text-muted-foreground',
+              )}
+            >
+              Todos os dias
+            </button>
+          </div>
           <div className="flex gap-1.5 flex-wrap">
             {DAYS_SHORT.map((dayLabel, dayIndex) => (
               <button
@@ -714,7 +736,7 @@ export default function WorkoutDetailPage() {
               </button>
             ))}
           </div>
-          <p className="text-xs text-muted-foreground mt-1">Selecione os dias em que este treino será realizado</p>
+          <p className="text-xs text-muted-foreground mt-1">Padrão: os dias definidos na criação do treino. Deixe em "Todos os dias" para não filtrar por dia.</p>
         </div>
 
         <div>

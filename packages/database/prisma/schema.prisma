@@ -648,6 +648,7 @@ model Workout {
   duration    Int?
   isTemplate  Boolean       @default(false)
   tags        String[]
+  dayOfWeek   Int[]         @default([])
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
 
