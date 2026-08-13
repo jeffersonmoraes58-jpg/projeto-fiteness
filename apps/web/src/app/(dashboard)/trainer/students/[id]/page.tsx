@@ -11,6 +11,7 @@ import {
   FileText, Download, Camera, Upload, ChevronDown, Smile,
   Minus, Sparkles, AlertTriangle, TrendingDown, BarChart3,
   CheckCircle2, RefreshCw, Trophy, ArrowUp, ArrowDown,
+  CheckCircle, Video,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
@@ -18,6 +19,7 @@ import { useParams } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import toast from 'react-hot-toast';
+import { resolveImageUrl, resolveVideoUrl } from '@/lib/video-url';
 
 const GOAL_LABELS: Record<string, string> = {
   LOSE_WEIGHT: 'Perda de peso', GAIN_MUSCLE: 'Ganho muscular',
@@ -28,6 +30,29 @@ const GOAL_LABELS: Record<string, string> = {
 
 const LEVEL_LABELS = ['', 'Iniciante', 'Básico', 'Intermediário', 'Avançado', 'Elite'];
 const DAYS_SHORT = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+
+const MUSCLE_GROUP_LABELS: Record<string, string> = {
+  PECTORALIS_MAJOR: 'Peitoral Maior', PECTORALIS_MINOR: 'Peitoral Menor',
+  LATISSIMUS_DORSI: 'Dorsal', TRAPEZIUS: 'Trapézio', RHOMBOIDS: 'Romboides',
+  DELTOID: 'Deltóide', BICEPS_BRACHII: 'Bíceps', TRICEPS_BRACHII: 'Tríceps',
+  FOREARMS: 'Antebraços', QUADRICEPS: 'Quadríceps', HAMSTRINGS: 'Posteriores',
+  GLUTES: 'Glúteos', CALVES: 'Panturrilhas', ABS: 'Abdomên', OBLIQUES: 'Oblíquos',
+  LOWER_BACK: 'Lombar', HIP_FLEXORS: 'Flexores',
+};
+
+const CATEGORY_LABELS: Record<string, string> = {
+  CHEST: 'Peito', BACK: 'Costas', SHOULDERS: 'Ombros', BICEPS: 'Bíceps',
+  TRICEPS: 'Tríceps', LEGS: 'Pernas', GLUTES: 'Glúteos', CORE: 'Core',
+  CARDIO: 'Cardio', FULL_BODY: 'Corpo Inteiro', MOBILITY: 'Mobilidade',
+};
+
+const EQUIPMENT_LABELS: Record<string, string> = {
+  BARBELL: 'Barra', DUMBBELL: 'Halteres', MACHINE: 'Máquina',
+  CABLE: 'Cabo', BODYWEIGHT: 'Peso Corporal', KETTLEBELL: 'Kettlebell',
+  BAND: 'Elástico', BENCH: 'Banco', EZ_BAR: 'Barra EZ', SMITH: 'Smith',
+  PLATE: 'Anilha', FOAM_ROLLER: 'Rolo', PULL_UP_BAR: 'Barra Fixa',
+  MEDICINE_BALL: 'Bola', SWISS_BALL: 'Bola Suíça',
+};
 const TABS = [
   { id: 'treinos', label: 'Treinos', icon: Dumbbell },
   { id: 'anamnese', label: 'Anamnese', icon: ClipboardList },
@@ -1697,9 +1722,28 @@ function PlanExerciseEditor({ plan, onPlansChange, onSaveSettings, saveSettingsP
   const [workoutId, setWorkoutId] = useState<string>(plan.workoutId);
   const [exercises, setExercises] = useState<any[]>([]);
   const [exSearch, setExSearch] = useState('');
-  const [searchResults, setSearchResults] = useState<any[]>([]);
-  const [searching, setSearching] = useState(false);
+  const [exSourceFilter, setExSourceFilter] = useState<'app' | 'mine' | 'gifs'>('app');
+  const [gifFolder, setGifFolder] = useState<string | null>(null);
+  const [addingGifId, setAddingGifId] = useState<string | null>(null);
   const [savingEx, setSavingEx] = useState(false);
+
+  const { data: exResults } = useQuery({
+    queryKey: ['student-exercises', exSearch],
+    queryFn: () => api.get('/exercises', { params: { search: exSearch || undefined } }).then((r) => r.data?.data ?? r.data ?? []),
+    enabled: exSourceFilter !== 'gifs',
+  });
+
+  const { data: gifFolders } = useQuery({
+    queryKey: ['student-gif-folders'],
+    queryFn: () => api.get('/cloudinary-gifs').then((r) => r.data?.data ?? r.data ?? []),
+    enabled: exSourceFilter === 'gifs',
+  });
+
+  const { data: gifFiles } = useQuery({
+    queryKey: ['student-gif-files', gifFolder],
+    queryFn: () => api.get(`/cloudinary-gifs/${gifFolder}`).then((r) => r.data?.data ?? r.data ?? []),
+    enabled: exSourceFilter === 'gifs' && !!gifFolder,
+  });
 
   useEffect(() => {
     let active = true;
@@ -1721,24 +1765,35 @@ function PlanExerciseEditor({ plan, onPlansChange, onSaveSettings, saveSettingsP
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [plan.id]);
 
-  async function searchExercises(q: string) {
-    setExSearch(q);
-    if (!q.trim()) { setSearchResults([]); return; }
-    setSearching(true);
-    try {
-      const res = await api.get(`/exercises?search=${encodeURIComponent(q)}`);
-      setSearchResults((res.data?.data ?? res.data ?? []).slice(0, 6));
-    } catch { setSearchResults([]); }
-    finally { setSearching(false); }
-  }
-
   function addExercise(ex: any) {
+    if (exercises.find((e) => e.exerciseId === ex.id)) return;
     setExercises((prev) => [
       ...prev,
       { _key: ex.id + Date.now(), exerciseId: ex.id, name: ex.name, sets: 3, reps: '10', weight: '', restSeconds: 60, notes: '', isDropSet: false, groupId: null },
     ]);
     setExSearch('');
-    setSearchResults([]);
+  }
+
+  async function addGif(file: any) {
+    if (exercises.find((e) => e.name === file.name)) return;
+    setAddingGifId(file.publicId);
+    try {
+      const res = await api.post('/exercises', {
+        name: file.name,
+        category: 'FULL_BODY',
+        difficulty: 1,
+        equipment: [],
+        gifUrl: file.url,
+        videoUrl: file.url,
+        isPublic: false,
+      });
+      const created = res.data?.data ?? res.data;
+      if (created?.id) addExercise({ id: created.id, name: file.name });
+    } catch {
+      toast.error('Erro ao adicionar GIF');
+    } finally {
+      setAddingGifId(null);
+    }
   }
 
   function removeExercise(idx: number) {
@@ -1811,8 +1866,113 @@ function PlanExerciseEditor({ plan, onPlansChange, onSaveSettings, saveSettingsP
         <div className="space-y-2">{[...Array(3)].map((_, i) => <div key={i} className="h-12 glass rounded-xl animate-pulse" />)}</div>
       ) : (
         <div className="space-y-2">
+          {/* Source filter buttons */}
+          <div className="flex flex-wrap gap-1.5">
+            {[{ key: 'app', label: 'Exercícios do app' }, { key: 'mine', label: 'Meus exercícios' }, { key: 'gifs', label: 'GIFs' }].map((f) => (
+              <button
+                key={f.key}
+                type="button"
+                onClick={() => { setExSourceFilter(f.key as any); setExSearch(''); setGifFolder(null); }}
+                className={cn('px-2.5 py-1.5 rounded-full text-xs font-medium transition-all border', exSourceFilter === f.key ? 'bg-primary text-primary-foreground border-primary' : 'glass border-transparent hover:bg-accent text-muted-foreground')}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
+
+          {exSourceFilter === 'gifs' ? (
+            // ── GIFs view ────────────────────────────────────────────────
+            <div className="space-y-2">
+              {gifFolder ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setGifFolder(null)}
+                    className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    <ChevronRight className="w-3 h-3 rotate-180" /> Voltar
+                  </button>
+                  <h3 className="text-sm font-bold capitalize">{gifFolder}</h3>
+                  {!gifFiles ? (
+                    <div className="space-y-2">
+                      {[...Array(3)].map((_, i) => <div key={i} className="glass rounded-xl animate-pulse h-14" />)}
+                    </div>
+                  ) : gifFiles.length === 0 ? (
+                    <p className="text-xs text-muted-foreground text-center py-3">Nenhum GIF nesta pasta</p>
+                  ) : (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                      {gifFiles.map((file: any) => (
+                        <GifCard
+                          key={file.publicId}
+                          file={file}
+                          onAdd={() => addGif(file)}
+                          isAdding={addingGifId === file.publicId}
+                          isAlreadyAdded={exercises.some((e) => e.name === file.name)}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="space-y-1.5 max-h-52 overflow-y-auto">
+                  {!gifFolders ? (
+                    [...Array(4)].map((_, i) => <div key={i} className="glass rounded-xl animate-pulse h-11" />)
+                  ) : gifFolders.length === 0 ? (
+                    <p className="text-xs text-muted-foreground text-center py-3">Nenhuma pasta encontrada</p>
+                  ) : (
+                    gifFolders.map((folder: any) => (
+                      <button
+                        key={folder.name}
+                        type="button"
+                        onClick={() => setGifFolder(folder.name)}
+                        className="w-full glass rounded-xl px-3 py-2.5 flex items-center gap-3 hover:bg-accent/50 transition-all text-left"
+                      >
+                        <div className="w-10 h-10 rounded-lg bg-purple-500/10 overflow-hidden flex-shrink-0">
+                          {folder.thumbnailUrl ? (
+                            <img src={folder.thumbnailUrl} alt={folder.name} className="w-full h-full object-cover" loading="lazy" />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center"><Dumbbell className="w-4 h-4 text-purple-400/40" /></div>
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium capitalize">{folder.name}</p>
+                          <p className="text-[10px] text-muted-foreground">{folder.count} exercício{folder.count !== 1 ? 's' : ''}</p>
+                        </div>
+                        <ChevronRight className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                      </button>
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
+          ) : (
+            // ── Search to add exercises ───────────────────────────────────
+            <div className="space-y-1.5">
+              <div className="relative">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+                <input
+                  type="text"
+                  value={exSearch}
+                  onChange={(e) => setExSearch(e.target.value)}
+                  placeholder="Buscar exercício para adicionar..."
+                  className="input-field text-xs py-2 pl-8"
+                />
+              </div>
+              {exSearch && (
+                <div className="glass rounded-xl divide-y divide-border/30 max-h-52 overflow-y-auto">
+                  {(exResults || []).filter((ex: any) => !exercises.find((r) => r.exerciseId === ex.id)).slice(0, 10).map((ex: any) => (
+                    <ExerciseSearchItem key={ex.id} exercise={ex} onAdd={() => addExercise(ex)} />
+                  ))}
+                  {(exResults || []).filter((ex: any) => !exercises.find((r) => r.exerciseId === ex.id)).length === 0 && (
+                    <p className="text-xs text-muted-foreground text-center py-3">Nenhum resultado</p>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
           {exercises.length === 0 && (
-            <p className="text-xs text-muted-foreground text-center py-3">Nenhum exercício. Adicione abaixo.</p>
+            <p className="text-xs text-muted-foreground text-center py-3">Nenhum exercício. Adicione usando a busca acima.</p>
           )}
           {exercises.map((ex, idx) => {
             const groupSize = ex.groupId ? exercises.filter(e => e.groupId === ex.groupId).length : 0;
@@ -1905,36 +2065,6 @@ function PlanExerciseEditor({ plan, onPlansChange, onSaveSettings, saveSettingsP
               </div>
             );
           })}
-
-          {/* Add exercise */}
-          <div className="space-y-1.5">
-            <div className="relative">
-              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-muted-foreground" />
-              <input
-                type="text"
-                value={exSearch}
-                onChange={(e) => searchExercises(e.target.value)}
-                placeholder="Buscar exercício para adicionar..."
-                className="input-field text-xs py-1.5 pl-7"
-              />
-            </div>
-            {searching && <p className="text-xs text-muted-foreground text-center py-1">Buscando...</p>}
-            {searchResults.length > 0 && (
-              <div className="glass rounded-xl overflow-hidden divide-y divide-border/30">
-                {searchResults.map((ex: any) => (
-                  <button
-                    key={ex.id}
-                    onClick={() => addExercise(ex)}
-                    className="w-full flex items-center gap-2 px-3 py-2 hover:bg-accent text-left transition-all"
-                  >
-                    <Plus className="w-3 h-3 text-primary flex-shrink-0" />
-                    <span className="text-xs truncate">{ex.name}</span>
-                    {ex.category && <span className="text-[10px] text-muted-foreground ml-auto">{ex.category}</span>}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
 
           <button
             onClick={saveExercises}
@@ -2271,5 +2401,162 @@ function WhatsAppIcon({ className }: { className?: string }) {
     <svg className={className} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
       <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
     </svg>
+  );
+}
+
+// ─── Exercise Search Item (thumbnail + hover preview) ───────────────────────
+
+function getPreviewUrl(exercise: any): string | null {
+  if (exercise.gifUrl) return resolveImageUrl(exercise.gifUrl);
+  if (exercise.videoUrl) return resolveVideoUrl(exercise.videoUrl);
+  if (exercise.thumbnailUrl) return resolveImageUrl(exercise.thumbnailUrl);
+  return null;
+}
+
+function ExerciseSearchItem({ exercise, onAdd }: { exercise: any; onAdd: () => void }) {
+  const [showPreview, setShowPreview] = useState(false);
+  const [tooltipPos, setTooltipPos] = useState({ top: 0, left: 0 });
+  const rowRef = useRef<HTMLDivElement>(null);
+  const previewUrl = getPreviewUrl(exercise);
+  const isGif = exercise.gifUrl != null;
+  const isVideo = !exercise.gifUrl && exercise.videoUrl != null;
+
+  const muscleLabel = (exercise.muscleGroups?.[0] && MUSCLE_GROUP_LABELS[exercise.muscleGroups[0]]) || null;
+  const categoryLabel = (exercise.category && CATEGORY_LABELS[exercise.category]) || null;
+  const equipmentLabel = (exercise.equipment?.[0] && EQUIPMENT_LABELS[exercise.equipment[0]]) || null;
+
+  const handleMouseEnter = () => {
+    if (!rowRef.current) { setShowPreview(true); return; }
+    const rect = rowRef.current.getBoundingClientRect();
+    const tooltipW = 224;
+    const tooltipH = 196;
+    const margin = 8;
+    let left = rect.left;
+    let top = rect.top - tooltipH - margin;
+    if (top < 0) top = rect.bottom + margin;
+    if (left + tooltipW > window.innerWidth - 16) left = window.innerWidth - tooltipW - 16;
+    if (left < 16) left = 16;
+    setTooltipPos({ top, left });
+    setShowPreview(true);
+  };
+
+  return (
+    <div
+      ref={rowRef}
+      className="w-full flex items-center gap-3 px-3 py-2 hover:bg-accent/60 transition-all text-left group cursor-pointer"
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={() => setShowPreview(false)}
+    >
+      {/* Thumbnail */}
+      <div className="w-16 h-11 rounded-lg bg-white/5 overflow-hidden flex-shrink-0 relative">
+        {previewUrl ? (
+          isVideo ? (
+            <video
+              src={previewUrl}
+              muted
+              loop
+              playsInline
+              className="w-full h-full object-cover"
+              onMouseEnter={(e) => (e.target as HTMLVideoElement).play().catch(() => {})}
+              onMouseLeave={(e) => { (e.target as HTMLVideoElement).pause(); (e.target as HTMLVideoElement).currentTime = 0; }}
+            />
+          ) : (
+            <img src={previewUrl} alt={exercise.name} className="w-full h-full object-cover" loading="lazy" />
+          )
+        ) : (
+          <div className="w-full h-full flex items-center justify-center">
+            <Dumbbell className="w-4 h-4 text-muted-foreground/40" />
+          </div>
+        )}
+        {previewUrl && (
+          <div className="absolute inset-0 flex items-center justify-center bg-black/20 group-hover:bg-black/40 transition-all">
+            <Video className="w-4 h-4 text-white/70" />
+          </div>
+        )}
+      </div>
+
+      {/* Info */}
+      <div className="flex-1 min-w-0">
+        <div className="text-xs font-medium truncate">{exercise.name}</div>
+        <div className="flex items-center gap-2 mt-0.5 text-[10px] text-muted-foreground">
+          {categoryLabel && <span>{categoryLabel}</span>}
+          {muscleLabel && <span className="text-purple-400/60">{muscleLabel}</span>}
+          {equipmentLabel && <span>{equipmentLabel}</span>}
+        </div>
+      </div>
+
+      {/* Add button */}
+      <button
+        type="button"
+        onClick={onAdd}
+        className="w-7 h-7 rounded-lg bg-primary/10 hover:bg-primary/20 flex items-center justify-center flex-shrink-0 transition-all"
+        title="Adicionar exercício"
+      >
+        <Plus className="w-4 h-4 text-primary" />
+      </button>
+
+      {/* Hover preview tooltip */}
+      {showPreview && previewUrl && (
+        <div
+          className="fixed z-[9999] pointer-events-none"
+          style={{ top: tooltipPos.top, left: tooltipPos.left }}
+        >
+          <div className="rounded-xl overflow-hidden bg-black shadow-2xl border border-white/10 w-56">
+            {isVideo ? (
+              <video
+                src={previewUrl}
+                autoPlay
+                muted
+                loop
+                playsInline
+                className="w-full h-40 object-cover"
+              />
+            ) : (
+              <img src={previewUrl} alt={exercise.name} className="w-full h-40 object-cover" />
+            )}
+            <div className="px-2.5 py-1.5 bg-white/5">
+              <p className="text-xs font-medium truncate">{exercise.name}</p>
+              <p className="text-[10px] text-muted-foreground">
+                {[categoryLabel, muscleLabel].filter(Boolean).join(' · ')}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── GifCard (compact version for student plan editor) ──────────────────────
+
+function GifCard({ file, onAdd, isAdding, isAlreadyAdded }: { file: any; onAdd: () => void; isAdding: boolean; isAlreadyAdded: boolean }) {
+  return (
+    <div className="glass rounded-xl overflow-hidden">
+      <div className="aspect-square bg-black/40 relative">
+        <img src={file.url} alt={file.name} className="w-full h-full object-cover" loading="lazy" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+        <div className="absolute bottom-1.5 left-1.5 right-1.5">
+          <p className="text-[10px] font-medium text-white line-clamp-2 leading-tight">{file.name}</p>
+        </div>
+      </div>
+      <button
+        type="button"
+        disabled={isAdding || isAlreadyAdded}
+        onClick={(e) => { e.stopPropagation(); onAdd(); }}
+        className={cn(
+          'w-full py-1.5 text-[10px] font-medium transition-colors flex items-center justify-center gap-1',
+          isAlreadyAdded ? 'bg-emerald-500/10 text-emerald-400 cursor-default' : 'hover:bg-accent text-primary hover:text-primary/80',
+          isAdding && 'opacity-50',
+        )}
+      >
+        {isAlreadyAdded ? (
+          <><CheckCircle className="w-3 h-3" />Adicionado</>
+        ) : isAdding ? (
+          <><div className="w-3 h-3 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />Adicionando...</>
+        ) : (
+          <><Plus className="w-3 h-3" />Adicionar</>
+        )}
+      </button>
+    </div>
   );
 }

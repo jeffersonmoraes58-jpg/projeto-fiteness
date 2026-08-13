@@ -299,14 +299,14 @@ export class TrainersService {
     const prevSince = new Date(since.getTime() - days * 86400000);
     const oneYearAgo = new Date(Date.now() - 365 * 86400000);
 
-    const [currentLogs, prevLogs, allRelations, totalWorkouts, platformAgg] = await Promise.all([
+    const [currentLogs, prevLogs, allRelations, totalWorkouts, prevTotalWorkouts, platformAgg] = await Promise.all([
       this.prisma.workoutLog.findMany({
         where: { workoutPlan: { workout: { trainerId: trainer.id } }, completedAt: { gte: since } },
         select: { completedAt: true, studentId: true },
       }),
       this.prisma.workoutLog.findMany({
         where: { workoutPlan: { workout: { trainerId: trainer.id } }, completedAt: { gte: prevSince, lt: since } },
-        select: { completedAt: true },
+        select: { completedAt: true, studentId: true },
       }),
       this.prisma.trainerStudent.findMany({
         where: { trainerId: trainer.id },
@@ -323,7 +323,8 @@ export class TrainersService {
           },
         },
       }),
-      this.prisma.workout.count({ where: { trainerId: trainer.id, NOT: { tags: { has: '__personalized' } } } }),
+      this.prisma.workout.count({ where: { trainerId: trainer.id, createdAt: { gte: since }, NOT: { tags: { has: '__personalized' } } } }),
+      this.prisma.workout.count({ where: { trainerId: trainer.id, createdAt: { gte: prevSince, lt: since }, NOT: { tags: { has: '__personalized' } } } }),
       this.getPlatformBenchmarks(),
     ]);
 
@@ -333,14 +334,10 @@ export class TrainersService {
     const totalCheckins = currentLogs.length;
     const prevTotalCheckins = prevLogs.length;
 
-    const avgStreak = activeStudents > 0
-      ? Math.round(activeRelations.reduce((s, r) => s + (r.student.streak || 0), 0) / activeStudents)
-      : 0;
-    const prevAvgStreak = avgStreak;
+    const avgStreak = this.periodStreak(currentLogs);
+    const prevAvgStreak = this.periodStreak(prevLogs);
 
-    const prevActiveStudents = activeStudents;
-
-    const prevTotalWorkouts = totalWorkouts;
+    const prevActiveStudents = new Set(prevLogs.map((l) => l.studentId)).size;
 
     const dailyMap: Record<string, number> = {};
     currentLogs.forEach((log) => { dailyMap[this.toBRDate(log.completedAt)] = (dailyMap[this.toBRDate(log.completedAt)] || 0) + 1; });
@@ -466,6 +463,30 @@ export class TrainersService {
       students: studentsWithDetails,
       days,
     };
+  }
+
+  private periodStreak(logs: { studentId: string; completedAt: Date | string }[]): number {
+    const byStudent: Record<string, Date[]> = {};
+    for (const l of logs) {
+      const d = new Date(l.completedAt);
+      d.setHours(0, 0, 0, 0);
+      if (!byStudent[l.studentId]) byStudent[l.studentId] = [];
+      byStudent[l.studentId].push(d);
+    }
+    let sum = 0;
+    let count = 0;
+    for (const dates of Object.values(byStudent)) {
+      const unique = [...new Set(dates.map((d) => d.getTime()))].sort((a, b) => a - b);
+      let best = 1;
+      let run = 1;
+      for (let i = 1; i < unique.length; i++) {
+        run = unique[i] - unique[i - 1] === 86400000 ? run + 1 : 1;
+        if (run > best) best = run;
+      }
+      sum += best;
+      count++;
+    }
+    return count > 0 ? Math.round(sum / count) : 0;
   }
 
   private calculateCohortRetention(relations: any[]) {
