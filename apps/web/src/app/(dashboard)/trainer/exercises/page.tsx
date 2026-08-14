@@ -37,25 +37,6 @@ const MUSCLE_GROUPS = [
 
 const DIFFICULTY_LABELS = ['', 'Iniciante', 'Básico', 'Intermediário', 'Avançado', 'Elite'];
 
-const EQUIPMENT_OPTIONS = [
-  { value: '', label: 'Equipamento' },
-  { value: 'Halteres', label: 'Halteres' },
-  { value: 'Barra', label: 'Barra' },
-  { value: 'Polia', label: 'Polia' },
-  { value: 'Kettlebell', label: 'Kettlebell' },
-  { value: 'Yoga', label: 'Yoga' },
-  { value: 'Peso corporal', label: 'Peso corporal' },
-  { value: 'Anilha', label: 'Anilha' },
-  { value: 'Elástico', label: 'Elástico' },
-  { value: 'Alongamento', label: 'Alongamento' },
-  { value: 'Smith', label: 'Smith' },
-  { value: 'Bosu', label: 'Bosu' },
-  { value: 'Medicine ball', label: 'Medicine ball' },
-  { value: 'TRX', label: 'TRX' },
-  { value: 'Vitruvian', label: 'Vitruvian' },
-  { value: 'Máquina', label: 'Máquina' },
-  { value: 'Cardio', label: 'Cardio' },
-];
 const EMPTY_FORM = { name: '', description: '', instructions: '', category: 'CHEST', difficulty: '1', equipment: '', videoUrl: '' };
 
 function getYoutubeThumbnail(url: string): string | null {
@@ -75,7 +56,7 @@ function getVideoThumbnail(url: string): string | null {
   return getYoutubeThumbnail(url) || getCloudinaryThumbnail(url);
 }
 
-function getEmbedUrl(rawUrl: string): { src: string; type: 'iframe' | 'video' } | null {
+function getEmbedUrl(rawUrl: string): { src: string; type: 'iframe' | 'video' | 'gif' } | null {
   if (!rawUrl) return null;
   const url = resolveVideoUrl(rawUrl);
   // YouTube (supports youtube.com, youtu.be, and youtube-nocookie.com)
@@ -83,7 +64,8 @@ function getEmbedUrl(rawUrl: string): { src: string; type: 'iframe' | 'video' } 
   if (yt) return { type: 'iframe', src: `https://www.youtube-nocookie.com/embed/${yt[1]}?rel=0&modestbranding=1&autoplay=1` };
   const vim = url.match(/vimeo\.com\/(\d+)/);
   if (vim) return { type: 'iframe', src: `https://player.vimeo.com/video/${vim[1]}?autoplay=1` };
-  if (/\.(mp4|webm|ogg)(\?|$)/i.test(url)) return { type: 'video', src: url };
+  if (/\.gif(\?|$)/i.test(url)) return { type: 'gif', src: url };
+  if (/\.(mp4|webm|ogg|mov)(\?|$)/i.test(url)) return { type: 'video', src: url };
   // Cloudinary video URL
   if (url.includes('cloudinary.com')) return { type: 'video', src: url };
   // MuscleWiki proxy stream
@@ -218,16 +200,12 @@ export default function TrainerExercises() {
   const [search, setSearch] = useState('');
   const [sourceFilter, setSourceFilter] = useState<'all' | 'app' | 'mine' | 'gifs'>('all');
   const [muscleFilter, setMuscleFilter] = useState('');
-  const [categoryFilter, setCategoryFilter] = useState('');
-  const [equipmentFilter, setEquipmentFilter] = useState('');
   const [showForm, setShowForm] = useState(false);
   const [videoModal, setVideoModal] = useState<any>(null);
   const [added, setAdded] = useState<any[]>([]);
   const [form, setForm] = useState(EMPTY_FORM);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState(EMPTY_FORM);
-  const [videoEditId, setVideoEditId] = useState<string | null>(null);
-  const [videoEditUrl, setVideoEditUrl] = useState('');
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [gifFolder, setGifFolder] = useState<string | null>(null);
   const [workoutModal, setWorkoutModal] = useState(false);
@@ -235,8 +213,8 @@ export default function TrainerExercises() {
   const queryClient = useQueryClient();
 
   const { data: exercises, isLoading } = useQuery({
-    queryKey: ['trainer-exercises', categoryFilter, search],
-    queryFn: () => api.get(`/exercises?category=${categoryFilter}&search=${search}`).then(r => r.data.data),
+    queryKey: ['trainer-exercises', search],
+    queryFn: () => api.get(`/exercises?search=${search}`).then(r => r.data.data),
   });
 
   const { data: gifFolders } = useQuery({
@@ -271,7 +249,6 @@ export default function TrainerExercises() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['trainer-exercises'] });
       setEditingId(null);
-      setVideoEditId(null);
     },
   });
 
@@ -339,9 +316,8 @@ export default function TrainerExercises() {
   const filtered = (exercises || []).filter((e: any) => {
     const matchSearch = e.name?.toLowerCase().includes(search.toLowerCase());
     const matchMuscle = !muscleFilter || e.category === muscleFilter || e.muscleGroups?.includes(muscleFilter);
-    const matchEquipment = !equipmentFilter || (e.equipment || []).includes(equipmentFilter);
     const matchSource = sourceFilter === 'all' || (sourceFilter === 'mine' && (!e.isPublic || e.trainerId)) || (sourceFilter === 'app' && e.isPublic && !e.trainerId);
-    return matchSearch && matchMuscle && matchEquipment && matchSource;
+    return matchSearch && matchMuscle && matchSource;
   });
 
   const systemExercises = filtered.filter((e: any) => e.isPublic && !e.trainerId);
@@ -364,8 +340,8 @@ export default function TrainerExercises() {
     });
   };
 
-  const clearFilters = () => { setMuscleFilter(''); setCategoryFilter(''); setEquipmentFilter(''); setSearch(''); setSourceFilter('all'); };
-  const hasActiveFilters = !!(muscleFilter || categoryFilter || equipmentFilter || sourceFilter !== 'all');
+  const clearFilters = () => { setMuscleFilter(''); setSearch(''); setSourceFilter('all'); };
+  const hasActiveFilters = !!(muscleFilter || sourceFilter !== 'all');
 
   const renderList = (list: any[], offset = 0) =>
     list.map((exercise: any, i: number) => (
@@ -385,13 +361,6 @@ export default function TrainerExercises() {
         onEditCancel={() => setEditingId(null)}
         isSaving={updateMutation.isPending && editingId === exercise.id}
         onDelete={() => setDeleteConfirm(exercise.id)}
-        isVideoEditing={videoEditId === exercise.id}
-        videoEditUrl={videoEditUrl}
-        onVideoEdit={() => { setVideoEditId(exercise.id); setVideoEditUrl(exercise.videoUrl || ''); }}
-        onVideoEditChange={setVideoEditUrl}
-        onVideoEditSave={() => updateMutation.mutate({ id: exercise.id, data: { videoUrl: videoEditUrl || undefined } })}
-        onVideoEditCancel={() => setVideoEditId(null)}
-        isVideoSaving={updateMutation.isPending && videoEditId === exercise.id}
       />
     ));
 
@@ -457,18 +426,6 @@ export default function TrainerExercises() {
           <div className="relative">
             <select value={muscleFilter} onChange={e => setMuscleFilter(e.target.value)} className={cn('appearance-none pl-3 pr-7 py-1.5 rounded-xl text-xs font-medium border transition-all bg-transparent cursor-pointer', muscleFilter ? 'border-primary text-primary' : 'border-border text-muted-foreground')}>
               {MUSCLE_GROUPS.map(g => <option key={g.value} value={g.value}>{g.label}</option>)}
-            </select>
-            <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 text-muted-foreground pointer-events-none" />
-          </div>
-          <div className="relative">
-            <select value={categoryFilter} onChange={e => setCategoryFilter(e.target.value)} className={cn('appearance-none pl-3 pr-7 py-1.5 rounded-xl text-xs font-medium border transition-all bg-transparent cursor-pointer', categoryFilter ? 'border-primary text-primary' : 'border-border text-muted-foreground')}>
-              {CATEGORIES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
-            </select>
-            <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 text-muted-foreground pointer-events-none" />
-          </div>
-          <div className="relative">
-            <select value={equipmentFilter} onChange={e => setEquipmentFilter(e.target.value)} className={cn('appearance-none pl-3 pr-7 py-1.5 rounded-xl text-xs font-medium border transition-all bg-transparent cursor-pointer', equipmentFilter ? 'border-primary text-primary' : 'border-border text-muted-foreground')}>
-              {EQUIPMENT_OPTIONS.map(eq => <option key={eq.value} value={eq.value}>{eq.label}</option>)}
             </select>
             <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 text-muted-foreground pointer-events-none" />
           </div>
@@ -731,9 +688,11 @@ export default function TrainerExercises() {
                       </div>
                     );
                   }
-                  return embed.type === 'video'
-                    ? <video key={embed.src} src={embed.src} controls autoPlay muted playsInline className="absolute inset-0 w-full h-full object-contain" />
-                    : <iframe key={embed.src} src={embed.src} className="absolute inset-0 w-full h-full border-0" allow="autoplay; fullscreen" allowFullScreen title={videoModal.name} />;
+                  return embed.type === 'gif'
+                    ? <img key={embed.src} src={embed.src} alt={videoModal.name} className="absolute inset-0 w-full h-full object-contain" />
+                    : embed.type === 'video'
+                      ? <video key={embed.src} src={embed.src} controls autoPlay muted playsInline loop className="absolute inset-0 w-full h-full object-contain" />
+                      : <iframe key={embed.src} src={embed.src} className="absolute inset-0 w-full h-full border-0" allow="autoplay; fullscreen" allowFullScreen title={videoModal.name} />;
                 })()}
               </div>
               {(() => {
@@ -807,7 +766,6 @@ function GifCard({ file, isAdded, onToggleAdd }: { file: any; isAdded: boolean; 
 function ExerciseRow({
   exercise, index, isAdded, onToggleAdd, onPlayVideo,
   isSystem, isEditing, editForm, onEditFormChange, onEdit, onEditSave, onEditCancel, isSaving, onDelete,
-  isVideoEditing, videoEditUrl, onVideoEdit, onVideoEditChange, onVideoEditSave, onVideoEditCancel, isVideoSaving,
 }: any) {
   const thumbnail = exercise.thumbnailUrl
     ? resolveImageUrl(exercise.thumbnailUrl)
@@ -876,11 +834,7 @@ function ExerciseRow({
             </div>
             <div className="flex items-center gap-1 flex-shrink-0">
               {hasVideo && <button onClick={onPlayVideo} className="w-8 h-8 rounded-full border border-border flex items-center justify-center hover:bg-accent transition-all"><Play className="w-3 h-3 text-muted-foreground fill-muted-foreground ml-0.5" /></button>}
-              {isSystem ? (
-                <button onClick={onVideoEdit} className="w-8 h-8 rounded-full border border-border flex items-center justify-center hover:bg-accent hover:border-primary/30 transition-all" title="Adicionar/editar vídeo">
-                  <Video className="w-3 h-3 text-muted-foreground" />
-                </button>
-              ) : (
+              {!isSystem && (
                 <>
                   <button onClick={onEdit} className="w-8 h-8 rounded-full border border-border flex items-center justify-center hover:bg-accent hover:border-primary/30 transition-all"><Pencil className="w-3 h-3 text-muted-foreground" /></button>
                   <button onClick={onDelete} className="w-8 h-8 rounded-full border border-border flex items-center justify-center hover:bg-destructive/10 hover:border-destructive/30 transition-all"><Trash2 className="w-3 h-3 text-muted-foreground" /></button>
@@ -888,30 +842,6 @@ function ExerciseRow({
               )}
             </div>
           </div>
-
-          {/* Inline video editor for system exercises */}
-          <AnimatePresence>
-            {isVideoEditing && (
-              <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden border-t border-border">
-                <div className="p-3 space-y-2 bg-primary/5">
-                  <div className="grid grid-cols-2 gap-2">
-                    <VideoInput value={videoEditUrl} onChange={onVideoEditChange} compact />
-                  </div>
-                  <div className="flex items-center gap-2 justify-end">
-                    <button onClick={onVideoEditCancel} className="text-xs text-muted-foreground hover:text-foreground transition-colors px-2 py-1">Cancelar</button>
-                    <button
-                      onClick={onVideoEditSave}
-                      disabled={isVideoSaving}
-                      className="text-xs text-primary hover:text-primary/80 transition-colors font-medium flex items-center gap-1 disabled:opacity-50"
-                    >
-                      {isVideoSaving ? <div className="w-3.5 h-3.5 border-2 border-primary/30 border-t-primary rounded-full animate-spin" /> : <CheckCircle className="w-3.5 h-3.5" />}
-                      Salvar
-                    </button>
-                  </div>
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
         </>
       )}
     </motion.div>

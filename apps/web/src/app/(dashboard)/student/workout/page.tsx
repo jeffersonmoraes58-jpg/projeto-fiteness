@@ -66,11 +66,12 @@ function getEmbedInfo(rawUrl: string): { embedUrl: string; type: 'youtube' | 'vi
   if (!rawUrl) return null;
   const url = resolveVideoUrl(rawUrl);
   const ytId = getYouTubeId(url);
-  if (ytId) return { type: 'youtube', embedUrl: `https://www.youtube-nocookie.com/embed/${ytId}?rel=0&modestbranding=1&autoplay=1` };
+  if (ytId) return { type: 'youtube', embedUrl: `https://www.youtube-nocookie.com/embed/${ytId}?rel=0&modestbranding=1&autoplay=1&loop=1&playlist=${ytId}` };
   const vimeoMatch = url.match(/(?:vimeo\.com\/)(\d+)/);
   if (vimeoMatch) return { type: 'vimeo', embedUrl: `https://player.vimeo.com/video/${vimeoMatch[1]}?title=0&byline=0&autoplay=1` };
   if (/\.gif(\?|$)/i.test(url)) return { type: 'gif', embedUrl: url };
-  if (/\.(mp4|webm|ogg)(\?|$)/i.test(url)) return { type: 'direct', embedUrl: url };
+  if (/\.(mp4|webm|ogg|mov)(\?|$)/i.test(url)) return { type: 'direct', embedUrl: url };
+  if (url.includes('cloudinary.com')) return { type: 'direct', embedUrl: url };
   if (url.includes('/musclewiki/stream/')) return { type: 'direct', embedUrl: url };
   return null;
 }
@@ -174,6 +175,7 @@ function VideoModal({ url, title, onClose }: { url: string; title: string; onClo
                     autoPlay
                     muted
                     playsInline
+                    loop
                     className="absolute inset-0 w-full h-full object-contain"
                     onError={() => setVideoError(true)}
                   />
