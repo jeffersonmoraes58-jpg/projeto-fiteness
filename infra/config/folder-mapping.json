@@ -1,0 +1,27 @@
+{
+  "comment": "Os vídeos ficam na RAIZ da conta Cloudinary (public_ids planos, sem pasta). A categoria é inferida por palavras-chave do nome. Primeira keyword que casar vence.",
+  "order": [
+    "MOBILITY",
+    "CARDIO",
+    "TRICEPS",
+    "BICEPS",
+    "GLUTES",
+    "SHOULDERS",
+    "CHEST",
+    "BACK",
+    "LEGS",
+    "CORE"
+  ],
+  "keywords": {
+    "MOBILITY": ["mobilidade", "alongamento"],
+    "CARDIO": ["esteira", "bike", "spinning", "spinnig", "elíptico", "eliptico", "escada", "simulador", "air bike", "corda naval", "corrida", "caminhada"],
+    "TRICEPS": ["tríceps", "triceps", "testa", "francês", "frances"],
+    "BICEPS": ["rosca", "martelo", "scott", "bíceps", "biceps"],
+    "GLUTES": ["elevação pélvica", "elevacao pelvica", "abdução", "abducao", "glúteo", "gluteo"],
+    "SHOULDERS": ["desenvolvimento", "elevação frontal", "elevacao frontal", "elevação lateral", "elevacao lateral", "arnold", "crucifixo inverso", "face pull", "elevação", "elevacao"],
+    "CHEST": ["supino", "crucifixo", "voador", "pulôver", "pulover", "pullover", "crossover", "peck"],
+    "BACK": ["remada", "puxada", "barra fixa", "dorsal", "chines", "terra"],
+    "LEGS": ["agachamento", "legpres", "leg press", "hack", "stiff", "búlgaro", "bulgaro", "afundo", "lunge", "flexora", "extensora", "abdutora", "adutora", "panturrilha"],
+    "CORE": ["abdominal", "prancha", "crunch", "russian twist", "core"]
+  }
+}
