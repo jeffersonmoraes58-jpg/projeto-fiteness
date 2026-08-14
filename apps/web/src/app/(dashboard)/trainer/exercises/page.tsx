@@ -673,11 +673,17 @@ export default function TrainerExercises() {
       {/* Video modal */}
       <AnimatePresence>
         {videoModal && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setVideoModal(null)} className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4">
-            <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }} onClick={e => e.stopPropagation()} className="w-full max-w-2xl bg-card rounded-2xl overflow-hidden shadow-2xl">
-              <div className="flex items-center justify-between px-4 py-3 border-b border-border">
-                <span className="font-semibold truncate">{videoModal.name}</span>
-                <div className="flex items-center gap-2 flex-shrink-0 ml-3">
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setVideoModal(null)} className="fixed inset-0 z-50 bg-black">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={e => e.stopPropagation()}
+              className="relative flex h-full w-full items-center justify-center"
+            >
+              <div className="absolute top-0 left-0 right-0 z-10 flex items-center justify-between px-4 pt-3 pb-8 bg-gradient-to-b from-black/80 to-transparent">
+                <span className="font-semibold truncate text-white pr-3">{videoModal.name}</span>
+                <div className="flex items-center gap-2 flex-shrink-0">
                   {(() => {
                     const ytId = videoModal.videoUrl?.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube-nocookie\.com\/embed\/)([^&\n?#]+)/)?.[1];
                     if (!ytId) return null;
@@ -686,17 +692,20 @@ export default function TrainerExercises() {
                         href={`https://www.youtube.com/watch?v=${ytId}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="w-7 h-7 rounded-lg hover:bg-accent flex items-center justify-center transition-all"
+                        className="w-9 h-9 rounded-lg hover:bg-white/10 flex items-center justify-center transition-all"
                         title="Abrir no YouTube"
                       >
-                        <ExternalLink className="w-3.5 h-3.5" />
+                        <ExternalLink className="w-4 h-4 text-white" />
                       </a>
                     );
                   })()}
-                  <button onClick={() => setVideoModal(null)} className="w-7 h-7 rounded-lg hover:bg-accent flex items-center justify-center"><X className="w-4 h-4" /></button>
+                  <button onClick={() => setVideoModal(null)} className="w-9 h-9 rounded-lg hover:bg-white/10 flex items-center justify-center" title="Fechar"><X className="w-5 h-5 text-white" /></button>
                 </div>
               </div>
-              <div style={{ aspectRatio: '16/9' }} className="bg-black/60 flex items-center justify-center">
+              <div
+                className="relative bg-black flex items-center justify-center"
+                style={{ height: 'min(100dvh, calc(100vw * 16 / 9))', aspectRatio: '9 / 16', maxWidth: '100vw' }}
+              >
                 {(() => {
                   const embed = getEmbedUrl(videoModal.videoUrl);
                   const ytId = videoModal.videoUrl?.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube-nocookie\.com\/embed\/)([^&\n?#]+)/)?.[1];
@@ -723,21 +732,20 @@ export default function TrainerExercises() {
                     );
                   }
                   return embed.type === 'video'
-                    ? <video key={embed.src} src={embed.src} controls autoPlay muted playsInline className="w-full h-full" />
-                    : <iframe key={embed.src} src={embed.src} className="w-full h-full" allow="autoplay; fullscreen" allowFullScreen title={videoModal.name} />;
+                    ? <video key={embed.src} src={embed.src} controls autoPlay muted playsInline className="absolute inset-0 w-full h-full object-contain" />
+                    : <iframe key={embed.src} src={embed.src} className="absolute inset-0 w-full h-full border-0" allow="autoplay; fullscreen" allowFullScreen title={videoModal.name} />;
                 })()}
               </div>
-              {/* Fallback footer */}
               {(() => {
                 const ytId = videoModal.videoUrl?.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube-nocookie\.com\/embed\/)([^&\n?#]+)/)?.[1];
                 if (!ytId) return null;
                 return (
-                  <div className="px-4 py-2 bg-white/5 border-t border-border/50">
+                  <div className="absolute bottom-0 left-0 right-0 z-10 flex justify-center px-4 pb-3">
                     <a
                       href={`https://www.youtube.com/watch?v=${ytId}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="flex items-center justify-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                      className="flex items-center gap-1.5 text-xs text-white/70 hover:text-white transition-colors"
                     >
                       <ExternalLink className="w-3 h-3" />
                       Se o vídeo não reproduzir, abra no YouTube

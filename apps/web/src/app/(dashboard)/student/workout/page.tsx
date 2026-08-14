@@ -106,48 +106,53 @@ function VideoModal({ url, title, onClose }: { url: string; title: string; onClo
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
+        className="fixed inset-0 z-50 bg-black"
         onClick={onClose}
       >
         <motion.div
-          initial={{ scale: 0.9, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          exit={{ scale: 0.9, opacity: 0 }}
-          transition={{ type: 'spring', damping: 25 }}
-          className="relative w-full max-w-3xl rounded-2xl overflow-hidden bg-black shadow-2xl"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="relative flex h-full w-full items-center justify-center"
           onClick={(e) => e.stopPropagation()}
         >
-          <div className="flex items-center justify-between px-4 py-3 bg-white/5">
-            <span className="font-medium text-sm truncate">{title}</span>
-            <div className="flex items-center gap-2 flex-shrink-0 ml-3">
+          {/* Top bar overlay */}
+          <div className="absolute top-0 left-0 right-0 z-10 flex items-center justify-between px-4 pt-3 pb-8 bg-gradient-to-b from-black/80 to-transparent">
+            <span className="font-medium text-sm text-white truncate pr-3">{title}</span>
+            <div className="flex items-center gap-2 flex-shrink-0">
               {rawYtUrl && (
                 <a
                   href={rawYtUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="w-8 h-8 rounded-lg hover:bg-white/10 flex items-center justify-center transition-all"
+                  className="w-9 h-9 rounded-lg hover:bg-white/10 flex items-center justify-center transition-all"
                   title="Abrir no YouTube"
                 >
-                  <ExternalLink className="w-4 h-4" />
+                  <ExternalLink className="w-4 h-4 text-white" />
                 </a>
               )}
-              <button onClick={onClose} className="w-8 h-8 rounded-lg hover:bg-white/10 flex items-center justify-center transition-all">
-                <X className="w-4 h-4" />
+              <button onClick={onClose} className="w-9 h-9 rounded-lg hover:bg-white/10 flex items-center justify-center transition-all" title="Fechar">
+                <X className="w-5 h-5 text-white" />
               </button>
             </div>
           </div>
-          <div className="relative aspect-video bg-black">
+
+          {/* 9:16 video area — tela cheia, maior possível dentro da viewport */}
+          <div
+            className="relative bg-black overflow-hidden"
+            style={{ height: 'min(100dvh, calc(100vw * 16 / 9))', aspectRatio: '9 / 16', maxWidth: '100vw' }}
+          >
             {info?.type === 'gif' ? (
               <img
                 src={info.embedUrl}
                 alt={title}
-                className="w-full h-full object-contain"
+                className="absolute inset-0 w-full h-full object-contain"
                 loading="lazy"
               />
             ) : info?.type === 'direct' ? (
               <>
                 {videoError ? (
-                  <div className="flex flex-col items-center justify-center h-full text-muted-foreground text-sm gap-3">
+                  <div className="absolute inset-0 flex flex-col items-center justify-center h-full text-muted-foreground text-sm gap-3">
                     <PlayCircle className="w-10 h-10 opacity-50" />
                     <span>Não foi possível carregar o vídeo</span>
                     {rawYtUrl && (
@@ -169,7 +174,7 @@ function VideoModal({ url, title, onClose }: { url: string; title: string; onClo
                     autoPlay
                     muted
                     playsInline
-                    className="w-full h-full"
+                    className="absolute inset-0 w-full h-full object-contain"
                     onError={() => setVideoError(true)}
                   />
                 )}
@@ -177,12 +182,12 @@ function VideoModal({ url, title, onClose }: { url: string; title: string; onClo
             ) : info ? (
               <iframe
                 src={info.embedUrl}
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
                 allowFullScreen
                 className="absolute inset-0 w-full h-full border-0"
               />
             ) : (
-              <div className="flex flex-col items-center justify-center h-full text-muted-foreground text-sm gap-3">
+              <div className="absolute inset-0 flex flex-col items-center justify-center h-full text-muted-foreground text-sm gap-3">
                 <PlayCircle className="w-10 h-10 opacity-50" />
                 <span>Formato de vídeo não suportado</span>
                 {rawYtUrl && (
@@ -199,14 +204,15 @@ function VideoModal({ url, title, onClose }: { url: string; title: string; onClo
               </div>
             )}
           </div>
+
           {/* Fallback footer */}
           {rawYtUrl && !videoError && (
-            <div className="px-4 py-2 bg-white/5 border-t border-white/10">
+            <div className="absolute bottom-0 left-0 right-0 z-10 flex justify-center px-4 pb-3">
               <a
                 href={rawYtUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center justify-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                className="flex items-center gap-1.5 text-xs text-white/70 hover:text-white transition-colors"
               >
                 <ExternalLink className="w-3 h-3" />
                 Se o vídeo não reproduzir, abra no YouTube
