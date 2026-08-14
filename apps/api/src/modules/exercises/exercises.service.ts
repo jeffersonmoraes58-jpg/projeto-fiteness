@@ -9,7 +9,10 @@ export class ExercisesService {
     const trainer = await this.prisma.trainer.findUnique({ where: { userId } });
     return this.prisma.exercise.findMany({
       where: {
-        OR: [{ isPublic: true }, { trainerId: trainer?.id ?? undefined }],
+        OR: [
+          { isPublic: true, trainerId: null },
+          { trainerId: trainer?.id ?? undefined },
+        ],
         ...(category && { category: category as any }),
         ...(search && { name: { contains: search, mode: 'insensitive' } }),
       },
@@ -44,7 +47,19 @@ export class ExercisesService {
     const trainer = await this.prisma.trainer.findUnique({ where: { userId } });
     const exercise = await this.findOne(id);
     if (exercise.trainerId !== trainer?.id) throw new ForbiddenException('Sem permissão');
-    return this.prisma.exercise.delete({ where: { id } });
+    return this.prisma.$transaction(async (tx) => {
+      const refs = await tx.workoutExercise.findMany({
+        where: { exerciseId: id },
+        select: { id: true },
+      });
+      if (refs.length) {
+        await tx.workoutExerciseLog.deleteMany({
+          where: { workoutExerciseId: { in: refs.map((r) => r.id) } },
+        });
+        await tx.workoutExercise.deleteMany({ where: { exerciseId: id } });
+      }
+      return tx.exercise.delete({ where: { id } });
+    });
   }
 }
 

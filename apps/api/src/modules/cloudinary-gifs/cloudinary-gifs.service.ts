@@ -95,11 +95,16 @@ export class CloudinaryGifsService {
       return resources.map((r: any) => {
         // Extrai nome legível do public_id (última parte do path, sem extensão)
         const filename = r.public_id.split('/').pop() || r.public_id;
-        const name = filename
-          .replace(/[-_]/g, ' ')
+        let name = filename
           .replace(/\.(gif|mp4|webm|png|jpg|jpeg)$/i, '')
-          .replace(/\b\w/g, (c: string) => c.toUpperCase())
+          .replace(/_\w{6}$/, '')
+          .replace(/[-_]/g, ' ')
           .trim();
+        // Capitaliza cada palavra preservando acentos (último char de cada token)
+        name = name
+          .split(/\s+/)
+          .map((w) => (w ? w.charAt(0).toUpperCase() + w.slice(1) : w))
+          .join(' ');
 
         return {
           publicId: r.public_id,
