@@ -14,10 +14,19 @@ export class ExercisesService {
           { trainerId: trainer?.id ?? undefined },
         ],
         ...(category && { category: category as any }),
-        ...(search && { name: { contains: search, mode: 'insensitive' } }),
+        ...(search && {
+          OR: [
+            { name: { contains: search, mode: 'insensitive' } },
+            { category: this.normalizeSearch(search) as any },
+          ],
+        }),
       },
       orderBy: { name: 'asc' },
     });
+  }
+
+  private normalizeSearch(value: string): string {
+    return value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase();
   }
 
   async findOne(id: string) {

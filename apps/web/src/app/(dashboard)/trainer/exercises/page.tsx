@@ -39,6 +39,10 @@ const DIFFICULTY_LABELS = ['', 'Iniciante', 'Básico', 'Intermediário', 'Avanç
 
 const EMPTY_FORM = { name: '', description: '', instructions: '', category: 'CHEST', difficulty: '1', equipment: '', videoUrl: '' };
 
+function normalize(s: string): string {
+  return (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+}
+
 function getYoutubeThumbnail(url: string): string | null {
   if (!url) return null;
   const m = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube-nocookie\.com\/embed\/)([^&\n?#]+)/);
@@ -213,8 +217,8 @@ export default function TrainerExercises() {
   const queryClient = useQueryClient();
 
   const { data: exercises, isLoading } = useQuery({
-    queryKey: ['trainer-exercises', search],
-    queryFn: () => api.get(`/exercises?search=${search}`).then(r => r.data.data),
+    queryKey: ['trainer-exercises'],
+    queryFn: () => api.get('/exercises').then(r => r.data.data),
   });
 
   const { data: gifFolders } = useQuery({
@@ -313,8 +317,10 @@ export default function TrainerExercises() {
     },
   });
 
+  const q = normalize(search);
+
   const filtered = (exercises || []).filter((e: any) => {
-    const matchSearch = e.name?.toLowerCase().includes(search.toLowerCase());
+    const matchSearch = !q || normalize(e.name).includes(q) || normalize(e.category || '').includes(q) || (e.muscleGroups || []).some((mg: string) => normalize(mg).includes(q));
     const matchMuscle = !muscleFilter || e.category === muscleFilter || e.muscleGroups?.includes(muscleFilter);
     const matchSource = sourceFilter === 'all' || (sourceFilter === 'mine' && (!e.isPublic || e.trainerId)) || (sourceFilter === 'app' && e.isPublic && !e.trainerId);
     return matchSearch && matchMuscle && matchSource;
@@ -322,6 +328,9 @@ export default function TrainerExercises() {
 
   const systemExercises = filtered.filter((e: any) => e.isPublic && !e.trainerId);
   const myExercises = filtered.filter((e: any) => !e.isPublic || e.trainerId);
+
+  const visibleGifFolders = (gifFolders || []).filter((f: any) => !q || normalize(f.name).includes(q));
+  const visibleGifFiles = (gifFiles || []).filter((f: any) => !q || normalize(f.name).includes(q));
 
   const isAdded = (id: string) => added.some(a => a.id === id);
   const toggleAdded = (exercise: any) =>
@@ -340,8 +349,8 @@ export default function TrainerExercises() {
     });
   };
 
-  const clearFilters = () => { setMuscleFilter(''); setSearch(''); setSourceFilter('all'); };
-  const hasActiveFilters = !!(muscleFilter || sourceFilter !== 'all');
+  const clearFilters = () => { setMuscleFilter(''); setSearch(''); setSourceFilter('all'); setGifFolder(null); };
+  const hasActiveFilters = !!(search || muscleFilter || sourceFilter !== 'all');
 
   const renderList = (list: any[], offset = 0) =>
     list.map((exercise: any, i: number) => (
@@ -422,15 +431,17 @@ export default function TrainerExercises() {
           ))}
         </div>
 
-        <div className="flex items-center gap-2 flex-wrap">
-          <div className="relative">
-            <select value={muscleFilter} onChange={e => setMuscleFilter(e.target.value)} className={cn('appearance-none pl-3 pr-7 py-1.5 rounded-xl text-xs font-medium border transition-all bg-transparent cursor-pointer', muscleFilter ? 'border-primary text-primary' : 'border-border text-muted-foreground')}>
-              {MUSCLE_GROUPS.map(g => <option key={g.value} value={g.value}>{g.label}</option>)}
-            </select>
-            <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 text-muted-foreground pointer-events-none" />
+        {sourceFilter !== 'gifs' && (
+          <div className="flex items-center gap-2 flex-wrap">
+            <div className="relative">
+              <select value={muscleFilter} onChange={e => setMuscleFilter(e.target.value)} className={cn('appearance-none pl-3 pr-7 py-1.5 rounded-xl text-xs font-medium border transition-all bg-transparent cursor-pointer', muscleFilter ? 'border-primary text-primary' : 'border-border text-muted-foreground')}>
+                {MUSCLE_GROUPS.map(g => <option key={g.value} value={g.value}>{g.label}</option>)}
+              </select>
+              <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 text-muted-foreground pointer-events-none" />
+            </div>
+            {hasActiveFilters && <button onClick={clearFilters} className="text-xs text-primary hover:underline">Limpar</button>}
           </div>
-          {hasActiveFilters && <button onClick={clearFilters} className="text-xs text-primary hover:underline">Limpar</button>}
-        </div>
+        )}
       </div>
 
       <div className="px-4 sm:px-6 lg:px-8 pb-32">
@@ -454,14 +465,14 @@ export default function TrainerExercises() {
                       <div key={i} className="glass rounded-2xl animate-pulse h-20" />
                     ))}
                   </div>
-                ) : gifFiles.length === 0 ? (
+                ) : visibleGifFiles.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-16 text-center">
                     <Dumbbell className="w-8 h-8 text-muted-foreground mb-3" />
-                    <p className="text-sm text-muted-foreground">Nenhum GIF encontrado nesta pasta</p>
+                    <p className="text-sm text-muted-foreground">{q ? `Nenhum resultado para "${search}"` : 'Nenhum GIF encontrado nesta pasta'}</p>
                   </div>
                 ) : (
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                    {gifFiles.map((file: any) => (
+                    {visibleGifFiles.map((file: any) => (
                       <GifCard
                         key={file.publicId}
                         file={file}
@@ -482,14 +493,14 @@ export default function TrainerExercises() {
                       <div key={i} className="glass rounded-2xl animate-pulse h-16" />
                     ))}
                   </div>
-                ) : gifFolders.length === 0 ? (
+                ) : visibleGifFolders.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-16 text-center">
                     <Dumbbell className="w-8 h-8 text-muted-foreground mb-3" />
-                    <p className="text-sm text-muted-foreground">Nenhuma pasta encontrada no Cloudinary</p>
+                    <p className="text-sm text-muted-foreground">{q ? `Nenhuma pasta encontrada para "${search}"` : 'Nenhuma pasta encontrada no Cloudinary'}</p>
                   </div>
                 ) : (
                   <div className="space-y-2">
-                    {gifFolders.map((folder: any) => (
+                    {visibleGifFolders.map((folder: any) => (
                       <button
                         key={folder.name}
                         onClick={() => setGifFolder(folder.name)}
