@@ -17,7 +17,7 @@ export class ExercisesService {
         ...(search && {
           OR: [
             { name: { contains: search, mode: 'insensitive' } },
-            { category: this.normalizeSearch(search) as any },
+            ...(this.isValidCategory(search) ? [{ category: this.normalizeSearch(search) as any }] : []),
           ],
         }),
       },
@@ -25,8 +25,17 @@ export class ExercisesService {
     });
   }
 
+  private readonly validCategories = new Set([
+    'CHEST', 'BACK', 'SHOULDERS', 'BICEPS', 'TRICEPS',
+    'LEGS', 'GLUTES', 'CORE', 'CARDIO', 'FULL_BODY', 'MOBILITY',
+  ]);
+
   private normalizeSearch(value: string): string {
     return value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase();
+  }
+
+  private isValidCategory(value: string): boolean {
+    return this.validCategories.has(this.normalizeSearch(value));
   }
 
   async findOne(id: string) {
