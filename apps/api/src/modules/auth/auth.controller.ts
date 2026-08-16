@@ -3,6 +3,7 @@ import {
   Post,
   Get,
   Patch,
+  Delete,
   Body,
   Query,
   UseGuards,
@@ -158,5 +159,14 @@ export class AuthController {
   @ApiOperation({ summary: 'Dados do usuário autenticado' })
   getMe(@CurrentUser() user: any) {
     return user;
+  }
+
+  @Delete('me')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Excluir minha conta e todos os dados' })
+  async deleteMyAccount(@CurrentUser('id') userId: string) {
+    return this.authService.deleteMyAccount(userId);
   }
 }

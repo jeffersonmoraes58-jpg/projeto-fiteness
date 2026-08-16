@@ -537,6 +537,95 @@ export class AuthService {
     return { message: 'Senha redefinida com sucesso' };
   }
 
+  async deleteMyAccount(userId: string) {
+    return this.prisma.$transaction(async (tx) => {
+      const user = await tx.user.findUnique({
+        where: { id: userId },
+        include: { student: true, trainer: true, nutritionist: true },
+      });
+
+      if (!user) throw new NotFoundException('Usuário não encontrado');
+
+      // 1. Dependências RESTRICT do Student
+      if (user.student) {
+        const sid = user.student.id;
+        await tx.workoutLog.deleteMany({ where: { studentId: sid } });
+        await tx.workoutPlan.deleteMany({ where: { studentId: sid } });
+        await tx.mealLog.deleteMany({ where: { studentId: sid } });
+        await tx.dietPlan.deleteMany({ where: { studentId: sid } });
+        await tx.appointment.deleteMany({ where: { studentId: sid } });
+        await tx.trainerStudent.deleteMany({ where: { studentId: sid } });
+        await tx.nutritionistPatient.deleteMany({ where: { studentId: sid } });
+        await tx.nutritionalAssessment.deleteMany({ where: { studentId: sid } });
+        await tx.physicalAssessment.deleteMany({ where: { studentId: sid } });
+        await tx.studentChallenge.deleteMany({ where: { studentId: sid } });
+        await tx.trainerStudentGoal.deleteMany({ where: { studentId: sid } });
+        await tx.evolutionInsight.deleteMany({ where: { studentId: sid } });
+      }
+
+      // 2. Dependências RESTRICT do Trainer
+      if (user.trainer) {
+        const tid = user.trainer.id;
+
+        const trainerWorkouts = await tx.workout.findMany({
+          where: { trainerId: tid },
+          select: { id: true },
+        });
+        if (trainerWorkouts.length > 0) {
+          const wIds = trainerWorkouts.map((w) => w.id);
+          const wExercises = await tx.workoutExercise.findMany({
+            where: { workoutId: { in: wIds } },
+            select: { id: true },
+          });
+          if (wExercises.length > 0) {
+            await tx.workoutExerciseLog.deleteMany({
+              where: { workoutExerciseId: { in: wExercises.map((e) => e.id) } },
+            });
+          }
+          await tx.workoutPlan.deleteMany({ where: { workoutId: { in: wIds } } });
+          await tx.workout.deleteMany({ where: { trainerId: tid } });
+        }
+
+        await tx.trainerStudent.deleteMany({ where: { trainerId: tid } });
+        await tx.appointment.deleteMany({ where: { trainerId: tid } });
+        await tx.studentBilling.deleteMany({ where: { trainerId: tid } });
+        await tx.trainerStudentGoal.deleteMany({ where: { trainerId: tid } });
+      }
+
+      // 3. Dependências RESTRICT do Nutritionist
+      if (user.nutritionist) {
+        const nid = user.nutritionist.id;
+
+        const nutritionistDiets = await tx.diet.findMany({
+          where: { nutritionistId: nid },
+          select: { id: true },
+        });
+        if (nutritionistDiets.length > 0) {
+          const dIds = nutritionistDiets.map((d) => d.id);
+          await tx.dietPlan.deleteMany({ where: { dietId: { in: dIds } } });
+        }
+
+        await tx.nutritionistPatient.deleteMany({ where: { nutritionistId: nid } });
+        await tx.diet.deleteMany({ where: { nutritionistId: nid } });
+        await tx.nutritionalConsultation.deleteMany({ where: { nutritionistId: nid } });
+        await tx.clinicalNote.deleteMany({ where: { nutritionistId: nid } });
+        await tx.supplementationPlan.deleteMany({ where: { nutritionistId: nid } });
+        await tx.patientExam.deleteMany({ where: { nutritionistId: nid } });
+      }
+
+      // 4. Dependências RESTRICT do User
+      await tx.chatParticipant.deleteMany({ where: { userId } });
+      await tx.message.deleteMany({ where: { senderId: userId } });
+
+      // 5. Deletar User (cascade → Student, Trainer, Nutritionist, Profile, RefreshToken, DeviceToken, Notification)
+      await tx.user.delete({ where: { id: userId } });
+
+      this.logger.log(`[DeleteAccount] Conta excluída: ${user.email} (${user.role})`);
+
+      return { message: 'Conta excluída com sucesso. Todos os seus dados foram removidos.', email: user.email };
+    });
+  }
+
   private async generateTokens(userId: string, email: string, role: string, tenantId: string) {
     const payload = { sub: userId, email, role, tenantId };
 
