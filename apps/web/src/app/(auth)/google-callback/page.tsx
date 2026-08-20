@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { Suspense, useEffect, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -15,7 +15,7 @@ import { useAuthStore } from '@/store/auth';
  * Aqui a gente busca os dados do usuário, guarda tudo no mesmo lugar que o
  * login por e-mail/senha usa (useAuthStore + cookies), e manda pro painel.
  */
-export default function GoogleCallbackPage() {
+function GoogleCallbackContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { setTokens, setUser } = useAuthStore();
@@ -64,5 +64,19 @@ export default function GoogleCallbackPage() {
         <p className="text-sm text-gray-300">Entrando com o Google...</p>
       </div>
     </div>
+  );
+}
+
+export default function GoogleCallbackPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-gradient-dark flex items-center justify-center">
+          <Loader2 className="w-8 h-8 animate-spin text-white" />
+        </div>
+      }
+    >
+      <GoogleCallbackContent />
+    </Suspense>
   );
 }

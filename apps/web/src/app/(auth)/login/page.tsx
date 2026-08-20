@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { useForm } from 'react-hook-form';
@@ -18,15 +18,14 @@ const schema = z.object({
 
 type FormData = z.infer<typeof schema>;
 
-export default function LoginPage() {
-  const [showPassword, setShowPassword] = useState(false);
-  const { login, isLoading } = useAuthStore();
+/**
+ * Mostra o erro de login do Google (se vier na URL) e limpa o parâmetro.
+ * Fica separado num componente próprio porque useSearchParams() exige um
+ * Suspense boundary pra não quebrar a geração estática da página.
+ */
+function GoogleLoginError() {
   const router = useRouter();
   const searchParams = useSearchParams();
-
-  const { register, handleSubmit, formState: { errors } } = useForm<FormData>({
-    resolver: zodResolver(schema),
-  });
 
   useEffect(() => {
     const googleError = searchParams.get('googleError');
@@ -35,6 +34,18 @@ export default function LoginPage() {
       router.replace('/login');
     }
   }, [searchParams, router]);
+
+  return null;
+}
+
+export default function LoginPage() {
+  const [showPassword, setShowPassword] = useState(false);
+  const { login, isLoading } = useAuthStore();
+  const router = useRouter();
+
+  const { register, handleSubmit, formState: { errors } } = useForm<FormData>({
+    resolver: zodResolver(schema),
+  });
 
   const onSubmit = async (data: FormData) => {
     try {
@@ -48,6 +59,9 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen bg-gradient-dark flex">
+      <Suspense fallback={null}>
+        <GoogleLoginError />
+      </Suspense>
       {/* Left side - decorative */}
       <div className="hidden lg:flex flex-1 bg-gradient-to-br from-purple-900/50 to-indigo-900/50 items-center justify-center relative overflow-hidden">
         <div className="absolute inset-0">
