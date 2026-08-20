@@ -271,25 +271,13 @@ export class AuthService {
           data: { googleId: googleUser.googleId },
         });
       } else {
-        user = await this.prisma.user.create({
-          data: {
-            email: googleUser.email,
-            googleId: googleUser.googleId,
-            emailVerified: true,
-            tenantId: googleUser.tenantId || 'default',
-            role: UserRole.STUDENT,
-            profile: {
-              create: {
-                firstName: googleUser.firstName,
-                lastName: googleUser.lastName,
-                avatarUrl: googleUser.avatarUrl,
-              },
-            },
-          },
-          include: { profile: true },
-        });
-
-        await this.prisma.student.create({ data: { userId: user.id } });
+        // Login com Google é só para quem JÁ tem cadastro (por e-mail).
+        // Não criamos conta nova aqui: sem um tenant/academia definido não
+        // há como saber a quem essa conta pertenceria (app é multi-tenant).
+        // O usuário precisa se cadastrar normalmente primeiro.
+        throw new UnauthorizedException(
+          'Nenhuma conta encontrada com esse e-mail do Google. Cadastre-se primeiro para depois entrar com o Google.',
+        );
       }
     }
 

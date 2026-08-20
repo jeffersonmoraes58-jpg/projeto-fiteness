@@ -8,11 +8,14 @@ import {
   Query,
   UseGuards,
   Req,
+  Res,
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
+import { Response } from 'express';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { ThrottlerGuard, Throttle } from '@nestjs/throttler';
+import { ConfigService } from '@nestjs/config';
 import { AuthService } from './auth.service';
 import { EmailService } from '../email/email.service';
 import { RegisterDto } from './dto/register.dto';
@@ -30,7 +33,11 @@ import { CurrentUser } from '../../decorators/current-user.decorator';
 @Controller('auth')
 @UseGuards(ThrottlerGuard)
 export class AuthController {
-  constructor(private authService: AuthService, private emailService: EmailService) {}
+  constructor(
+    private authService: AuthService,
+    private emailService: EmailService,
+    private configService: ConfigService,
+  ) {}
 
   @Public()
   @Post('register')
@@ -99,8 +106,16 @@ export class AuthController {
   @Get('google/callback')
   @UseGuards(GoogleOAuthGuard)
   @ApiOperation({ summary: 'Callback Google OAuth' })
-  async googleCallback(@Req() req: any) {
-    return this.authService.googleLogin(req.user);
+  async googleCallback(@Req() req: any, @Res() res: Response) {
+    const frontendUrl = this.configService.get<string>('FRONTEND_URL') || 'https://fitlynutri.com.br';
+    try {
+      const { accessToken, refreshToken } = await this.authService.googleLogin(req.user);
+      const params = new URLSearchParams({ accessToken, refreshToken });
+      return res.redirect(`${frontendUrl}/google-callback?${params.toString()}`);
+    } catch (err) {
+      const message = err?.message || 'Não foi possível entrar com o Google.';
+      return res.redirect(`${frontendUrl}/login?googleError=${encodeURIComponent(message)}`);
+    }
   }
 
   @Post('send-welcome')
