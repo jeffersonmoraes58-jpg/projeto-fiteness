@@ -3,11 +3,12 @@
 import { useState, useRef, useEffect } from 'react';
 import { useTheme } from 'next-themes';
 import { motion } from 'framer-motion';
+import Link from 'next/link';
 import {
   User, Camera, Mail, Phone, MapPin, Calendar,
   Shield, Bell, Palette, LogOut, ChevronRight,
   Save, Edit2, X, CheckCheck, Trash2, Eye, EyeOff,
-  Sun, Moon, Monitor, Check,
+  Sun, Moon, Monitor, Check, Star,
 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
@@ -143,6 +144,7 @@ export default function StudentProfile() {
       title: 'Suporte',
       items: [
         { icon: Mail, label: 'Fale Conosco', description: 'Entre em contato com o suporte', onClick: undefined },
+        { icon: Star, label: 'Avaliar o app', description: 'Deixe sua avaliação na Play Store', onClick: () => window.open('https://play.google.com/store/apps/details?id=com.fitlynutri.app', '_blank') },
       ],
     },
   ];
@@ -354,6 +356,21 @@ export default function StudentProfile() {
           </div>
         </motion.div>
       ))}
+
+      {/* Zona de perigo */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.35 }}
+      >
+        <Link
+          href="/account-deletion"
+          className="w-full flex items-center justify-center gap-2 p-4 rounded-2xl glass border border-destructive/30 text-destructive hover:bg-destructive/10 transition-all font-medium"
+        >
+          <Trash2 className="w-4 h-4" />
+          Excluir minha conta
+        </Link>
+      </motion.div>
 
       {/* Logout */}
       <motion.div

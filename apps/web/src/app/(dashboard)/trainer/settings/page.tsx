@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { useTheme } from 'next-themes';
 import { motion } from 'framer-motion';
 import {
@@ -295,6 +296,7 @@ export default function TrainerSettings() {
             { icon: Shield, label: 'Segurança', description: 'Senha e autenticação em dois fatores', onClick: () => setShowSecurity(true) },
             { icon: Palette, label: 'Aparência', description: 'Tema e cor de destaque', onClick: () => setShowAppearance(true) },
             { icon: CreditCard, label: 'Plano e Cobrança', description: 'Seu plano Fitlynutri', onClick: () => router.push('/trainer/subscription') },
+            { icon: Star, label: 'Avaliar o app', description: 'Deixe sua avaliação na Play Store', onClick: () => window.open('https://play.google.com/store/apps/details?id=com.fitlynutri.app', '_blank') },
           ].map((item) => (
             <button key={item.label} onClick={item.onClick} className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-accent transition-all text-left">
               <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center flex-shrink-0">
@@ -310,7 +312,18 @@ export default function TrainerSettings() {
         </div>
       </motion.div>
 
-      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }}>
+      {/* Zona de perigo */}
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.45 }}>
+        <Link
+          href="/account-deletion"
+          className="w-full flex items-center justify-center gap-2 p-4 rounded-2xl glass border border-destructive/30 text-destructive hover:bg-destructive/10 transition-all font-medium"
+        >
+          <Trash2 className="w-4 h-4" />
+          Excluir minha conta
+        </Link>
+      </motion.div>
+
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }}>
         <button
           onClick={() => logout()}
           className="w-full flex items-center justify-center gap-2 p-4 rounded-2xl glass text-destructive hover:bg-destructive/10 transition-all font-medium"

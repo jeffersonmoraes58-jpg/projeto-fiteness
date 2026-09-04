@@ -2,11 +2,12 @@
 
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { ChevronLeft, Save, LogOut, Building2, Mail } from 'lucide-react';
+import { ChevronLeft, Save, LogOut, Building2, Mail, Trash2, Star, ChevronRight } from 'lucide-react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { useAuthStore } from '@/store/auth';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import toast from 'react-hot-toast';
 
 export default function StudioSettingsPage() {
@@ -82,7 +83,33 @@ export default function StudioSettingsPage() {
         </div>
       </motion.div>
 
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }} className="glass-card">
+        <button
+          onClick={() => window.open('https://play.google.com/store/apps/details?id=com.fitlynutri.app', '_blank')}
+          className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-accent transition-all text-left"
+        >
+          <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center flex-shrink-0">
+            <Star className="w-4 h-4 text-muted-foreground" />
+          </div>
+          <div className="flex-1">
+            <div className="text-sm font-medium">Avaliar o app</div>
+            <div className="text-xs text-muted-foreground">Deixe sua avaliação na Play Store</div>
+          </div>
+          <ChevronRight className="w-4 h-4 text-muted-foreground" />
+        </button>
+      </motion.div>
+
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
+        <Link
+          href="/account-deletion"
+          className="w-full flex items-center justify-center gap-2 p-4 rounded-2xl glass border border-destructive/30 text-destructive hover:bg-destructive/10 transition-all font-medium"
+        >
+          <Trash2 className="w-4 h-4" />
+          Excluir minha conta
+        </Link>
+      </motion.div>
+
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}>
         <button onClick={() => logout()} className="w-full flex items-center justify-center gap-2 p-4 rounded-2xl glass text-destructive hover:bg-destructive/10 transition-all font-medium">
           <LogOut className="w-4 h-4" />
           Sair da conta
