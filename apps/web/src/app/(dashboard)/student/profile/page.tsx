@@ -8,11 +8,12 @@ import {
   User, Camera, Mail, Phone, MapPin, Calendar,
   Shield, Bell, Palette, LogOut, ChevronRight,
   Save, Edit2, X, CheckCheck, Trash2, Eye, EyeOff,
-  Sun, Moon, Monitor, Check, Star,
+  Sun, Moon, Monitor, Check, Star, HelpCircle,
 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { useAuthStore } from '@/store/auth';
+import { reopenOnboardingTour } from '@/components/dashboard/onboarding-tour';
 import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
 
@@ -145,6 +146,7 @@ export default function StudentProfile() {
       items: [
         { icon: Mail, label: 'Fale Conosco', description: 'Entre em contato com o suporte', onClick: undefined },
         { icon: Star, label: 'Avaliar o app', description: 'Deixe sua avaliação na Play Store', onClick: () => window.open('https://play.google.com/store/apps/details?id=com.fitlynutri.app', '_blank') },
+        { icon: HelpCircle, label: 'Rever tutorial', description: 'Veja de novo a introdução ao app', onClick: () => reopenOnboardingTour() },
       ],
     },
   ];

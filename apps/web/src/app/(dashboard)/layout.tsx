@@ -3,6 +3,7 @@ import { DashboardHeader } from '@/components/dashboard/header';
 import { MobileNav } from '@/components/dashboard/mobile-nav';
 import { SubscriptionGate } from '@/components/dashboard/subscription-gate';
 import { AuthGate } from '@/components/dashboard/auth-gate';
+import { OnboardingTour } from '@/components/dashboard/onboarding-tour';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -18,6 +19,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <MobileNav />
           </div>
         </div>
+        <OnboardingTour />
       </SubscriptionGate>
     </AuthGate>
   );

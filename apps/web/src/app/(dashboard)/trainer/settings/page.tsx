@@ -9,11 +9,12 @@ import {
   User, Camera, Mail, Phone, MapPin, Award,
   Bell, Shield, LogOut, Save, Edit2, ChevronRight,
   Globe, Star, CreditCard, Eye, EyeOff, X, Trash2, CheckCheck,
-  Palette, Sun, Moon, Monitor, Check,
+  Palette, Sun, Moon, Monitor, Check, HelpCircle,
 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { useAuthStore } from '@/store/auth';
+import { reopenOnboardingTour } from '@/components/dashboard/onboarding-tour';
 import toast from 'react-hot-toast';
 
 export default function TrainerSettings() {
@@ -297,6 +298,7 @@ export default function TrainerSettings() {
             { icon: Palette, label: 'Aparência', description: 'Tema e cor de destaque', onClick: () => setShowAppearance(true) },
             { icon: CreditCard, label: 'Plano e Cobrança', description: 'Seu plano Fitlynutri', onClick: () => router.push('/trainer/subscription') },
             { icon: Star, label: 'Avaliar o app', description: 'Deixe sua avaliação na Play Store', onClick: () => window.open('https://play.google.com/store/apps/details?id=com.fitlynutri.app', '_blank') },
+            { icon: HelpCircle, label: 'Rever tutorial', description: 'Veja de novo a introdução ao app', onClick: () => reopenOnboardingTour() },
           ].map((item) => (
             <button key={item.label} onClick={item.onClick} className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-accent transition-all text-left">
               <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center flex-shrink-0">

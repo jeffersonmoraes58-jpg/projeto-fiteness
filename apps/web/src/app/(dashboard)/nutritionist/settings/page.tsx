@@ -9,11 +9,12 @@ import {
   User, Camera, Mail, Phone, MapPin, Award,
   Bell, Shield, LogOut, Save, Edit2, ChevronRight, Globe,
   Eye, EyeOff, X, Trash2, CheckCheck, Palette, Sun, Moon, Monitor, Check,
-  CreditCard, Star,
+  CreditCard, Star, HelpCircle,
 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { useAuthStore } from '@/store/auth';
+import { reopenOnboardingTour } from '@/components/dashboard/onboarding-tour';
 import toast from 'react-hot-toast';
 
 export default function NutritionistSettings() {
@@ -149,6 +150,7 @@ export default function NutritionistSettings() {
     { icon: Shield, label: 'Segurança', description: 'Senha e autenticação', onClick: () => setShowSecurity(true) },
     { icon: Palette, label: 'Aparência', description: 'Tema e cor de destaque', onClick: () => setShowAppearance(true) },
     { icon: Star, label: 'Avaliar o app', description: 'Deixe sua avaliação na Play Store', onClick: () => window.open('https://play.google.com/store/apps/details?id=com.fitlynutri.app', '_blank') },
+    { icon: HelpCircle, label: 'Rever tutorial', description: 'Veja de novo a introdução ao app', onClick: () => reopenOnboardingTour() },
   ];
 
   return (

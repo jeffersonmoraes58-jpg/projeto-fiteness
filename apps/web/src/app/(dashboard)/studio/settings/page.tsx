@@ -2,10 +2,11 @@
 
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { ChevronLeft, Save, LogOut, Building2, Mail, Trash2, Star, ChevronRight } from 'lucide-react';
+import { ChevronLeft, Save, LogOut, Building2, Mail, Trash2, Star, ChevronRight, HelpCircle } from 'lucide-react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { useAuthStore } from '@/store/auth';
+import { reopenOnboardingTour } from '@/components/dashboard/onboarding-tour';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
@@ -94,6 +95,19 @@ export default function StudioSettingsPage() {
           <div className="flex-1">
             <div className="text-sm font-medium">Avaliar o app</div>
             <div className="text-xs text-muted-foreground">Deixe sua avaliação na Play Store</div>
+          </div>
+          <ChevronRight className="w-4 h-4 text-muted-foreground" />
+        </button>
+        <button
+          onClick={() => reopenOnboardingTour()}
+          className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-accent transition-all text-left"
+        >
+          <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center flex-shrink-0">
+            <HelpCircle className="w-4 h-4 text-muted-foreground" />
+          </div>
+          <div className="flex-1">
+            <div className="text-sm font-medium">Rever tutorial</div>
+            <div className="text-xs text-muted-foreground">Veja de novo a introdução ao app</div>
           </div>
           <ChevronRight className="w-4 h-4 text-muted-foreground" />
         </button>
