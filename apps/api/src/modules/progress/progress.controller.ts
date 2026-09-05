@@ -3,6 +3,8 @@ import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { ProgressService } from './progress.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../../decorators/current-user.decorator';
+import { PlanFeatureGuard } from '../subscriptions/plan-feature.guard';
+import { RequireFeature } from '../subscriptions/require-feature.decorator';
 
 @ApiTags('progress')
 @ApiBearerAuth()
@@ -42,6 +44,8 @@ export class ProgressController {
   }
 
   @Post('assessments')
+  @UseGuards(PlanFeatureGuard)
+  @RequireFeature('physicalAssessment')
   @ApiOperation({ summary: 'Adicionar avaliação física (trainer)' })
   addAssessment(@CurrentUser() user: any, @Body() body: any) {
     return this.service.addAssessment(body.studentUserId, user.id, body);

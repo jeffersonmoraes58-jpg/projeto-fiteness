@@ -15,6 +15,8 @@ import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { BillingService } from './billing.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../../decorators/current-user.decorator';
+import { PlanFeatureGuard } from '../subscriptions/plan-feature.guard';
+import { RequireFeature } from '../subscriptions/require-feature.decorator';
 
 @ApiTags('billing')
 @Controller('billing')
@@ -32,7 +34,8 @@ export class BillingController {
   }
 
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, PlanFeatureGuard)
+  @RequireFeature('billing')
   @Post('trainer/pricing')
   @ApiOperation({ summary: 'Configurar preços mensal/anual e token MP' })
   setTrainerPricing(
@@ -51,7 +54,8 @@ export class BillingController {
   }
 
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, PlanFeatureGuard)
+  @RequireFeature('billing')
   @Post('trainer/students/:studentUserId/subscribe')
   @ApiOperation({ summary: 'Criar assinatura para um aluno' })
   createSubscription(

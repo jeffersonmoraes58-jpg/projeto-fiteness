@@ -9,6 +9,7 @@ import {
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
+import { PlanGate } from '@/components/ui/plan-gate';
 
 const WEEKDAYS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 const MONTHS = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
@@ -66,6 +67,7 @@ export default function NutritionistSchedule() {
   const isSelected = (d: Date) => d.toDateString() === selectedDay.toDateString();
 
   return (
+    <PlanGate feature="scheduleCalendar">
     <div className="space-y-6">
       {/* Header */}
       <div className="page-header">
@@ -239,6 +241,7 @@ export default function NutritionistSchedule() {
         </div>
       </div>
     </div>
+    </PlanGate>
   );
 }
 

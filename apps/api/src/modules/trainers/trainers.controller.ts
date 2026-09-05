@@ -3,6 +3,8 @@ import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { TrainersService } from './trainers.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../../decorators/current-user.decorator';
+import { PlanFeatureGuard } from '../subscriptions/plan-feature.guard';
+import { RequireFeature } from '../subscriptions/require-feature.decorator';
 
 @ApiTags('trainers')
 @ApiBearerAuth()
@@ -54,6 +56,8 @@ export class TrainersController {
   }
 
   @Post('me/appointments')
+  @UseGuards(PlanFeatureGuard)
+  @RequireFeature('scheduleCalendar')
   @ApiOperation({ summary: 'Criar agendamento' })
   createAppointment(@CurrentUser() user: any, @Body() body: any) {
     return this.service.createAppointment(user.id, body);

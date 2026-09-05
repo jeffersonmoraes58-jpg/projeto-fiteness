@@ -10,32 +10,38 @@ export interface PlanLimits {
   csvReports: boolean;
   gamification: boolean;
   musicPlayer: boolean;
+  physicalAssessment: boolean;
 }
 
 export type PlanFeature = keyof Omit<PlanLimits, 'maxStudents'>;
 
+// Esta tabela precisa bater exatamente com o que é vendido em
+// apps/web/src/components/landing/pricing.tsx e SubscriptionPage.tsx —
+// qualquer mudança aqui deve ser espelhada lá (e vice-versa).
 export const PLAN_LIMITS: Record<SubscriptionPlan, PlanLimits> = {
   FREE: {
     maxStudents: 1,
-    ai: true,
-    challenges: true,
-    scheduleCalendar: true,
-    billing: true,
+    ai: false,
+    challenges: false,
+    scheduleCalendar: false,
+    billing: false,
     pdfReports: false,
-    csvReports: true,
-    gamification: true,
+    csvReports: false,
+    gamification: false,
     musicPlayer: false,
+    physicalAssessment: false,
   },
   BASIC: {
     maxStudents: 20,
-    ai: true,
-    challenges: true,
+    ai: false,
+    challenges: false,
     scheduleCalendar: true,
     billing: true,
     pdfReports: false,
     csvReports: true,
-    gamification: true,
-    musicPlayer: true,
+    gamification: false,
+    musicPlayer: false,
+    physicalAssessment: true,
   },
   PRO: {
     maxStudents: 60,
@@ -47,6 +53,7 @@ export const PLAN_LIMITS: Record<SubscriptionPlan, PlanLimits> = {
     csvReports: true,
     gamification: true,
     musicPlayer: true,
+    physicalAssessment: true,
   },
   ENTERPRISE: {
     maxStudents: -1,
@@ -58,6 +65,7 @@ export const PLAN_LIMITS: Record<SubscriptionPlan, PlanLimits> = {
     csvReports: true,
     gamification: true,
     musicPlayer: true,
+    physicalAssessment: true,
   },
 };
 

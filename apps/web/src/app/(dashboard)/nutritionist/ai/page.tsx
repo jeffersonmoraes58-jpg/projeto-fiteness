@@ -10,6 +10,7 @@ import {
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
+import { PlanGate } from '@/components/ui/plan-gate';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -229,6 +230,7 @@ export default function NutritionistAIToolbox() {
   };
 
   return (
+    <PlanGate feature="ai">
     <div className="flex flex-col h-[calc(100vh-8rem)] gap-4">
       {/* ── Header ── */}
       <div className="flex items-center gap-3">
@@ -490,6 +492,7 @@ export default function NutritionistAIToolbox() {
         </AnimatePresence>
       </div>
     </div>
+    </PlanGate>
   );
 }
 

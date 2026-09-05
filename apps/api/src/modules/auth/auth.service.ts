@@ -131,20 +131,32 @@ export class AuthService {
         const payload = await this.jwtService.verifyAsync(dto.inviteToken, {
           secret: this.config.get('JWT_SECRET'),
         });
+        // O cadastro do aluno em si nunca deve falhar por causa do plano do
+        // profissional — por isso a checagem de limite fica dentro do mesmo
+        // try/catch "silencioso": se o profissional já estiver no limite, o
+        // aluno cria a conta normalmente, só não fica vinculado automaticamente
+        // (evita o furo de driblar o limite de alunos via link de convite).
+        // O JWT do convite já carrega o tenantId do profissional (ver generateInviteLink).
         if (payload.type === 'student-invite') {
+          await this.subscriptionService.checkStudentLimit(payload.tenantId, payload.sub);
           await this.prisma.trainerStudent.upsert({
             where: { trainerId_studentId: { trainerId: payload.sub, studentId: createdStudentId } },
             update: { isActive: true, startedAt: new Date(), endedAt: null },
             create: { trainerId: payload.sub, studentId: createdStudentId, isActive: true },
           });
         } else if (payload.type === 'nutritionist-invite') {
+          await this.subscriptionService.checkPatientLimit(payload.tenantId, payload.sub);
           await this.prisma.nutritionistPatient.upsert({
             where: { nutritionistId_studentId: { nutritionistId: payload.sub, studentId: createdStudentId } },
             update: { isActive: true, startedAt: new Date(), endedAt: null },
             create: { nutritionistId: payload.sub, studentId: createdStudentId, isActive: true },
           });
         }
-      } catch {} // token expirado ou inválido — cadastro continua normalmente
+      } catch (err) {
+        // token expirado/inválido OU limite de alunos atingido — cadastro
+        // continua normalmente, só não vincula ao profissional
+        this.logger.warn(`[Register] Convite não aplicado para aluno ${createdStudentId}: ${err instanceof Error ? err.message : err}`);
+      }
     }
 
     const tokens = await this.generateTokens(user.id, user.email, user.role, user.tenantId);

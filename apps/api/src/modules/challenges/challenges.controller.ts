@@ -6,6 +6,8 @@ import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { ChallengesService } from './challenges.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../../decorators/current-user.decorator';
+import { PlanFeatureGuard } from '../subscriptions/plan-feature.guard';
+import { RequireFeature } from '../subscriptions/require-feature.decorator';
 
 @ApiTags('challenges')
 @ApiBearerAuth()
@@ -17,6 +19,8 @@ export class ChallengesController {
   // ── TRAINER ──────────────────────────────────────────────
 
   @Post()
+  @UseGuards(PlanFeatureGuard)
+  @RequireFeature('challenges')
   @ApiOperation({ summary: 'Criar desafio (TRAINER)' })
   create(@CurrentUser() user: any, @Body() body: any) {
     return this.service.createChallenge(user.id, body);

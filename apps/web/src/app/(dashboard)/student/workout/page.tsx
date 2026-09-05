@@ -15,6 +15,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { resolveVideoUrl, resolveImageUrl } from '@/lib/video-url';
+import { useSubscription } from '@/hooks/useSubscription';
 import toast from 'react-hot-toast';
 
 const DAYS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
@@ -230,6 +231,7 @@ function VideoModal({ url, title, onClose }: { url: string; title: string; onClo
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function StudentWorkout() {
+  const { canUseFeature } = useSubscription();
   const [selectedTrainerId, setSelectedTrainerId] = useState<string | null>(null);
   const [selectedDay, setSelectedDay] = useState<number>(TODAY);
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
@@ -713,10 +715,12 @@ export default function StudentWorkout() {
         {selectedPlan ? (
           // ── DETAIL VIEW ──────────────────────────────────────────────────
           <>
-            {/* Music player — sticky at top */}
-            <div className="sticky top-0 z-20 -mx-4 sm:-mx-6 px-4 sm:px-6 pt-3 pb-2 bg-background/95 backdrop-blur-sm border-b border-border/40">
-              <WorkoutMusicPlayer />
-            </div>
+            {/* Music player — sticky at top (recurso do plano do trainer, não do aluno) */}
+            {canUseFeature('musicPlayer') && (
+              <div className="sticky top-0 z-20 -mx-4 sm:-mx-6 px-4 sm:px-6 pt-3 pb-2 bg-background/95 backdrop-blur-sm border-b border-border/40">
+                <WorkoutMusicPlayer />
+              </div>
+            )}
 
             {/* Header */}
             <div className="flex items-center gap-3">

@@ -246,6 +246,23 @@ export class SubscriptionService {
     }
   }
 
+  /** Mesma checagem de limite, do lado do nutricionista (conta NutritionistPatient em vez de TrainerStudent). */
+  async checkPatientLimit(tenantId: string, nutritionistId: string, userId?: string): Promise<void> {
+    const plan = await this.getEffectivePlan(tenantId, userId);
+    const maxStudents = PLAN_LIMITS[plan].maxStudents;
+    if (maxStudents === -1) return;
+
+    const currentCount = await this.prisma.nutritionistPatient.count({
+      where: { nutritionistId, isActive: true },
+    });
+
+    if (currentCount >= maxStudents) {
+      throw new ForbiddenException(
+        `Limite de ${maxStudents} paciente(s) atingido no plano ${PLAN_DISPLAY_NAMES[plan]}. Faça upgrade para adicionar mais pacientes.`,
+      );
+    }
+  }
+
   async createMPCheckout(
     tenantId: string,
     plan: SubscriptionPlan,

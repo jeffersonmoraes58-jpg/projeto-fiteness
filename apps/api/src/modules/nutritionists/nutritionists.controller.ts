@@ -3,6 +3,8 @@ import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { NutritionistsService } from './nutritionists.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../../decorators/current-user.decorator';
+import { PlanFeatureGuard } from '../subscriptions/plan-feature.guard';
+import { RequireFeature } from '../subscriptions/require-feature.decorator';
 
 @ApiTags('nutritionists')
 @ApiBearerAuth()
@@ -64,6 +66,8 @@ export class NutritionistsController {
   }
 
   @Post('me/consultations')
+  @UseGuards(PlanFeatureGuard)
+  @RequireFeature('scheduleCalendar')
   @ApiOperation({ summary: 'Criar consulta nutricional' })
   createConsultation(@CurrentUser() user: any, @Body() body: any) {
     return this.service.createConsultation(user.id, body);
@@ -140,6 +144,8 @@ export class NutritionistsController {
   }
 
   @Post('me/patients/:studentId/physical-assessments')
+  @UseGuards(PlanFeatureGuard)
+  @RequireFeature('physicalAssessment')
   @ApiOperation({ summary: 'Criar avaliacao antropometrica do paciente' })
   createPhysicalAssessment(@CurrentUser() user: any, @Param('studentId') studentId: string, @Body() body: any) {
     return this.service.createPhysicalAssessment(user.id, studentId, body);
@@ -248,6 +254,8 @@ export class NutritionistsController {
   }
 
   @Post('me/patients/:studentId/consultations')
+  @UseGuards(PlanFeatureGuard)
+  @RequireFeature('scheduleCalendar')
   @ApiOperation({ summary: 'Registrar consulta do paciente' })
   createPatientConsultation(@CurrentUser() user: any, @Param('studentId') studentId: string, @Body() body: any) {
     return this.service.createPatientConsultation(user.id, studentId, body);

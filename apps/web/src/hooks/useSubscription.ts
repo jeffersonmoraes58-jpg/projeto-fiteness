@@ -14,6 +14,7 @@ export interface PlanLimits {
   csvReports: boolean;
   gamification: boolean;
   musicPlayer: boolean;
+  physicalAssessment: boolean;
 }
 
 export type SubscriptionPlan = 'FREE' | 'BASIC' | 'PRO' | 'ENTERPRISE';

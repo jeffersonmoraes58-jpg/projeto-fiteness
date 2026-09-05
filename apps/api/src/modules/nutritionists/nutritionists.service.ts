@@ -1,10 +1,14 @@
 import { Injectable, NotFoundException, ConflictException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { SubscriptionService } from '../subscriptions/subscription.service';
 import * as bcrypt from 'bcryptjs';
 
 @Injectable()
 export class NutritionistsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private subscriptionService: SubscriptionService,
+  ) {}
 
   private async getNutritionist(userId: string) {
     const n = await this.prisma.nutritionist.findUnique({
@@ -262,6 +266,12 @@ export class NutritionistsService {
       // Se o aluno ja existe em outro tenant, vincula em vez de criar novo
       const student = await this.prisma.student.findUnique({ where: { userId: existing.id } });
       if (student) {
+        const existingRelation = await this.prisma.nutritionistPatient.findUnique({
+          where: { nutritionistId_studentId: { nutritionistId: n.id, studentId: student.id } },
+        });
+        if (!existingRelation || !existingRelation.isActive) {
+          await this.subscriptionService.checkPatientLimit(n.user.tenantId, n.id, userId);
+        }
         await this.prisma.nutritionistPatient.upsert({
           where: { nutritionistId_studentId: { nutritionistId: n.id, studentId: student.id } },
           update: { isActive: true, monthlyFee: data.monthlyFee, startedAt: new Date(), endedAt: null },
@@ -271,6 +281,7 @@ export class NutritionistsService {
       }
       throw new ConflictException('Já existe um usuário com este e-mail');
     }
+    await this.subscriptionService.checkPatientLimit(n.user.tenantId, n.id, userId);
     const tempPassword = `Fit@${Math.random().toString(36).slice(-6).toUpperCase()}1`;
     const hashed = await bcrypt.hash(tempPassword, 12);
     const newUser = await this.prisma.$transaction(async (tx) => {
@@ -297,6 +308,14 @@ export class NutritionistsService {
     const n = await this.getNutritionist(userId);
     const student = await this.prisma.student.findUnique({ where: { userId: studentUserId } });
     if (!student) throw new NotFoundException('Aluno não encontrado');
+
+    const existing = await this.prisma.nutritionistPatient.findUnique({
+      where: { nutritionistId_studentId: { nutritionistId: n.id, studentId: student.id } },
+    });
+    if (!existing || !existing.isActive) {
+      await this.subscriptionService.checkPatientLimit(n.user.tenantId, n.id, userId);
+    }
+
     return this.prisma.nutritionistPatient.upsert({
       where: { nutritionistId_studentId: { nutritionistId: n.id, studentId: student.id } },
       // Reativação de um vínculo antigo (ex: paciente que voltou): zera o endedAt
