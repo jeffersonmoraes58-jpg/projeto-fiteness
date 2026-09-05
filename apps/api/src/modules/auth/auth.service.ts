@@ -115,8 +115,14 @@ export class AuthService {
         if (payload.type === 'student-invite') {
           await this.prisma.trainerStudent.upsert({
             where: { trainerId_studentId: { trainerId: payload.sub, studentId: createdStudentId } },
-            update: { isActive: true },
+            update: { isActive: true, startedAt: new Date(), endedAt: null },
             create: { trainerId: payload.sub, studentId: createdStudentId, isActive: true },
+          });
+        } else if (payload.type === 'nutritionist-invite') {
+          await this.prisma.nutritionistPatient.upsert({
+            where: { nutritionistId_studentId: { nutritionistId: payload.sub, studentId: createdStudentId } },
+            update: { isActive: true, startedAt: new Date(), endedAt: null },
+            create: { nutritionistId: payload.sub, studentId: createdStudentId, isActive: true },
           });
         }
       } catch {} // token expirado ou inválido — cadastro continua normalmente
@@ -287,23 +293,53 @@ export class AuthService {
     return { user: this.sanitizeUser(user), ...tokens };
   }
 
+  /**
+   * Gera um link de convite para o profissional autenticado (trainer OU
+   * nutricionista — detecta automaticamente qual sub-perfil o usuário tem).
+   * O aluno que abrir o link e se cadastrar já entra vinculado a ele.
+   */
   async generateInviteLink(userId: string) {
     const trainer = await this.prisma.trainer.findUnique({
       where: { userId },
       include: { user: { include: { profile: true } } },
     });
-    if (!trainer) throw new NotFoundException('Perfil de trainer não encontrado');
 
-    const trainerName = [trainer.user.profile?.firstName, trainer.user.profile?.lastName]
-      .filter(Boolean).join(' ') || 'Personal Trainer';
+    let professionalId: string;
+    let tenantId: string;
+    let professionalName: string;
+    let inviteType: 'student-invite' | 'nutritionist-invite';
+
+    if (trainer) {
+      professionalId = trainer.id;
+      tenantId = trainer.user.tenantId;
+      professionalName = [trainer.user.profile?.firstName, trainer.user.profile?.lastName]
+        .filter(Boolean).join(' ') || 'Personal Trainer';
+      inviteType = 'student-invite';
+    } else {
+      const nutritionist = await this.prisma.nutritionist.findUnique({
+        where: { userId },
+        include: { user: { include: { profile: true } } },
+      });
+      if (!nutritionist) throw new NotFoundException('Perfil de trainer ou nutricionista não encontrado');
+      professionalId = nutritionist.id;
+      tenantId = nutritionist.user.tenantId;
+      professionalName = [nutritionist.user.profile?.firstName, nutritionist.user.profile?.lastName]
+        .filter(Boolean).join(' ') || 'Nutricionista';
+      inviteType = 'nutritionist-invite';
+    }
 
     const token = await this.jwtService.signAsync(
-      { sub: trainer.id, tenantId: trainer.user.tenantId, trainerName, type: 'student-invite' },
+      { sub: professionalId, tenantId, trainerName: professionalName, type: inviteType },
       { secret: this.config.get('JWT_SECRET'), expiresIn: '7d' },
     );
 
     const baseUrl = this.config.get('FRONTEND_URL', 'https://fitlynutri.com.br');
-    return { link: `${baseUrl}/cadastro?invite=${token}`, trainerName };
+    return {
+      link: `${baseUrl}/cadastro?invite=${token}`,
+      trainerName: professionalName, // mantido por compatibilidade com o front existente
+      professionalName,
+      professionalType: inviteType === 'nutritionist-invite' ? 'NUTRITIONIST' : 'TRAINER',
+    };
   }
 
   async validateInviteToken(token: string) {
@@ -311,8 +347,15 @@ export class AuthService {
       const payload = await this.jwtService.verifyAsync(token, {
         secret: this.config.get('JWT_SECRET'),
       });
-      if (payload.type !== 'student-invite') throw new Error('invalid type');
-      return { valid: true, trainerName: payload.trainerName as string, tenantId: payload.tenantId as string };
+      if (payload.type !== 'student-invite' && payload.type !== 'nutritionist-invite') {
+        throw new Error('invalid type');
+      }
+      return {
+        valid: true,
+        trainerName: payload.trainerName as string,
+        professionalType: payload.type === 'nutritionist-invite' ? 'NUTRITIONIST' : 'TRAINER',
+        tenantId: payload.tenantId as string,
+      };
     } catch {
       throw new BadRequestException('Link inválido ou expirado');
     }
@@ -330,7 +373,7 @@ export class AuthService {
     const payload = await this.jwtService.verifyAsync(inviteToken, {
       secret: this.config.get('JWT_SECRET'),
     });
-    if (payload.type !== 'student-invite') {
+    if (payload.type !== 'student-invite' && payload.type !== 'nutritionist-invite') {
       throw new BadRequestException('Token de convite inválido');
     }
 
@@ -351,21 +394,35 @@ export class AuthService {
       throw new NotFoundException('Conta não possui perfil de aluno');
     }
 
-    const trainerId = payload.sub as string;
+    const professionalId = payload.sub as string;
+    const studentId = user.student.id;
+    const isNutritionistInvite = payload.type === 'nutritionist-invite';
 
-    const existing = await this.prisma.trainerStudent.findUnique({
-      where: { trainerId_studentId: { trainerId, studentId: user.student.id } },
-    });
+    const existing = isNutritionistInvite
+      ? await this.prisma.nutritionistPatient.findUnique({
+          where: { nutritionistId_studentId: { nutritionistId: professionalId, studentId } },
+        })
+      : await this.prisma.trainerStudent.findUnique({
+          where: { trainerId_studentId: { trainerId: professionalId, studentId } },
+        });
 
     if (existing?.isActive) {
       return { alreadyLinked: true, user: this.sanitizeUser(user) };
     }
 
-    await this.prisma.trainerStudent.upsert({
-      where: { trainerId_studentId: { trainerId, studentId: user.student.id } },
-      update: { isActive: true },
-      create: { trainerId, studentId: user.student.id, isActive: true },
-    });
+    if (isNutritionistInvite) {
+      await this.prisma.nutritionistPatient.upsert({
+        where: { nutritionistId_studentId: { nutritionistId: professionalId, studentId } },
+        update: { isActive: true, startedAt: new Date(), endedAt: null },
+        create: { nutritionistId: professionalId, studentId, isActive: true },
+      });
+    } else {
+      await this.prisma.trainerStudent.upsert({
+        where: { trainerId_studentId: { trainerId: professionalId, studentId } },
+        update: { isActive: true, startedAt: new Date(), endedAt: null },
+        create: { trainerId: professionalId, studentId, isActive: true },
+      });
+    }
 
     const tokens = await this.generateTokens(user.id, user.email, user.role, user.tenantId);
     await this.saveRefreshToken(user.id, tokens.refreshToken);

@@ -15,6 +15,8 @@ function CadastroConvite() {
   const { register: authRegister, isLoading, login: authLogin } = useAuthStore();
 
   const [trainerName, setTrainerName] = useState('');
+  const [professionalType, setProfessionalType] = useState<'TRAINER' | 'NUTRITIONIST'>('TRAINER');
+  const roleLabel = professionalType === 'NUTRITIONIST' ? 'nutricionista' : 'personal';
   const [tenantId, setTenantId] = useState('');
   const [tokenError, setTokenError] = useState('');
   const [validating, setValidating] = useState(true);
@@ -36,8 +38,13 @@ function CadastroConvite() {
   useEffect(() => {
     if (!token) { setTokenError('Link de convite inválido ou ausente.'); setValidating(false); return; }
     api.get(`/auth/invite/validate?token=${token}`)
-      .then((r) => { const d = r.data.data ?? r.data; setTrainerName(d.trainerName); setTenantId(d.tenantId); })
-      .catch(() => setTokenError('Este link é inválido ou já expirou. Solicite um novo link ao seu personal.'))
+      .then((r) => {
+        const d = r.data.data ?? r.data;
+        setTrainerName(d.trainerName);
+        setProfessionalType(d.professionalType === 'NUTRITIONIST' ? 'NUTRITIONIST' : 'TRAINER');
+        setTenantId(d.tenantId);
+      })
+      .catch(() => setTokenError('Este link é inválido ou já expirou. Solicite um novo link ao seu personal ou nutricionista.'))
       .finally(() => setValidating(false));
   }, [token]);
 
@@ -110,7 +117,7 @@ function CadastroConvite() {
       const data = res.data.data ?? res.data;
 
       if (data.alreadyLinked) {
-        toast.success('Você já está vinculado a este personal!');
+        toast.success(`Você já está vinculado a este ${roleLabel}!`);
         router.push('/login');
         return;
       }
@@ -189,13 +196,13 @@ function CadastroConvite() {
               <Link2 className="w-5 h-5 text-violet-400 flex-shrink-0" />
               <div>
                 <p className="text-sm font-semibold text-violet-300">Vincular conta existente</p>
-                <p className="text-xs text-muted-foreground">Conecte sua conta ao personal {trainerName}</p>
+                <p className="text-xs text-muted-foreground">Conecte sua conta ao {roleLabel} {trainerName}</p>
               </div>
             </div>
 
             <h1 className="text-xl font-bold mb-1">Entrar na sua conta</h1>
             <p className="text-sm text-muted-foreground mb-5">
-              Informe sua senha para vincular ao personal <strong>{trainerName}</strong>
+              Informe sua senha para vincular ao {roleLabel} <strong>{trainerName}</strong>
             </p>
 
             <form onSubmit={handleLinkExisting} className="space-y-4">
@@ -246,7 +253,11 @@ function CadastroConvite() {
               <CheckCircle2 className="w-5 h-5 text-violet-400 flex-shrink-0" />
               <div>
                 <p className="text-sm font-semibold text-violet-300">Convite de {trainerName}</p>
-                <p className="text-xs text-muted-foreground">Crie sua conta e comece a treinar agora</p>
+                <p className="text-xs text-muted-foreground">
+                  {professionalType === 'NUTRITIONIST'
+                    ? 'Crie sua conta e comece seu acompanhamento nutricional agora'
+                    : 'Crie sua conta e comece a treinar agora'}
+                </p>
               </div>
             </div>
 
@@ -260,7 +271,7 @@ function CadastroConvite() {
                 <div className="flex-1">
                   <p className="text-sm font-semibold text-amber-400">Você já possui conta</p>
                   <p className="text-xs text-muted-foreground mt-1">
-                    Este e-mail já está cadastrado no Fitlynutri. Vincule sua conta existente ao personal {trainerName}.
+                    Este e-mail já está cadastrado no Fitlynutri. Vincule sua conta existente ao {roleLabel} {trainerName}.
                   </p>
                   <button
                     type="button"
