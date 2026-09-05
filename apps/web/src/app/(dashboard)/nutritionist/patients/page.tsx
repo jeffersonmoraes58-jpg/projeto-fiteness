@@ -5,11 +5,11 @@ import { motion } from 'framer-motion';
 import {
   Search, Plus, Filter, Users, Apple, TrendingUp,
   ChevronRight, MoreVertical, MessageCircle, Calendar,
-  FileText, ClipboardCheck,
+  FileText, ClipboardCheck, UserMinus,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
@@ -174,6 +174,7 @@ const COLORS = ['from-emerald-600 to-teal-600', 'from-cyan-600 to-blue-600', 'fr
 
 function PatientCard({ patient, index }: { patient: any; index: number }) {
   const router = useRouter();
+  const qc = useQueryClient();
   const [menuOpen, setMenuOpen] = useState(false);
   const initials = `${patient.user?.profile?.firstName?.[0] || ''}${patient.user?.profile?.lastName?.[0] || ''}`;
   const color = COLORS[index % COLORS.length];
@@ -185,6 +186,19 @@ function PatientCard({ patient, index }: { patient: any; index: number }) {
       router.push(`/nutritionist/chat?chatId=${chatId}`);
     } catch {
       toast.error('Erro ao abrir chat');
+    }
+  }
+
+  async function handleRemove() {
+    setMenuOpen(false);
+    if (!confirm(`Remover ${patient.user?.profile?.firstName} da sua lista de pacientes?`)) return;
+    try {
+      await api.delete(`/nutritionists/me/patients/${patient.id}`);
+      toast.success('Paciente removido');
+      qc.invalidateQueries({ queryKey: ['nutritionist-patients-list'] });
+      qc.invalidateQueries({ queryKey: ['nutritionist-dashboard'] });
+    } catch {
+      toast.error('Erro ao remover paciente');
     }
   }
 
@@ -225,6 +239,13 @@ function PatientCard({ patient, index }: { patient: any; index: number }) {
               </Link>
               <button onClick={handleStartChat} className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-accent transition-all">
                 <MessageCircle className="w-3.5 h-3.5" /> Enviar mensagem
+              </button>
+              <div className="border-t border-border/40 my-0.5" />
+              <button
+                onClick={handleRemove}
+                className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-400 hover:bg-red-500/10 transition-all"
+              >
+                <UserMinus className="w-3.5 h-3.5" /> Remover paciente
               </button>
             </div>
           )}

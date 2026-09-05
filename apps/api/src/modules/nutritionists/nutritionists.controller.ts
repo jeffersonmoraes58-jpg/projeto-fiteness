@@ -51,6 +51,12 @@ export class NutritionistsController {
     return this.service.addPatient(user.id, body.studentUserId, body.monthlyFee);
   }
 
+  @Delete('me/patients/:studentId')
+  @ApiOperation({ summary: 'Remover/desvincular paciente' })
+  removePatient(@CurrentUser() user: any, @Param('studentId') studentId: string) {
+    return this.service.removePatient(user.id, studentId);
+  }
+
   @Get('me/consultations')
   @ApiOperation({ summary: 'Listar consultas nutricionais' })
   getConsultations(@CurrentUser() user: any) {

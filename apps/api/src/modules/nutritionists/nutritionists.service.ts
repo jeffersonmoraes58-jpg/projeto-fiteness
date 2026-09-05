@@ -264,7 +264,7 @@ export class NutritionistsService {
       if (student) {
         await this.prisma.nutritionistPatient.upsert({
           where: { nutritionistId_studentId: { nutritionistId: n.id, studentId: student.id } },
-          update: { isActive: true, monthlyFee: data.monthlyFee },
+          update: { isActive: true, monthlyFee: data.monthlyFee, startedAt: new Date(), endedAt: null },
           create: { nutritionistId: n.id, studentId: student.id, monthlyFee: data.monthlyFee, isActive: true },
         });
         return { ...existing, profile: existing.profile, tempPassword: null, alreadyExisted: true };
@@ -299,9 +299,34 @@ export class NutritionistsService {
     if (!student) throw new NotFoundException('Aluno não encontrado');
     return this.prisma.nutritionistPatient.upsert({
       where: { nutritionistId_studentId: { nutritionistId: n.id, studentId: student.id } },
-      update: { isActive: true, monthlyFee },
+      // Reativação de um vínculo antigo (ex: paciente que voltou): zera o endedAt
+      // e marca um novo início, igual ao fluxo de trainer.
+      update: { isActive: true, monthlyFee, startedAt: new Date(), endedAt: null },
       create: { nutritionistId: n.id, studentId: student.id, monthlyFee, isActive: true },
     });
+  }
+
+  /**
+   * Encerra o vínculo nutricionista↔paciente (ex: paciente trocou de nutricionista).
+   * Espelha o removeStudent() do TrainersService: desativa o vínculo e os planos
+   * alimentares ativos que vieram DESTE nutricionista, preservando o histórico.
+   */
+  async removePatient(userId: string, studentId: string) {
+    const n = await this.getNutritionist(userId);
+
+    await Promise.all([
+      this.prisma.nutritionistPatient.updateMany({
+        where: { nutritionistId: n.id, studentId },
+        data: { isActive: false, endedAt: new Date() },
+      }),
+      // Só desativa os planos alimentares que vieram de dietas DESTE nutricionista —
+      // não mexe em planos de um nutricionista anterior/futuro do mesmo aluno.
+      this.prisma.dietPlan.updateMany({
+        where: { studentId, isActive: true, diet: { nutritionistId: n.id } },
+        data: { isActive: false },
+      }),
+    ]);
+    return { message: 'Paciente removido' };
   }
 
   async getConsultations(userId: string) {

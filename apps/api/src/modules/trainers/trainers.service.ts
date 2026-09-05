@@ -208,15 +208,37 @@ export class TrainersService {
 
   async removeStudent(userId: string, studentId: string) {
     const trainer = await this.getTrainer(userId);
+
+    // Cobranças ainda ativas desse aluno com ESTE trainer não podem ficar
+    // penduradas depois que o vínculo acaba — cancela e limpa faturas em aberto.
+    const openBillings = await this.prisma.studentBilling.findMany({
+      where: { trainerId: trainer.id, studentId, status: { notIn: ['CANCELLED'] } },
+      select: { id: true },
+    });
+    const billingIds = openBillings.map((b) => b.id);
+
     await Promise.all([
       this.prisma.trainerStudent.updateMany({
         where: { trainerId: trainer.id, studentId },
-        data: { isActive: false },
+        data: { isActive: false, endedAt: new Date() },
       }),
+      // Só desativa os planos de treino que vieram de treinos DESTE trainer —
+      // não mexe em planos de um trainer anterior/futuro do mesmo aluno.
       this.prisma.workoutPlan.updateMany({
-        where: { studentId, isActive: true },
+        where: { studentId, isActive: true, workout: { trainerId: trainer.id } },
         data: { isActive: false },
       }),
+      billingIds.length
+        ? this.prisma.invoice.deleteMany({
+            where: { billingId: { in: billingIds }, status: { in: ['PENDING', 'OVERDUE'] } },
+          })
+        : Promise.resolve(),
+      billingIds.length
+        ? this.prisma.studentBilling.updateMany({
+            where: { id: { in: billingIds } },
+            data: { status: 'CANCELLED' },
+          })
+        : Promise.resolve(),
     ]);
     return { message: 'Aluno removido' };
   }
@@ -239,7 +261,9 @@ export class TrainersService {
 
     return this.prisma.trainerStudent.upsert({
       where: { trainerId_studentId: { trainerId: trainer.id, studentId: student.id } },
-      update: { isActive: true, monthlyFee },
+      // Reativação de um vínculo antigo: zera o endedAt e marca um novo início,
+      // pra não deixar registro de histórico incoerente (ativo com endedAt preenchido).
+      update: { isActive: true, monthlyFee, startedAt: new Date(), endedAt: null },
       create: { trainerId: trainer.id, studentId: student.id, monthlyFee, isActive: true },
     });
   }
