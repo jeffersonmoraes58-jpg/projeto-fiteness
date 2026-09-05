@@ -9,7 +9,7 @@ import {
   User, Camera, Mail, Phone, MapPin, Award,
   Bell, Shield, LogOut, Save, Edit2, ChevronRight, Globe,
   Eye, EyeOff, X, Trash2, CheckCheck, Palette, Sun, Moon, Monitor, Check,
-  CreditCard, Star, HelpCircle,
+  CreditCard, Star, HelpCircle, Dumbbell,
 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
@@ -18,7 +18,7 @@ import { reopenOnboardingTour } from '@/components/dashboard/onboarding-tour';
 import toast from 'react-hot-toast';
 
 export default function NutritionistSettings() {
-  const { user, logout } = useAuthStore();
+  const { user, logout, switchRole, addRole } = useAuthStore();
   const { theme, setTheme } = useTheme();
   const router = useRouter();
   const [editing, setEditing] = useState(false);
@@ -144,8 +144,26 @@ export default function NutritionistSettings() {
     setEditing(true);
   };
 
+  // Uma mesma conta pode ser personal E nutricionista. Se já tiver os dois
+  // perfis, só troca o papel ativo; senão, cria o perfil de personal nesta
+  // mesma conta (sem precisar de um segundo cadastro/e-mail).
+  const trainerRoleMutation = useMutation({
+    mutationFn: () => (profile?.trainer ? switchRole('TRAINER') : addRole('TRAINER')),
+    onSuccess: () => {
+      toast.success(profile?.trainer ? 'Modo personal ativado!' : 'Perfil de personal criado!');
+      router.push('/trainer');
+    },
+    onError: (e: any) => toast.error(e.response?.data?.message || 'Erro ao trocar de papel'),
+  });
+
   const preferences = [
     { icon: CreditCard, label: 'Plano e Cobrança', description: 'Seu plano Fitlynutri', onClick: () => router.push('/nutritionist/subscription') },
+    {
+      icon: Dumbbell,
+      label: profile?.trainer ? 'Ir para modo Personal' : 'Tornar-se também Personal',
+      description: profile?.trainer ? 'Trocar para o painel de personal trainer' : 'Adicione o papel de personal a esta mesma conta',
+      onClick: () => trainerRoleMutation.mutate(),
+    },
     { icon: Bell, label: 'Notificações', description: 'Alertas e lembretes', onClick: () => setShowNotifications(true) },
     { icon: Shield, label: 'Segurança', description: 'Senha e autenticação', onClick: () => setShowSecurity(true) },
     { icon: Palette, label: 'Aparência', description: 'Tema e cor de destaque', onClick: () => setShowAppearance(true) },

@@ -9,7 +9,7 @@ import {
   User, Camera, Mail, Phone, MapPin, Award,
   Bell, Shield, LogOut, Save, Edit2, ChevronRight,
   Globe, Star, CreditCard, Eye, EyeOff, X, Trash2, CheckCheck,
-  Palette, Sun, Moon, Monitor, Check, HelpCircle,
+  Palette, Sun, Moon, Monitor, Check, HelpCircle, Apple,
 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
@@ -18,7 +18,7 @@ import { reopenOnboardingTour } from '@/components/dashboard/onboarding-tour';
 import toast from 'react-hot-toast';
 
 export default function TrainerSettings() {
-  const { user, logout } = useAuthStore();
+  const { user, logout, switchRole, addRole } = useAuthStore();
   const router = useRouter();
   const { theme, setTheme } = useTheme();
   const [showAppearance, setShowAppearance] = useState(false);
@@ -94,6 +94,18 @@ export default function TrainerSettings() {
     if (pwForm.newPw !== pwForm.confirm) return toast.error('As senhas não coincidem');
     changePasswordMutation.mutate({ currentPassword: pwForm.current, newPassword: pwForm.newPw });
   };
+
+  // Uma mesma conta pode ser personal E nutricionista. Se já tiver os dois
+  // perfis, só troca o papel ativo; senão, cria o perfil de nutricionista
+  // nesta mesma conta (sem precisar de um segundo cadastro/e-mail).
+  const nutritionistRoleMutation = useMutation({
+    mutationFn: () => (profile?.nutritionist ? switchRole('NUTRITIONIST') : addRole('NUTRITIONIST')),
+    onSuccess: () => {
+      toast.success(profile?.nutritionist ? 'Modo nutricionista ativado!' : 'Perfil de nutricionista criado!');
+      router.push('/nutritionist');
+    },
+    onError: (e: any) => toast.error(e.response?.data?.message || 'Erro ao trocar de papel'),
+  });
 
   const updateMutation = useMutation({
     mutationFn: (data: any) => api.patch('/trainers/me', data),
@@ -297,6 +309,12 @@ export default function TrainerSettings() {
             { icon: Shield, label: 'Segurança', description: 'Senha e autenticação em dois fatores', onClick: () => setShowSecurity(true) },
             { icon: Palette, label: 'Aparência', description: 'Tema e cor de destaque', onClick: () => setShowAppearance(true) },
             { icon: CreditCard, label: 'Plano e Cobrança', description: 'Seu plano Fitlynutri', onClick: () => router.push('/trainer/subscription') },
+            {
+              icon: Apple,
+              label: profile?.nutritionist ? 'Ir para modo Nutricionista' : 'Tornar-se também Nutricionista',
+              description: profile?.nutritionist ? 'Trocar para o painel de nutricionista' : 'Adicione o papel de nutricionista a esta mesma conta',
+              onClick: () => nutritionistRoleMutation.mutate(),
+            },
             { icon: Star, label: 'Avaliar o app', description: 'Deixe sua avaliação na Play Store', onClick: () => window.open('https://play.google.com/store/apps/details?id=com.fitlynutri.app', '_blank') },
             { icon: HelpCircle, label: 'Rever tutorial', description: 'Veja de novo a introdução ao app', onClick: () => reopenOnboardingTour() },
           ].map((item) => (

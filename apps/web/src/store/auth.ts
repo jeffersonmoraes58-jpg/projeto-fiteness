@@ -7,6 +7,8 @@ interface User {
   email: string;
   role: string;
   tenantId: string;
+  hasTrainerProfile?: boolean;
+  hasNutritionistProfile?: boolean;
   profile?: {
     firstName: string;
     lastName: string;
@@ -24,6 +26,10 @@ interface AuthState {
   logout: () => Promise<void>;
   setUser: (user: User) => void;
   setTokens: (access: string, refresh: string) => void;
+  /** Troca o papel ativo (TRAINER/NUTRITIONIST) de uma conta que já tem os dois sub-perfis. */
+  switchRole: (role: 'TRAINER' | 'NUTRITIONIST') => Promise<User>;
+  /** Cria o sub-perfil que falta e já ativa esse papel na mesma conta. */
+  addRole: (role: 'TRAINER' | 'NUTRITIONIST') => Promise<User>;
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -82,6 +88,22 @@ export const useAuthStore = create<AuthState>()(
 
       setUser: (user) => set({ user }),
       setTokens: (accessToken, refreshToken) => set({ accessToken, refreshToken }),
+
+      switchRole: async (role) => {
+        const res = await api.post('/auth/switch-role', { role });
+        const updatedUser = res.data.data?.user ?? res.data.user;
+        set({ user: { ...get().user, ...updatedUser } });
+        document.cookie = `fitlynutri-role=${updatedUser.role};path=/;max-age=${7 * 24 * 3600};SameSite=Lax`;
+        return updatedUser;
+      },
+
+      addRole: async (role) => {
+        const res = await api.post('/auth/add-role', { role });
+        const updatedUser = res.data.data?.user ?? res.data.user;
+        set({ user: { ...get().user, ...updatedUser } });
+        document.cookie = `fitlynutri-role=${updatedUser.role};path=/;max-age=${7 * 24 * 3600};SameSite=Lax`;
+        return updatedUser;
+      },
     }),
     {
       name: 'fitlynutri-auth',

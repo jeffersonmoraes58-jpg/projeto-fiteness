@@ -2,20 +2,22 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Dumbbell, Users, Apple, BarChart3, MessageCircle, Bell,
   Settings, LogOut, ChevronLeft, Trophy,
   Calendar, CreditCard, Brain, Home, Utensils, Wand2,
   Activity, Target, Star, Building2, Shield, Zap, Clock, Medal, ClipboardCheck,
+  ArrowLeftRight,
 } from 'lucide-react';
 
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuthStore } from '@/store/auth';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { useSubscription } from '@/hooks/useSubscription';
+import toast from 'react-hot-toast';
 
 const TRAINER_NAV: NavItem[] = [
   { icon: Home, label: 'Dashboard', href: '/trainer' },
@@ -97,15 +99,41 @@ export function DashboardSidebar() {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const pathname = usePathname();
-  const { user, logout } = useAuthStore();
+  const router = useRouter();
+  const queryClient = useQueryClient();
+  const { user, logout, switchRole } = useAuthStore();
   const { displayName, upgradePrice, upgradePlan, isMaxPlan } = useSubscription();
   const showPlanBadge = user?.role !== 'ADMIN' && user?.role !== 'STUDENT';
+  const isDualRoleEligible = user?.role === 'TRAINER' || user?.role === 'NUTRITIONIST';
 
   const { data: unreadCount = 0 } = useQuery<number>({
     queryKey: ['chat-unread-count'],
     queryFn: () => api.get('/chat/unread/count').then((r) => r.data.data ?? 0),
     refetchInterval: 20000,
     enabled: !!user,
+  });
+
+  // Só consulta se o usuário tem os dois sub-perfis (personal + nutricionista)
+  // quando o papel atual já é um dos dois — evita essa checagem pra
+  // estudante/admin/studio-owner, que não podem ter papel duplo.
+  const { data: dualRoleInfo } = useQuery({
+    queryKey: ['user-dual-role-check'],
+    queryFn: () => api.get('/users/me').then((r) => {
+      const d = r.data.data ?? r.data;
+      return { hasTrainer: !!d.trainer, hasNutritionist: !!d.nutritionist };
+    }),
+    enabled: !!user && isDualRoleEligible,
+    staleTime: 5 * 60 * 1000,
+  });
+  const hasBothProfiles = !!dualRoleInfo?.hasTrainer && !!dualRoleInfo?.hasNutritionist;
+
+  const switchRoleMutation = useMutation({
+    mutationFn: (role: 'TRAINER' | 'NUTRITIONIST') => switchRole(role),
+    onSuccess: (updatedUser) => {
+      queryClient.invalidateQueries();
+      router.push(updatedUser.role === 'NUTRITIONIST' ? '/nutritionist' : '/trainer');
+    },
+    onError: () => toast.error('Erro ao trocar de papel'),
   });
 
   useEffect(() => {
@@ -236,6 +264,30 @@ export function DashboardSidebar() {
           <div className="w-8 h-8 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center" title={`Plano ${displayName} — Upgrade disponível`}>
             <Star className="w-3.5 h-3.5 text-primary" />
           </div>
+        </div>
+      )}
+
+      {/* Role switcher — só aparece se a conta tiver os dois perfis (personal + nutricionista) */}
+      {hasBothProfiles && (
+        <div className="px-3 pb-1">
+          <button
+            onClick={() => switchRoleMutation.mutate(user?.role === 'TRAINER' ? 'NUTRITIONIST' : 'TRAINER')}
+            disabled={switchRoleMutation.isPending}
+            className={cn(
+              'w-full flex items-center gap-3 p-2.5 rounded-xl bg-primary/10 border border-primary/20 hover:bg-primary/20 transition-all disabled:opacity-50',
+              collapsed && 'justify-center px-2',
+            )}
+            title={user?.role === 'TRAINER' ? 'Trocar para modo Nutricionista' : 'Trocar para modo Personal'}
+          >
+            <ArrowLeftRight className="w-4 h-4 flex-shrink-0 text-primary" />
+            {!collapsed && (
+              <span className="text-xs font-medium text-left flex-1">
+                {switchRoleMutation.isPending
+                  ? 'Trocando...'
+                  : user?.role === 'TRAINER' ? 'Modo Nutricionista' : 'Modo Personal'}
+              </span>
+            )}
+          </button>
         </div>
       )}
 

@@ -136,6 +136,24 @@ export class AuthController {
     return this.authService.generateInviteLink(user.id);
   }
 
+  @Post('switch-role')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Trocar o papel ativo (personal/nutricionista) de uma conta com os dois perfis' })
+  async switchRole(@CurrentUser() user: any, @Body() body: { role: 'TRAINER' | 'NUTRITIONIST' }) {
+    return this.authService.switchRole(user.id, body.role);
+  }
+
+  @Post('add-role')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Adicionar o outro papel profissional (personal/nutricionista) à conta atual' })
+  async addRole(@CurrentUser() user: any, @Body() body: { role: 'TRAINER' | 'NUTRITIONIST' }) {
+    return this.authService.addRole(user.id, body.role);
+  }
+
   @Public()
   @Get('invite/validate')
   @ApiOperation({ summary: 'Validar token de convite (público)' })

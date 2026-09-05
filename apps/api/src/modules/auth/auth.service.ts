@@ -39,6 +39,25 @@ export class AuthService {
       if (!dto.studioName) {
         throw new BadRequestException('Informe tenantId ou studioName');
       }
+
+      // Cadastro "solo" (cria um tenant novo) para TRAINER/NUTRITIONIST:
+      // o e-mail é único por tenant, então sem essa checagem a mesma pessoa
+      // conseguiria criar uma 2ª conta com o mesmo e-mail em outro tenant —
+      // e o login() busca por e-mail globalmente (findFirst sem tenantId),
+      // ficando ambíguo entre as duas contas. Bloqueia aqui e direciona pro
+      // fluxo correto (login + "adicionar papel").
+      // Escopo restrito a TRAINER/NUTRITIONIST de propósito: são os únicos
+      // que têm hoje um caminho de escape (addRole) — não trava STUDIO_OWNER
+      // sem alternativa caso alguém legitimamente precise de um 2º studio.
+      if (dto.role === 'TRAINER' || dto.role === 'NUTRITIONIST') {
+        const anyExisting = await this.prisma.user.findFirst({ where: { email: dto.email } });
+        if (anyExisting) {
+          throw new ConflictException(
+            'Este e-mail já tem uma conta no Fitlynutri. Faça login e, nas Configurações, use a opção de adicionar o outro papel (personal/nutricionista) à sua conta existente.',
+          );
+        }
+      }
+
       const base = dto.studioName.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
       const suffix = Math.random().toString(36).slice(2, 8);
       const tenant = await this.prisma.tenant.create({
@@ -170,13 +189,21 @@ export class AuthService {
       tenantName: dto.studioName ?? undefined,
     }).catch((err) => this.logger.error('[Register] Erro ao enviar email de boas-vindas:', err));
 
-    return { user: this.sanitizeUser(user), ...tokens, checkoutUrl };
+    return {
+      user: this.sanitizeUser({
+        ...user,
+        trainer: user.role === UserRole.TRAINER,
+        nutritionist: user.role === UserRole.NUTRITIONIST,
+      }),
+      ...tokens,
+      checkoutUrl,
+    };
   }
 
   async login(dto: LoginDto) {
     const user = await this.prisma.user.findFirst({
       where: { email: dto.email },
-      include: { profile: true },
+      include: { profile: true, trainer: true, nutritionist: true },
     });
 
     if (!user || !user.password) {
@@ -698,8 +725,74 @@ export class AuthService {
     });
   }
 
+  /**
+   * Remove a senha e, quando trainer/nutritionist vierem incluídos na query,
+   * troca os objetos de relação por flags booleanas simples (o front só
+   * precisa saber SE existe o sub-perfil, não os dados dele) — usado pelo
+   * seletor de papel para contas que são personal E nutricionista.
+   */
   private sanitizeUser(user: any) {
-    const { password, ...rest } = user;
-    return rest;
+    const { password, trainer, nutritionist, ...rest } = user;
+    const result: any = { ...rest };
+    if (trainer !== undefined) result.hasTrainerProfile = !!trainer;
+    if (nutritionist !== undefined) result.hasNutritionistProfile = !!nutritionist;
+    return result;
+  }
+
+  /**
+   * Troca o papel ATIVO de uma conta que já possui os dois sub-perfis
+   * (personal e nutricionista). Não precisa reemitir token: o JwtStrategy
+   * busca o `role` direto do banco a cada request, então a troca já vale
+   * na próxima chamada com o mesmo access token.
+   */
+  async switchRole(userId: string, role: 'TRAINER' | 'NUTRITIONIST') {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      include: { trainer: true, nutritionist: true, profile: true },
+    });
+    if (!user) throw new NotFoundException('Usuário não encontrado');
+
+    const hasProfile = role === 'TRAINER' ? !!user.trainer : !!user.nutritionist;
+    if (!hasProfile) {
+      throw new BadRequestException(
+        role === 'TRAINER'
+          ? 'Esta conta ainda não tem perfil de personal trainer'
+          : 'Esta conta ainda não tem perfil de nutricionista',
+      );
+    }
+
+    const updated = await this.prisma.user.update({
+      where: { id: userId },
+      data: { role: role === 'TRAINER' ? UserRole.TRAINER : UserRole.NUTRITIONIST },
+      include: { trainer: true, nutritionist: true, profile: true },
+    });
+
+    return { user: this.sanitizeUser(updated) };
+  }
+
+  /**
+   * Cria o sub-perfil que falta (trainer OU nutritionist) para uma conta que
+   * já é uma dessas duas coisas, reaproveitando o MESMO usuário/tenant — em
+   * vez de exigir um segundo cadastro com e-mail diferente. Já deixa o novo
+   * papel como ativo, pronto pra configurar.
+   */
+  async addRole(userId: string, role: 'TRAINER' | 'NUTRITIONIST') {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      include: { trainer: true, nutritionist: true },
+    });
+    if (!user) throw new NotFoundException('Usuário não encontrado');
+
+    if (user.role !== UserRole.TRAINER && user.role !== UserRole.NUTRITIONIST) {
+      throw new BadRequestException('Apenas contas de personal ou nutricionista podem adicionar o outro papel');
+    }
+
+    if (role === 'TRAINER' && !user.trainer) {
+      await this.prisma.trainer.create({ data: { userId } });
+    } else if (role === 'NUTRITIONIST' && !user.nutritionist) {
+      await this.prisma.nutritionist.create({ data: { userId } });
+    }
+
+    return this.switchRole(userId, role);
   }
 }
