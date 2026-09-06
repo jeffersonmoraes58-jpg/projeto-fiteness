@@ -6,7 +6,9 @@ import {
   Apple, Droplets, Plus, ChevronDown, ChevronUp,
   Coffee, Sun, UtensilsCrossed, Moon, Zap, CheckCircle2,
   Camera, Loader2, X, BookOpen, Download, ExternalLink,
+  Lock, CreditCard,
 } from 'lucide-react';
+import Link from 'next/link';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
@@ -54,6 +56,16 @@ export default function StudentDiet() {
     queryKey: ['student-meal-logs-today'],
     queryFn: () => api.get('/students/me/meal-logs/today').then((r) => r.data?.data ?? r.data ?? []),
   });
+
+  const { data: nutriBillingStatus } = useQuery({
+    queryKey: ['student-nutritionist-billing'],
+    queryFn: () => api.get('/nutritionist-billing/student/status').then((r) => r.data?.data ?? r.data),
+    staleTime: 60_000,
+  });
+  const blockingBilling = Array.isArray(nutriBillingStatus)
+    ? nutriBillingStatus.find((b: any) => b.blocked)
+    : undefined;
+  const isBlocked = !!blockingBilling;
 
   const waterMutation = useMutation({
     mutationFn: (amount: number) => api.post('/students/me/water', { amount }),
@@ -210,6 +222,41 @@ export default function StudentDiet() {
         toast.success('Refeição registrada!');
       },
     });
+  }
+
+  if (isBlocked) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] text-center px-6 py-12">
+        <div className="w-16 h-16 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center mb-4">
+          <Lock className="w-8 h-8 text-amber-400" />
+        </div>
+        <h2 className="text-lg font-bold mb-2">Dieta bloqueada</h2>
+        <p className="text-sm text-muted-foreground mb-1">
+          Você tem uma fatura em aberto
+          {blockingBilling?.nutritionistName ? ` com ${blockingBilling.nutritionistName}` : ''}.
+        </p>
+        {blockingBilling?.amount != null && (
+          <p className="text-2xl font-bold text-amber-400 my-3">
+            R$ {Number(blockingBilling.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+          </p>
+        )}
+        {blockingBilling?.nextDueDate && (
+          <p className="text-xs text-muted-foreground mb-6">
+            Vencimento: {new Date(blockingBilling.nextDueDate).toLocaleDateString('pt-BR')}
+          </p>
+        )}
+        <Link
+          href="/student/billing"
+          className="flex items-center gap-2 text-sm py-3 px-6 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-semibold transition-all"
+        >
+          <CreditCard className="w-4 h-4" />
+          Ver fatura e pagar
+        </Link>
+        <p className="text-xs text-muted-foreground mt-4">
+          O acesso é liberado automaticamente após a confirmação do pagamento.
+        </p>
+      </div>
+    );
   }
 
   return (

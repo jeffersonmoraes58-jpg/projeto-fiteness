@@ -36,21 +36,35 @@ function BillingContent() {
   const [pixData, setPixData] = useState<Record<string, { pixQrCode: string; pixQrCodeBase64: string; expiresAt: string }>>({});
   const [expandedInvoice, setExpandedInvoice] = useState<string | null>(null);
 
-  const { data: billings = [], isLoading, refetch } = useQuery({
+  // Junta cobrança de personal e de nutricionista num só painel — são
+  // relações independentes (o aluno pode dever pra um sem dever pro outro),
+  // mas do ponto de vista dele é só "minhas faturas".
+  const { data: trainerBillings = [], isLoading: loadingTrainer, refetch: refetchTrainer } = useQuery({
     queryKey: ['student-billing'],
     queryFn: () => api.get('/billing/student/status').then((r) => r.data?.data ?? r.data),
     refetchInterval: 30_000,
   });
+  const { data: nutriBillings = [], isLoading: loadingNutri, refetch: refetchNutri } = useQuery({
+    queryKey: ['student-nutritionist-billing'],
+    queryFn: () => api.get('/nutritionist-billing/student/status').then((r) => r.data?.data ?? r.data),
+    refetchInterval: 30_000,
+  });
+
+  const isLoading = loadingTrainer || loadingNutri;
+  const billings = [
+    ...(Array.isArray(trainerBillings) ? trainerBillings : []).map((b: any) => ({ ...b, source: 'trainer', professionalName: b.trainerName })),
+    ...(Array.isArray(nutriBillings) ? nutriBillings : []).map((b: any) => ({ ...b, source: 'nutritionist', professionalName: b.nutritionistName })),
+  ];
 
   // Refresh after returning from MP checkout
   useEffect(() => {
-    if (paymentReturn) refetch();
-  }, [paymentReturn, refetch]);
+    if (paymentReturn) { refetchTrainer(); refetchNutri(); }
+  }, [paymentReturn, refetchTrainer, refetchNutri]);
 
   const pixMut = useMutation({
-    mutationFn: (invoiceId: string) =>
-      api.post(`/billing/student/invoice/${invoiceId}/pix`).then((r) => r.data?.data ?? r.data),
-    onSuccess: (data: any, invoiceId) => {
+    mutationFn: ({ invoiceId, source }: { invoiceId: string; source: 'trainer' | 'nutritionist' }) =>
+      api.post(`/${source === 'trainer' ? 'billing' : 'nutritionist-billing'}/student/invoice/${invoiceId}/pix`).then((r) => r.data?.data ?? r.data),
+    onSuccess: (data: any, { invoiceId }) => {
       setPixData((prev) => ({ ...prev, [invoiceId]: data }));
       setActiveInvoice(invoiceId);
       setExpandedInvoice(invoiceId);
@@ -58,8 +72,8 @@ function BillingContent() {
   });
 
   const checkoutMut = useMutation({
-    mutationFn: (invoiceId: string) =>
-      api.post(`/billing/student/invoice/${invoiceId}/checkout`).then((r) => r.data?.data ?? r.data),
+    mutationFn: ({ invoiceId, source }: { invoiceId: string; source: 'trainer' | 'nutritionist' }) =>
+      api.post(`/${source === 'trainer' ? 'billing' : 'nutritionist-billing'}/student/invoice/${invoiceId}/checkout`).then((r) => r.data?.data ?? r.data),
     onSuccess: (data: any) => {
       window.open(data.checkoutUrl, '_blank');
     },
@@ -71,7 +85,7 @@ function BillingContent() {
     setTimeout(() => setCopied(false), 2000);
   }
 
-  const arr = Array.isArray(billings) ? billings : [];
+  const arr = billings;
   const suspended = arr.some((b: any) => b.status === 'SUSPENDED' && !b.accessReleasedAt);
   const released = arr.find((b: any) => b.accessReleasedAt);
 
@@ -156,12 +170,15 @@ function BillingContent() {
           const isExpanded = expandedInvoice === inv?.id;
 
           return (
-            <motion.div key={billing.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
+            <motion.div key={`${billing.source}-${billing.id}`} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
               className={cn('glass-card border', info.bg)}>
               {/* Billing header */}
               <div className="flex items-start justify-between gap-4 mb-4">
                 <div>
-                  <p className="font-semibold text-lg">{billing.trainerName}</p>
+                  <p className="font-semibold text-lg">{billing.professionalName}</p>
+                  <p className="text-xs text-muted-foreground/70 -mt-0.5 mb-0.5">
+                    {billing.source === 'trainer' ? 'Personal Trainer' : 'Nutricionista'}
+                  </p>
                   <p className="text-sm text-muted-foreground">
                     {billing.interval === 'ANNUAL' ? 'Plano Anual' : 'Plano Mensal'}
                     {' · '}
@@ -207,7 +224,7 @@ function BillingContent() {
                   <div className="grid grid-cols-2 gap-3">
                     {/* Credit card button */}
                     <button
-                      onClick={() => checkoutMut.mutate(inv.id)}
+                      onClick={() => checkoutMut.mutate({ invoiceId: inv.id, source: billing.source })}
                       disabled={checkoutMut.isPending}
                       className="flex items-center justify-center gap-2 px-4 py-3 rounded-xl font-medium text-sm
                         bg-blue-600/20 border border-blue-500/30 text-blue-400 hover:bg-blue-600/30
@@ -226,14 +243,14 @@ function BillingContent() {
                         if (pix) {
                           setExpandedInvoice(isExpanded ? null : inv.id);
                         } else {
-                          pixMut.mutate(inv.id);
+                          pixMut.mutate({ invoiceId: inv.id, source: billing.source });
                         }
                       }}
-                      disabled={pixMut.isPending && pixMut.variables === inv.id}
+                      disabled={pixMut.isPending && pixMut.variables?.invoiceId === inv.id}
                       className="flex items-center justify-center gap-2 px-4 py-3 rounded-xl font-medium text-sm
                         bg-emerald-600/20 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-600/30
                         disabled:opacity-50 disabled:cursor-not-allowed transition-all">
-                      {pixMut.isPending && pixMut.variables === inv.id ? (
+                      {pixMut.isPending && pixMut.variables?.invoiceId === inv.id ? (
                         <RefreshCw className="w-4 h-4 animate-spin" />
                       ) : (
                         <QrCode className="w-4 h-4" />
@@ -244,7 +261,7 @@ function BillingContent() {
                   </div>
 
                   {/* Errors */}
-                  {pixMut.isError && pixMut.variables === inv.id && (
+                  {pixMut.isError && pixMut.variables?.invoiceId === inv.id && (
                     <p className="text-xs text-red-400 text-center">
                       {(pixMut.error as any)?.message ?? 'Erro ao gerar QR Code'}
                     </p>

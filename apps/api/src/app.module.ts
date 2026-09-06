@@ -27,6 +27,7 @@ import { AdminModule } from './modules/admin/admin.module';
 import { TenantsModule } from './modules/tenants/tenants.module';
 import { UploadsModule } from './modules/uploads/uploads.module';
 import { BillingModule } from './modules/billing/billing.module';
+import { NutritionistBillingModule } from './modules/nutritionist-billing/nutritionist-billing.module';
 import { EmailModule } from './modules/email/email.module';
 import { MusicModule } from './modules/music/music.module';
 import { SubscriptionsModule } from './modules/subscriptions/subscription.module';
@@ -80,6 +81,7 @@ import { GamificationModule } from './modules/gamification/gamification.module';
     TenantsModule,
     UploadsModule,
     BillingModule,
+    NutritionistBillingModule,
     EmailModule,
     MusicModule,
     SubscriptionsModule,

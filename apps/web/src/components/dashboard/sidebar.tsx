@@ -52,6 +52,7 @@ const navByRole: Record<string, NavItem[]> = {
     { icon: MessageCircle, label: 'Chat', href: '/nutritionist/chat', isChat: true },
     { icon: BarChart3, label: 'Relatórios', href: '/nutritionist/reports' },
     { icon: Wand2, label: 'Ferramentas IA', href: '/nutritionist/ai' },
+    { icon: CreditCard, label: 'Pagamentos', href: '/nutritionist/payments' },
     { icon: CreditCard, label: 'Meu Plano', href: '/nutritionist/subscription' },
     { icon: Settings, label: 'Configurações', href: '/nutritionist/settings' },
   ],

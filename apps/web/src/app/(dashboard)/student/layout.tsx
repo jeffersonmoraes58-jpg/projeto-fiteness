@@ -9,16 +9,23 @@ import Link from 'next/link';
 export default function StudentLayout({ children }: { children: React.ReactNode }) {
   const [dismissed, setDismissed] = useState(false);
 
-  const { data: billings } = useQuery({
+  const { data: trainerBillings } = useQuery({
     queryKey: ['student-billing-status'],
     queryFn: () => api.get('/billing/student/status').then((r) => r.data?.data ?? r.data),
     staleTime: 60_000,
     retry: false,
   });
+  const { data: nutriBillings } = useQuery({
+    queryKey: ['student-nutritionist-billing-status'],
+    queryFn: () => api.get('/nutritionist-billing/student/status').then((r) => r.data?.data ?? r.data),
+    staleTime: 60_000,
+    retry: false,
+  });
 
-  const overdueItems = Array.isArray(billings)
-    ? billings.filter((b: any) => b.blocked)
-    : [];
+  const overdueItems = [
+    ...(Array.isArray(trainerBillings) ? trainerBillings.filter((b: any) => b.blocked).map((b: any) => ({ ...b, trainerName: b.trainerName })) : []),
+    ...(Array.isArray(nutriBillings) ? nutriBillings.filter((b: any) => b.blocked).map((b: any) => ({ ...b, trainerName: b.nutritionistName })) : []),
+  ];
 
   const showBanner = overdueItems.length > 0 && !dismissed;
   const first = overdueItems[0];
@@ -38,7 +45,7 @@ export default function StudentLayout({ children }: { children: React.ReactNode 
                 {first?.trainerName ? ` · ${first.trainerName}` : ''}
               </p>
               <p className="text-[10px] text-amber-400/80">
-                Seus treinos estão bloqueados até o pagamento
+                Seu acesso está bloqueado até o pagamento
                 {first?.nextDueDate
                   ? ` · Venc. ${new Date(first.nextDueDate).toLocaleDateString('pt-BR')}`
                   : ''}

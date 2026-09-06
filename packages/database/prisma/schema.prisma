@@ -413,6 +413,8 @@ model Nutritionist {
   supplementationPlans SupplementationPlan[]
   clinicalNotes        ClinicalNote[]
   patientExams         PatientExam[]
+  pricing              NutritionistPricing?
+  billings             PatientBilling[]
 
   @@map("nutritionists")
 }
@@ -484,6 +486,7 @@ model Student {
   clinicalNotes          ClinicalNote[]
   patientExams           PatientExam[]
   billings               StudentBilling[]
+  patientBillings        PatientBilling[]
   weeklyCheckins         WeeklyCheckin[]
 
   @@map("students")
@@ -1408,6 +1411,69 @@ model Invoice {
   billing StudentBilling @relation(fields: [billingId], references: [id], onDelete: Cascade)
 
   @@map("invoices")
+}
+
+// ================================================
+// COBRANÇA NUTRICIONISTA → PACIENTE
+// Espelha TrainerPricing/StudentBilling/Invoice acima — tabelas separadas
+// (não compartilhadas) de propósito, mesmo padrão já usado em
+// Workout/Diet e TrainerStudent/NutritionistPatient neste schema.
+// ================================================
+
+model NutritionistPricing {
+  id             String   @id @default(cuid())
+  nutritionistId String   @unique
+  monthlyPrice   Float?
+  annualPrice    Float?
+  mpAccessToken  String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  nutritionist Nutritionist @relation(fields: [nutritionistId], references: [id], onDelete: Cascade)
+
+  @@map("nutritionist_pricing")
+}
+
+model PatientBilling {
+  id                String               @id @default(cuid())
+  studentId         String
+  nutritionistId    String
+  interval          BillingInterval      @default(MONTHLY)
+  amount            Float
+  status            StudentBillingStatus @default(PENDING)
+  startDate         DateTime             @default(now())
+  nextDueDate       DateTime
+  accessReleasedAt  DateTime?            // liberação "na confiança" pelo nutricionista (não altera faturas)
+  accessReleaseNote String?
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+
+  student      Student        @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  nutritionist Nutritionist   @relation(fields: [nutritionistId], references: [id])
+  invoices     PatientInvoice[]
+
+  @@unique([studentId, nutritionistId])
+  @@map("patient_billings")
+}
+
+model PatientInvoice {
+  id              String        @id @default(cuid())
+  billingId       String
+  amount          Float
+  status          InvoiceStatus @default(PENDING)
+  dueDate         DateTime
+  paidAt          DateTime?
+  description     String?
+  mpPaymentId     String?
+  pixQrCode       String?
+  pixQrCodeBase64 String?
+  pixExpiresAt    DateTime?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  billing PatientBilling @relation(fields: [billingId], references: [id], onDelete: Cascade)
+
+  @@map("patient_invoices")
 }
 
 // ================================================
