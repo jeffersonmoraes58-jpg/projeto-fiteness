@@ -6,13 +6,13 @@ import {
   Apple, Droplets, Plus, ChevronDown, ChevronUp,
   Coffee, Sun, UtensilsCrossed, Moon, Zap, CheckCircle2,
   Camera, Loader2, X, BookOpen, Download, ExternalLink,
-  Lock, CreditCard,
+  Lock, CreditCard, ShoppingCart,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
-import { openDietPDF } from '@/lib/diet-pdf';
+import { openDietPDF, openShoppingListPDF } from '@/lib/diet-pdf';
 import toast from 'react-hot-toast';
 
 const MEAL_ICONS: Record<string, any> = {
@@ -209,14 +209,27 @@ export default function StudentDiet() {
             );
           })()}
           {dietPlan?.diet && (
-            <button
-              onClick={downloadDietPDF}
-              className="btn-secondary flex items-center gap-2 text-sm py-2 px-3"
-              title="Baixar dieta em PDF"
-            >
-              <Download className="w-4 h-4" />
-              PDF
-            </button>
+            <>
+              <button
+                onClick={() => {
+                  const ok = openShoppingListPDF(dietPlan.diet);
+                  if (!ok) toast.error('Sua dieta ainda não tem alimentos para listar');
+                }}
+                className="btn-secondary flex items-center gap-2 text-sm py-2 px-3"
+                title="Lista de compras da dieta"
+              >
+                <ShoppingCart className="w-4 h-4" />
+                <span className="hidden sm:inline">Compras</span>
+              </button>
+              <button
+                onClick={downloadDietPDF}
+                className="btn-secondary flex items-center gap-2 text-sm py-2 px-3"
+                title="Baixar dieta em PDF"
+              >
+                <Download className="w-4 h-4" />
+                PDF
+              </button>
+            </>
           )}
         </div>
       </div>

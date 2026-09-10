@@ -4,13 +4,13 @@ import { useState, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import {
   Apple, ChevronLeft, Flame, Beef, Wheat, Droplets, Users, UserCheck,
-  Plus, Trash2, Save, CheckCircle, Clock, Search, X, Download,
+  Plus, Trash2, Save, CheckCircle, Clock, Search, X, Download, ShoppingCart,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
-import { openDietPDF } from '@/lib/diet-pdf';
+import { openDietPDF, openShoppingListPDF } from '@/lib/diet-pdf';
 import toast from 'react-hot-toast';
 
 const MEAL_TYPES = [
@@ -417,17 +417,30 @@ export default function DietDetailPage() {
             )}
           </div>
         </div>
-        <button
-          onClick={() => {
-            const ok = openDietPDF(diet);
-            if (!ok) toast.error('Permita pop-ups para gerar o PDF');
-          }}
-          className="flex items-center gap-1.5 text-sm px-3 py-2 rounded-xl glass hover:bg-accent transition-all flex-shrink-0"
-          title="Baixar dieta em PDF (salva a partir da versão já gravada)"
-        >
-          <Download className="w-4 h-4" />
-          <span className="hidden sm:inline">PDF</span>
-        </button>
+        <div className="flex items-center gap-2 flex-shrink-0">
+          <button
+            onClick={() => {
+              const ok = openShoppingListPDF(diet);
+              if (!ok) toast.error('Adicione alimentos à dieta primeiro (e permita pop-ups)');
+            }}
+            className="flex items-center gap-1.5 text-sm px-3 py-2 rounded-xl glass hover:bg-accent transition-all"
+            title="Lista de compras somando os alimentos de todas as refeições"
+          >
+            <ShoppingCart className="w-4 h-4" />
+            <span className="hidden sm:inline">Compras</span>
+          </button>
+          <button
+            onClick={() => {
+              const ok = openDietPDF(diet);
+              if (!ok) toast.error('Permita pop-ups para gerar o PDF');
+            }}
+            className="flex items-center gap-1.5 text-sm px-3 py-2 rounded-xl glass hover:bg-accent transition-all"
+            title="Baixar dieta em PDF (salva a partir da versão já gravada)"
+          >
+            <Download className="w-4 h-4" />
+            <span className="hidden sm:inline">PDF</span>
+          </button>
+        </div>
       </div>
 
       {/* Macros summary */}

@@ -120,3 +120,99 @@ export function openDietPDF(diet: any, opts: DietPDFOptions = {}): boolean {
   w.focus();
   return true;
 }
+
+/**
+ * Lista de compras: soma as quantidades de cada alimento em todas as refeições
+ * da dieta e mostra numa lista imprimível com checkbox. Assume que a dieta é
+ * um "dia padrão" (multiplica pelos dias que o paciente informar ao imprimir).
+ */
+export function openShoppingListPDF(diet: any): boolean {
+  if (!diet) return false;
+  const meals: any[] = diet.meals ?? [];
+
+  // agrega por nome do alimento + unidade
+  const agg = new Map<string, { name: string; unit: string; qty: number }>();
+  for (const m of meals) {
+    for (const mf of m.foods ?? []) {
+      const name = mf.food?.name ?? mf.name ?? '—';
+      const unit = mf.unit ?? 'g';
+      const key = `${name.toLowerCase()}|${unit}`;
+      const prev = agg.get(key);
+      const qty = Number(mf.quantity) || 0;
+      if (prev) prev.qty += qty;
+      else agg.set(key, { name, unit, qty });
+    }
+  }
+
+  const items = Array.from(agg.values()).sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
+  if (items.length === 0) return false;
+
+  const date = new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' });
+  const rows = items
+    .map(
+      (it) => `
+      <tr>
+        <td style="padding:8px 10px;font-size:14px;color:#111827;">
+          <span style="display:inline-block;width:14px;height:14px;border:1.5px solid #10b981;border-radius:3px;margin-right:10px;vertical-align:middle;"></span>
+          ${it.name}
+        </td>
+        <td style="padding:8px 10px;font-size:14px;color:#374151;text-align:right;white-space:nowrap;">
+          ${Math.round(it.qty * 10) / 10} ${it.unit}<span class="mult" style="color:#9ca3af;"></span>
+        </td>
+      </tr>`,
+    )
+    .join('');
+
+  const html = `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">
+  <title>Lista de compras — ${diet.name}</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Segoe UI', Arial, sans-serif; color: #111827; background: #fff; padding: 32px; max-width: 620px; margin: 0 auto; }
+    @media print { body { padding: 16px; } button, .controls { display: none !important; } @page { margin: 16mm 12mm; } }
+    .header { border-bottom: 2px solid #10b981; padding-bottom: 14px; margin-bottom: 8px; }
+    .logo { font-size: 20px; font-weight: 700; color: #10b981; }
+    .subtitle { font-size: 12px; color: #6b7280; margin-top: 2px; }
+    .plan { font-size: 15px; font-weight: 600; margin-top: 8px; }
+    .date { font-size: 11px; color: #9ca3af; }
+    .controls { margin: 14px 0; font-size: 13px; color: #374151; }
+    .controls input { width: 54px; padding: 4px 6px; border: 1px solid #d1d5db; border-radius: 6px; margin: 0 4px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+    tr:nth-child(even) { background: #f9fafb; }
+    .footer { margin-top: 20px; text-align: center; font-size: 11px; color: #9ca3af; border-top: 1px solid #e5e7eb; padding-top: 10px; }
+    .print-btn { position: fixed; bottom: 24px; right: 24px; background: #10b981; color: white; border: none; padding: 12px 20px; border-radius: 10px; font-size: 14px; font-weight: 600; cursor: pointer; box-shadow: 0 4px 12px rgba(16,185,129,.4); }
+  </style></head><body>
+  <div class="header">
+    <div class="logo">Fitlynutri</div>
+    <div class="subtitle">Lista de Compras</div>
+    <div class="plan">${diet.name}</div>
+    <div class="date">Base: 1 dia · Emitida em ${date}</div>
+  </div>
+  <div class="controls">
+    Multiplicar quantidades por
+    <input id="mult" type="number" min="1" value="1" onchange="applyMult(this.value)" />
+    dia(s) e <button onclick="window.print()" style="border:none;background:#10b981;color:#fff;padding:5px 12px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;">imprimir</button>
+  </div>
+  <table><tbody>${rows}</tbody></table>
+  <div class="footer">Gerado pelo Fitlynutri</div>
+  <button class="print-btn" onclick="window.print()">⬇ Salvar PDF</button>
+  <script>
+    var base = ${JSON.stringify(items.map((i) => ({ q: Math.round(i.qty * 10) / 10, u: i.unit })))};
+    function applyMult(m){
+      m = parseFloat(m) || 1;
+      var cells = document.querySelectorAll('td:last-child');
+      cells.forEach(function(c, i){
+        if(!base[i]) return;
+        var total = Math.round(base[i].q * m * 10) / 10;
+        c.firstChild.textContent = total + ' ' + base[i].u + (m > 1 ? '' : '');
+      });
+    }
+  </script>
+  </body></html>`;
+
+  const w = window.open('', '_blank', 'width=680,height=760');
+  if (!w) return false;
+  w.document.write(html);
+  w.document.close();
+  w.focus();
+  return true;
+}

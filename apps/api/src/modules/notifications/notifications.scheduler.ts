@@ -268,4 +268,87 @@ export class NotificationsScheduler {
       });
     }
   }
+
+  // Consultas nutricionais — 8h todo dia
+  // (a) lembra paciente + nutricionista de consulta marcada para amanhã
+  // (b) avisa o nutricionista quando chega a data de retorno (nextConsultation)
+  //     de uma consulta já concluída e não há consulta futura marcada
+  @Cron('0 8 * * *')
+  async nutritionConsultationReminders() {
+    const startOfTomorrow = new Date();
+    startOfTomorrow.setDate(startOfTomorrow.getDate() + 1);
+    startOfTomorrow.setHours(0, 0, 0, 0);
+    const endOfTomorrow = new Date(startOfTomorrow);
+    endOfTomorrow.setHours(23, 59, 59, 999);
+
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
+    const endOfToday = new Date(startOfToday);
+    endOfToday.setHours(23, 59, 59, 999);
+
+    // (a) consultas marcadas para amanhã, ainda não concluídas
+    const upcoming = await this.prisma.nutritionalConsultation.findMany({
+      where: { completedAt: null, scheduledAt: { gte: startOfTomorrow, lte: endOfTomorrow } },
+      include: { nutritionist: { include: { user: { include: { profile: true } } } } },
+    });
+
+    for (const c of upcoming) {
+      const timeStr = new Date(c.scheduledAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+      const nutriName = [c.nutritionist.user.profile?.firstName, c.nutritionist.user.profile?.lastName]
+        .filter(Boolean).join(' ') || 'seu nutricionista';
+
+      if (c.studentId) {
+        const student = await this.prisma.student.findUnique({
+          where: { id: c.studentId },
+          include: { user: { include: { profile: true } } },
+        });
+        if (student) {
+          await this.notifications.create({
+            userId: student.userId,
+            type: 'SYSTEM',
+            title: '🥗 Consulta amanhã',
+            body: `Você tem consulta com ${nutriName} amanhã às ${timeStr}.`,
+          });
+        }
+        const studentName = student
+          ? [student.user.profile?.firstName, student.user.profile?.lastName].filter(Boolean).join(' ') || 'seu paciente'
+          : 'seu paciente';
+        await this.notifications.create({
+          userId: c.nutritionist.userId,
+          type: 'SYSTEM',
+          title: '🥗 Consulta amanhã',
+          body: `Consulta com ${studentName} amanhã às ${timeStr}.`,
+        });
+      }
+    }
+
+    // (b) data de retorno chegou (nextConsultation = hoje) e não há consulta futura
+    const returnsDue = await this.prisma.nutritionalConsultation.findMany({
+      where: { completedAt: { not: null }, nextConsultation: { gte: startOfToday, lte: endOfToday } },
+      include: { nutritionist: { include: { user: { select: { id: true } } } } },
+    });
+
+    for (const c of returnsDue) {
+      if (!c.studentId) continue;
+      const hasFuture = await this.prisma.nutritionalConsultation.findFirst({
+        where: { nutritionistId: c.nutritionistId, studentId: c.studentId, scheduledAt: { gt: new Date() } },
+      });
+      if (hasFuture) continue;
+
+      const student = await this.prisma.student.findUnique({
+        where: { id: c.studentId },
+        include: { user: { include: { profile: true } } },
+      });
+      const studentName = student
+        ? [student.user.profile?.firstName, student.user.profile?.lastName].filter(Boolean).join(' ') || 'um paciente'
+        : 'um paciente';
+
+      await this.notifications.create({
+        userId: c.nutritionist.userId,
+        type: 'SYSTEM',
+        title: '📅 Retorno de consulta',
+        body: `Hoje é a data de retorno de ${studentName}. Agende a próxima consulta.`,
+      });
+    }
+  }
 }
