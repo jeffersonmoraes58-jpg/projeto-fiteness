@@ -487,6 +487,7 @@ model Student {
   patientExams           PatientExam[]
   billings               StudentBilling[]
   patientBillings        PatientBilling[]
+  foodRecalls            FoodRecall[]
   weeklyCheckins         WeeklyCheckin[]
 
   @@map("students")
@@ -586,6 +587,19 @@ model PhysicalAssessment {
   leftThighCm    Float?
   rightCalfCm    Float?
   leftCalfCm     Float?
+
+  // Dobras cutâneas (mm) — usadas pelos protocolos de composição corporal
+  skinfoldTricepsMm      Float?
+  skinfoldSubscapularMm  Float?
+  skinfoldChestMm        Float?
+  skinfoldMidaxillaryMm  Float?
+  skinfoldSuprailiacMm   Float?
+  skinfoldAbdominalMm    Float?
+  skinfoldThighMm        Float?
+  skinfoldProtocol       String?  // pollock3 | pollock7 | guedes3 | faulkner
+  assessedAge            Int?     // idade na data da avaliação (para os protocolos)
+  assessedGender         String?  // MALE | FEMALE
+
   notes          String?
   createdAt      DateTime @default(now())
 
@@ -1028,6 +1042,42 @@ model WaterLog {
   student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
 
   @@map("water_logs")
+}
+
+// ================================================
+// RECORDATÓRIO ALIMENTAR 24H
+// ================================================
+
+model FoodRecall {
+  id             String   @id @default(cuid())
+  studentId      String
+  nutritionistId String?
+  status         String   @default("PENDING") // PENDING (nutri solicitou) | SUBMITTED (paciente preencheu)
+  requestedAt    DateTime @default(now())
+  submittedAt    DateTime?
+  referenceDate  String?  // "ontem", "sábado", data — o dia que o paciente relatou
+  patientNotes   String?
+  nutritionistNotes String?
+
+  student Student          @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  meals   FoodRecallMeal[]
+
+  @@index([studentId, status])
+  @@map("food_recalls")
+}
+
+model FoodRecallMeal {
+  id       String  @id @default(cuid())
+  recallId String
+  order    Int     @default(0)
+  time     String?
+  place    String?
+  name     String
+  foods    String  // texto livre: "2 ovos mexidos, 1 pão francês, café com 1 colher de açúcar"
+
+  recall FoodRecall @relation(fields: [recallId], references: [id], onDelete: Cascade)
+
+  @@map("food_recall_meals")
 }
 
 // ================================================

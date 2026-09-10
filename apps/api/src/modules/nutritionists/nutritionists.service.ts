@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException, ConflictException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { SubscriptionService } from '../subscriptions/subscription.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import * as bcrypt from 'bcryptjs';
 
 @Injectable()
@@ -8,6 +9,7 @@ export class NutritionistsService {
   constructor(
     private prisma: PrismaService,
     private subscriptionService: SubscriptionService,
+    private notifications: NotificationsService,
   ) {}
 
   private async getNutritionist(userId: string) {
@@ -540,6 +542,64 @@ export class NutritionistsService {
     return this.prisma.physicalAssessment.create({
       data: { studentId, ...data },
     });
+  }
+
+  // ── Recordatório alimentar 24h ──────────────────────────
+  async getFoodRecalls(userId: string, studentId: string) {
+    const n = await this.getNutritionist(userId);
+    const relation = await this.prisma.nutritionistPatient.findFirst({
+      where: { nutritionistId: n.id, studentId },
+    });
+    if (!relation) throw new NotFoundException('Paciente não encontrado');
+    return this.prisma.foodRecall.findMany({
+      where: { studentId },
+      include: { meals: { orderBy: { order: 'asc' } } },
+      orderBy: { requestedAt: 'desc' },
+    });
+  }
+
+  async requestFoodRecall(userId: string, studentId: string) {
+    const n = await this.getNutritionist(userId);
+    const relation = await this.prisma.nutritionistPatient.findFirst({
+      where: { nutritionistId: n.id, studentId },
+    });
+    if (!relation) throw new NotFoundException('Paciente não encontrado');
+
+    // não duplica solicitação em aberto
+    const pending = await this.prisma.foodRecall.findFirst({
+      where: { studentId, nutritionistId: n.id, status: 'PENDING' },
+    });
+    if (pending) return pending;
+
+    const recall = await this.prisma.foodRecall.create({
+      data: { studentId, nutritionistId: n.id, status: 'PENDING' },
+    });
+
+    const student = await this.prisma.student.findUnique({ where: { id: studentId } });
+    if (student) {
+      await this.notifications.create({
+        userId: student.userId,
+        type: 'SYSTEM',
+        title: '📝 Recordatório 24h solicitado',
+        body: 'Seu nutricionista pediu um recordatório alimentar. Abra "Minha Dieta" e conte o que você comeu nas últimas 24h.',
+      });
+    }
+    return recall;
+  }
+
+  async updateFoodRecallNotes(userId: string, recallId: string, nutritionistNotes: string) {
+    const n = await this.getNutritionist(userId);
+    const recall = await this.prisma.foodRecall.findUnique({ where: { id: recallId } });
+    if (!recall || recall.nutritionistId !== n.id) throw new NotFoundException('Recordatório não encontrado');
+    return this.prisma.foodRecall.update({ where: { id: recallId }, data: { nutritionistNotes } });
+  }
+
+  async deleteFoodRecall(userId: string, recallId: string) {
+    const n = await this.getNutritionist(userId);
+    const recall = await this.prisma.foodRecall.findUnique({ where: { id: recallId } });
+    if (!recall || recall.nutritionistId !== n.id) throw new NotFoundException('Recordatório não encontrado');
+    await this.prisma.foodRecall.delete({ where: { id: recallId } });
+    return { deleted: true };
   }
 
   async getClinicalNotes(userId: string, studentId: string) {

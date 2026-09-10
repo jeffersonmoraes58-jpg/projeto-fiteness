@@ -3,9 +3,10 @@ import { NutritionistsController } from './nutritionists.controller';
 import { NutritionistsService } from './nutritionists.service';
 import { EmailModule } from '../email/email.module';
 import { SubscriptionsModule } from '../subscriptions/subscription.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
-  imports: [EmailModule, SubscriptionsModule],
+  imports: [EmailModule, SubscriptionsModule, NotificationsModule],
   controllers: [NutritionistsController],
   providers: [NutritionistsService],
   exports: [NutritionistsService],

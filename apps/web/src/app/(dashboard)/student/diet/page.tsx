@@ -234,6 +234,8 @@ export default function StudentDiet() {
         </div>
       </div>
 
+      <FoodRecallSection />
+
       {/* Calorie summary */}
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="glass-card">
         <div className="flex items-center justify-between mb-6">
@@ -641,6 +643,82 @@ function DiaryCard({ mood, meal, isPending, onSave, onSkip }: {
           {isPending ? 'Salvando...' : 'Salvar diário'}
         </button>
       </div>
+    </motion.div>
+  );
+}
+
+// ── Recordatório alimentar 24h (solicitado pelo nutricionista) ────────────────
+function FoodRecallSection() {
+  const qc = useQueryClient();
+  const { data: recalls = [] } = useQuery({
+    queryKey: ['student-food-recalls'],
+    queryFn: () => api.get('/students/me/food-recalls').then((r) => r.data?.data ?? r.data ?? []),
+  });
+  const pending = (recalls as any[]).find((r: any) => r.status === 'PENDING');
+
+  const [open, setOpen] = useState(false);
+  const [referenceDate, setReferenceDate] = useState('ontem');
+  const [patientNotes, setPatientNotes] = useState('');
+  const [meals, setMeals] = useState<{ name: string; time: string; place: string; foods: string }[]>([
+    { name: 'Café da manhã', time: '', place: '', foods: '' },
+    { name: 'Lanche da manhã', time: '', place: '', foods: '' },
+    { name: 'Almoço', time: '', place: '', foods: '' },
+    { name: 'Lanche da tarde', time: '', place: '', foods: '' },
+    { name: 'Jantar', time: '', place: '', foods: '' },
+    { name: 'Ceia', time: '', place: '', foods: '' },
+  ]);
+
+  const submitMut = useMutation({
+    mutationFn: () => api.post(`/students/me/food-recalls/${pending.id}/submit`, { referenceDate, patientNotes, meals }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['student-food-recalls'] });
+      setOpen(false);
+      toast.success('Recordatório enviado ao seu nutricionista!');
+    },
+    onError: () => toast.error('Erro ao enviar. Tente de novo.'),
+  });
+
+  if (!pending) return null;
+
+  return (
+    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="glass-card border border-blue-500/30 bg-blue-500/5">
+      {!open ? (
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <div className="flex items-start gap-3">
+            <BookOpen className="w-5 h-5 text-blue-400 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="font-semibold text-sm">Recordatório 24h solicitado</p>
+              <p className="text-xs text-muted-foreground">Seu nutricionista quer saber tudo que você comeu nas últimas 24h.</p>
+            </div>
+          </div>
+          <button onClick={() => setOpen(true)} className="btn-primary text-sm py-2 px-4">Preencher</button>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <p className="font-semibold text-sm">Recordatório 24h</p>
+            <button onClick={() => setOpen(false)} className="text-muted-foreground hover:text-foreground"><X className="w-4 h-4" /></button>
+          </div>
+          <label className="text-xs text-muted-foreground block">
+            Que dia você está relatando?
+            <input className="input-field text-sm mt-1" value={referenceDate} onChange={(e) => setReferenceDate(e.target.value)} placeholder="ontem, sábado, 08/09..." />
+          </label>
+          {meals.map((m, i) => (
+            <div key={i} className="p-2.5 rounded-lg bg-white/5 space-y-2">
+              <div className="flex gap-2">
+                <input className="input-field text-sm flex-1" value={m.name} onChange={(e) => { const n = [...meals]; n[i].name = e.target.value; setMeals(n); }} placeholder="Refeição" />
+                <input className="input-field text-sm w-20" value={m.time} onChange={(e) => { const n = [...meals]; n[i].time = e.target.value; setMeals(n); }} placeholder="hora" />
+              </div>
+              <textarea className="input-field text-sm resize-none" rows={2} value={m.foods} onChange={(e) => { const n = [...meals]; n[i].foods = e.target.value; setMeals(n); }} placeholder="Ex: 2 ovos mexidos, 1 pão francês com manteiga, café com 1 colher de açúcar" />
+            </div>
+          ))}
+          <button onClick={() => setMeals([...meals, { name: `Refeição ${meals.length + 1}`, time: '', place: '', foods: '' }])} className="btn-secondary text-xs py-1.5 w-full">+ Adicionar refeição</button>
+          <textarea className="input-field text-sm resize-none" rows={2} value={patientNotes} onChange={(e) => setPatientNotes(e.target.value)} placeholder="Observações: bebi pouca água, dia atípico, beliscei entre refeições... (opcional)" />
+          <button onClick={() => submitMut.mutate()} disabled={submitMut.isPending} className="btn-primary w-full text-sm py-2.5">
+            {submitMut.isPending ? 'Enviando...' : 'Enviar ao nutricionista'}
+          </button>
+        </div>
+      )}
     </motion.div>
   );
 }

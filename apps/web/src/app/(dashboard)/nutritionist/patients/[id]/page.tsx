@@ -16,6 +16,10 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { exportPatientReport } from '@/lib/exportPatientReport';
 import { cn } from '@/lib/utils';
+import {
+  calcBodyFat, classifyBodyFat, requiredSkinfolds, PROTOCOL_LABELS,
+  type SkinfoldProtocol, type Sex,
+} from '@/lib/bodyfat';
 import toast from 'react-hot-toast';
 
 const GOAL_LABELS: Record<string, string> = {
@@ -28,8 +32,20 @@ const GOAL_LABELS: Record<string, string> = {
 const TABS = [
   { id: 'dietas', label: 'Dietas', icon: Apple },
   { id: 'diario', label: 'Diário Alimentar', icon: Utensils },
+  { id: 'recordatorio', label: 'Recordatório 24h', icon: FileText },
   { id: 'anamnese', label: 'Anamnese', icon: ClipboardList },
+  { id: 'avaliacao', label: 'Avaliação', icon: Scale },
   { id: 'evolucao', label: 'Evolução', icon: TrendingUp },
+];
+
+const SKINFOLD_FIELDS: { key: string; label: string }[] = [
+  { key: 'triceps', label: 'Tríceps' },
+  { key: 'subscapular', label: 'Subescapular' },
+  { key: 'chest', label: 'Peitoral' },
+  { key: 'midaxillary', label: 'Axilar média' },
+  { key: 'suprailiac', label: 'Supra-ilíaca' },
+  { key: 'abdominal', label: 'Abdominal' },
+  { key: 'thigh', label: 'Coxa' },
 ];
 
 const MEAL_LABELS: Record<string, string> = {
@@ -498,7 +514,254 @@ export default function NutritionistPatientDetailPage() {
             )}
           </motion.div>
         )}
+
+        {tab === 'avaliacao' && (
+          <motion.div key="avaliacao" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+            <AssessmentTab patientId={String(id)} patient={patient} />
+          </motion.div>
+        )}
+
+        {tab === 'recordatorio' && (
+          <motion.div key="recordatorio" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+            <RecallTab patientId={String(id)} patient={patient} />
+          </motion.div>
+        )}
       </AnimatePresence>
+    </div>
+  );
+}
+
+// ── Aba: Avaliação física + dobras cutâneas ───────────────────────────────────
+function AssessmentTab({ patientId, patient }: { patientId: string; patient: any }) {
+  const qc = useQueryClient();
+  const profile = patient?.user?.profile;
+  const birthAge = profile?.birthDate
+    ? Math.floor((Date.now() - new Date(profile.birthDate).getTime()) / (365.25 * 864e5))
+    : '';
+
+  const [form, setForm] = useState<Record<string, string>>({
+    assessedAt: new Date().toISOString().slice(0, 10),
+    weight: '', height: '', assessedAge: String(birthAge || ''), assessedGender: 'MALE',
+    bodyFatPercent: '', muscleMassKg: '', waistCm: '', hipCm: '', abdomenCm: '',
+    skinfoldProtocol: 'pollock3',
+  });
+  const [sf, setSf] = useState<Record<string, string>>({});
+
+  const { data: history = [] } = useQuery({
+    queryKey: ['patient-assessments', patientId],
+    queryFn: () => api.get(`/nutritionists/me/patients/${patientId}/physical-assessments`).then((r) => r.data?.data ?? r.data ?? []),
+  });
+
+  const protocol = form.skinfoldProtocol as SkinfoldProtocol;
+  const sex = form.assessedGender as Sex;
+  const needed = requiredSkinfolds(protocol, sex);
+  const sfNums: any = {};
+  for (const k of Object.keys(sf)) sfNums[k] = sf[k] === '' ? null : parseFloat(sf[k]);
+  const bf = calcBodyFat(protocol, sex, form.assessedAge ? parseInt(form.assessedAge) : null, sfNums);
+
+  const createMut = useMutation({
+    mutationFn: () => {
+      const w = parseFloat(form.weight);
+      const h = parseFloat(form.height);
+      if (!w || !h) throw new Error('Informe peso e altura');
+      const bmi = Math.round((w / ((h / 100) ** 2)) * 10) / 10;
+      const payload: any = {
+        assessedAt: new Date(form.assessedAt).toISOString(),
+        weight: w, height: h, bmi,
+        assessedAge: form.assessedAge ? parseInt(form.assessedAge) : null,
+        assessedGender: form.assessedGender,
+        bodyFatPercent: form.bodyFatPercent ? parseFloat(form.bodyFatPercent) : (bf ? bf.fatPercent : null),
+        muscleMassKg: form.muscleMassKg ? parseFloat(form.muscleMassKg) : null,
+        waistCm: form.waistCm ? parseFloat(form.waistCm) : null,
+        hipCm: form.hipCm ? parseFloat(form.hipCm) : null,
+        abdomenCm: form.abdomenCm ? parseFloat(form.abdomenCm) : null,
+        skinfoldProtocol: Object.keys(sf).length ? form.skinfoldProtocol : null,
+        skinfoldTricepsMm: sfNums.triceps ?? null,
+        skinfoldSubscapularMm: sfNums.subscapular ?? null,
+        skinfoldChestMm: sfNums.chest ?? null,
+        skinfoldMidaxillaryMm: sfNums.midaxillary ?? null,
+        skinfoldSuprailiacMm: sfNums.suprailiac ?? null,
+        skinfoldAbdominalMm: sfNums.abdominal ?? null,
+        skinfoldThighMm: sfNums.thigh ?? null,
+      };
+      return api.post(`/nutritionists/me/patients/${patientId}/physical-assessments`, payload);
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['patient-assessments', patientId] });
+      qc.invalidateQueries({ queryKey: ['patient-evolution', patientId] });
+      setForm((f) => ({ ...f, weight: '', bodyFatPercent: '', muscleMassKg: '', waistCm: '', hipCm: '', abdomenCm: '' }));
+      setSf({});
+      toast.success('Avaliação registrada!');
+    },
+    onError: (e: any) => toast.error(e.response?.data?.message || e.message || 'Erro ao registrar'),
+  });
+
+  const inp = 'input-field text-sm';
+
+  return (
+    <div className="space-y-4">
+      <div className="glass-card">
+        <h2 className="font-semibold flex items-center gap-2 mb-4"><Scale className="w-4 h-4 text-emerald-400" /> Nova avaliação</h2>
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+          <label className="text-xs text-muted-foreground">Data<input type="date" className={inp} value={form.assessedAt} onChange={(e) => setForm({ ...form, assessedAt: e.target.value })} /></label>
+          <label className="text-xs text-muted-foreground">Peso (kg)<input type="number" step="0.1" className={inp} value={form.weight} onChange={(e) => setForm({ ...form, weight: e.target.value })} /></label>
+          <label className="text-xs text-muted-foreground">Altura (cm)<input type="number" className={inp} value={form.height} onChange={(e) => setForm({ ...form, height: e.target.value })} /></label>
+          <label className="text-xs text-muted-foreground">Idade<input type="number" className={inp} value={form.assessedAge} onChange={(e) => setForm({ ...form, assessedAge: e.target.value })} /></label>
+          <label className="text-xs text-muted-foreground">Sexo
+            <select className={inp} value={form.assessedGender} onChange={(e) => setForm({ ...form, assessedGender: e.target.value })}>
+              <option value="MALE">Masculino</option><option value="FEMALE">Feminino</option>
+            </select>
+          </label>
+          <label className="text-xs text-muted-foreground">Massa magra (kg)<input type="number" step="0.1" className={inp} value={form.muscleMassKg} onChange={(e) => setForm({ ...form, muscleMassKg: e.target.value })} /></label>
+          <label className="text-xs text-muted-foreground">Cintura (cm)<input type="number" step="0.1" className={inp} value={form.waistCm} onChange={(e) => setForm({ ...form, waistCm: e.target.value })} /></label>
+          <label className="text-xs text-muted-foreground">Quadril (cm)<input type="number" step="0.1" className={inp} value={form.hipCm} onChange={(e) => setForm({ ...form, hipCm: e.target.value })} /></label>
+          <label className="text-xs text-muted-foreground">Abdômen (cm)<input type="number" step="0.1" className={inp} value={form.abdomenCm} onChange={(e) => setForm({ ...form, abdomenCm: e.target.value })} /></label>
+        </div>
+
+        <div className="mt-5 pt-4 border-t border-border/40">
+          <div className="flex items-center justify-between mb-3 gap-3 flex-wrap">
+            <h3 className="text-sm font-semibold">Dobras cutâneas (mm)</h3>
+            <select className="input-field text-sm py-1.5 w-auto" value={form.skinfoldProtocol} onChange={(e) => setForm({ ...form, skinfoldProtocol: e.target.value })}>
+              {(['pollock3', 'pollock7', 'guedes3', 'faulkner'] as SkinfoldProtocol[]).map((p) => (
+                <option key={p} value={p}>{PROTOCOL_LABELS[p]}</option>
+              ))}
+            </select>
+          </div>
+          <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+            {SKINFOLD_FIELDS.map((s) => {
+              const req = needed.includes(s.key as any);
+              return (
+                <label key={s.key} className={cn('text-xs', req ? 'text-foreground' : 'text-muted-foreground/50')}>
+                  {s.label}{req && <span className="text-emerald-400"> *</span>}
+                  <input type="number" step="0.1" className={inp} value={sf[s.key] ?? ''} onChange={(e) => setSf({ ...sf, [s.key]: e.target.value })} />
+                </label>
+              );
+            })}
+          </div>
+          {bf && (
+            <div className="mt-3 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-sm">
+              <strong className="text-emerald-400">% de gordura estimado: {bf.fatPercent}%</strong>
+              <span className="text-muted-foreground"> · Σ dobras {bf.sum} mm · {classifyBodyFat(bf.fatPercent, sex)}</span>
+            </div>
+          )}
+          <label className="text-xs text-muted-foreground block mt-3">% gordura (sobrescrever, opcional)
+            <input type="number" step="0.1" className={inp} placeholder={bf ? String(bf.fatPercent) : ''} value={form.bodyFatPercent} onChange={(e) => setForm({ ...form, bodyFatPercent: e.target.value })} />
+          </label>
+        </div>
+
+        <button onClick={() => createMut.mutate()} disabled={createMut.isPending} className="btn-primary w-full mt-4 flex items-center justify-center gap-2">
+          <Save className="w-4 h-4" /> {createMut.isPending ? 'Salvando...' : 'Registrar avaliação'}
+        </button>
+      </div>
+
+      <div className="glass-card">
+        <h3 className="text-sm font-semibold mb-3">Histórico</h3>
+        {(history as any[]).length === 0 ? (
+          <p className="text-sm text-muted-foreground text-center py-6">Nenhuma avaliação registrada.</p>
+        ) : (
+          <div className="space-y-2">
+            {(history as any[]).map((a: any) => (
+              <div key={a.id} className="flex items-center justify-between p-2.5 rounded-lg bg-white/5 text-sm">
+                <span className="text-muted-foreground">{new Date(a.assessedAt).toLocaleDateString('pt-BR')}</span>
+                <span className="flex gap-3 text-xs">
+                  <span>{a.weight} kg</span>
+                  <span>IMC {a.bmi}</span>
+                  {a.bodyFatPercent != null && <span className="text-emerald-400">{a.bodyFatPercent}% GC</span>}
+                  {a.skinfoldProtocol && <span className="text-muted-foreground/60">{PROTOCOL_LABELS[a.skinfoldProtocol as SkinfoldProtocol] ?? a.skinfoldProtocol}</span>}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── Aba: Recordatório alimentar 24h ──────────────────────────────────────────
+function RecallTab({ patientId, patient }: { patientId: string; patient: any }) {
+  const qc = useQueryClient();
+  const [notesDraft, setNotesDraft] = useState<Record<string, string>>({});
+
+  const { data: recalls = [] } = useQuery({
+    queryKey: ['patient-recalls', patientId],
+    queryFn: () => api.get(`/nutritionists/me/patients/${patientId}/food-recalls`).then((r) => r.data?.data ?? r.data ?? []),
+  });
+
+  const requestMut = useMutation({
+    mutationFn: () => api.post(`/nutritionists/me/patients/${patientId}/food-recalls`),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['patient-recalls', patientId] }); toast.success('Recordatório solicitado — o paciente foi notificado.'); },
+    onError: (e: any) => toast.error(e.response?.data?.message || 'Erro ao solicitar'),
+  });
+  const notesMut = useMutation({
+    mutationFn: ({ id, notes }: { id: string; notes: string }) => api.patch(`/nutritionists/me/food-recalls/${id}`, { nutritionistNotes: notes }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['patient-recalls', patientId] }); toast.success('Observação salva'); },
+  });
+  const delMut = useMutation({
+    mutationFn: (id: string) => api.delete(`/nutritionists/me/food-recalls/${id}`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['patient-recalls', patientId] }),
+  });
+
+  return (
+    <div className="space-y-4">
+      <div className="glass-card flex items-center justify-between gap-3 flex-wrap">
+        <div>
+          <h2 className="font-semibold flex items-center gap-2"><FileText className="w-4 h-4 text-blue-400" /> Recordatório 24h</h2>
+          <p className="text-xs text-muted-foreground mt-0.5">O paciente relata tudo que comeu nas últimas 24h, refeição por refeição.</p>
+        </div>
+        <button onClick={() => requestMut.mutate()} disabled={requestMut.isPending} className="btn-primary text-sm py-2 flex items-center gap-2">
+          <Plus className="w-4 h-4" /> Solicitar
+        </button>
+      </div>
+
+      {(recalls as any[]).length === 0 ? (
+        <p className="text-sm text-muted-foreground text-center py-8">Nenhum recordatório ainda.</p>
+      ) : (
+        (recalls as any[]).map((r: any) => (
+          <div key={r.id} className="glass-card">
+            <div className="flex items-center justify-between mb-2">
+              <span className={cn('text-xs px-2 py-0.5 rounded-full', r.status === 'SUBMITTED' ? 'bg-emerald-500/15 text-emerald-400' : 'bg-yellow-500/15 text-yellow-400')}>
+                {r.status === 'SUBMITTED' ? 'Respondido' : 'Aguardando paciente'}
+              </span>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-muted-foreground">
+                  {r.status === 'SUBMITTED' && r.submittedAt ? new Date(r.submittedAt).toLocaleDateString('pt-BR') : `solicitado ${new Date(r.requestedAt).toLocaleDateString('pt-BR')}`}
+                </span>
+                <button onClick={() => delMut.mutate(r.id)} className="p-1 rounded text-muted-foreground hover:text-red-400"><Trash2 className="w-3.5 h-3.5" /></button>
+              </div>
+            </div>
+            {r.status === 'SUBMITTED' ? (
+              <>
+                {r.referenceDate && <p className="text-xs text-muted-foreground mb-2">Referência: {r.referenceDate}</p>}
+                <div className="space-y-2">
+                  {(r.meals ?? []).map((m: any) => (
+                    <div key={m.id} className="p-2.5 rounded-lg bg-white/5 text-sm">
+                      <div className="font-medium">{m.name}{m.time ? ` · ${m.time}` : ''}{m.place ? ` · ${m.place}` : ''}</div>
+                      <div className="text-muted-foreground whitespace-pre-wrap">{m.foods}</div>
+                    </div>
+                  ))}
+                </div>
+                {r.patientNotes && <p className="text-xs text-muted-foreground mt-2"><strong>Obs. do paciente:</strong> {r.patientNotes}</p>}
+                <textarea
+                  className="input-field text-sm mt-3 resize-none"
+                  rows={2}
+                  placeholder="Sua análise deste recordatório..."
+                  defaultValue={r.nutritionistNotes ?? ''}
+                  onChange={(e) => setNotesDraft({ ...notesDraft, [r.id]: e.target.value })}
+                />
+                <button
+                  onClick={() => notesMut.mutate({ id: r.id, notes: notesDraft[r.id] ?? r.nutritionistNotes ?? '' })}
+                  className="btn-secondary text-xs py-1.5 mt-2"
+                >
+                  Salvar análise
+                </button>
+              </>
+            ) : (
+              <p className="text-sm text-muted-foreground">O paciente ainda não respondeu. Ele vê o pedido em "Minha Dieta".</p>
+            )}
+          </div>
+        ))
+      )}
     </div>
   );
 }

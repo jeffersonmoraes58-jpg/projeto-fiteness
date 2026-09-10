@@ -84,6 +84,18 @@ export class StudentsController {
     return this.service.getWaterToday(user.id);
   }
 
+  @Get('me/food-recalls')
+  @ApiOperation({ summary: 'Recordatórios 24h do aluno' })
+  getFoodRecalls(@CurrentUser() user: any) {
+    return this.service.getFoodRecalls(user.id);
+  }
+
+  @Post('me/food-recalls/:recallId/submit')
+  @ApiOperation({ summary: 'Responder recordatório 24h' })
+  submitFoodRecall(@CurrentUser() user: any, @Param('recallId') recallId: string, @Body() body: any) {
+    return this.service.submitFoodRecall(user.id, recallId, body);
+  }
+
   @Get('me/progress')
   @ApiOperation({ summary: 'Dados de evolução e medidas' })
   getProgress(@CurrentUser() user: any) {

@@ -437,6 +437,64 @@ export class StudentsService {
     return { total: logs.reduce((s, l) => s + l.amount, 0), logs };
   }
 
+  async getFoodRecalls(userId: string) {
+    const student = await this.getStudent(userId);
+    return this.prisma.foodRecall.findMany({
+      where: { studentId: student.id },
+      include: { meals: { orderBy: { order: 'asc' } } },
+      orderBy: { requestedAt: 'desc' },
+    });
+  }
+
+  async submitFoodRecall(
+    userId: string,
+    recallId: string,
+    data: { referenceDate?: string; patientNotes?: string; meals?: any[] },
+  ) {
+    const student = await this.getStudent(userId);
+    const recall = await this.prisma.foodRecall.findUnique({ where: { id: recallId } });
+    if (!recall || recall.studentId !== student.id) {
+      throw new NotFoundException('Recordatório não encontrado');
+    }
+    await this.prisma.foodRecallMeal.deleteMany({ where: { recallId } });
+    const updated = await this.prisma.foodRecall.update({
+      where: { id: recallId },
+      data: {
+        status: 'SUBMITTED',
+        submittedAt: new Date(),
+        referenceDate: data.referenceDate ?? null,
+        patientNotes: data.patientNotes ?? null,
+        meals: {
+          create: (data.meals ?? [])
+            .filter((m) => (m.name || '').trim() || (m.foods || '').trim())
+            .map((m, i) => ({
+              order: i,
+              time: m.time ?? null,
+              place: m.place ?? null,
+              name: (m.name || `Refeição ${i + 1}`).trim(),
+              foods: (m.foods || '').trim(),
+            })),
+        },
+      },
+      include: { meals: { orderBy: { order: 'asc' } } },
+    });
+
+    if (recall.nutritionistId) {
+      const nutritionist = await this.prisma.nutritionist.findUnique({ where: { id: recall.nutritionistId } });
+      const profile = await this.prisma.profile.findUnique({ where: { userId: student.userId } });
+      const name = [profile?.firstName, profile?.lastName].filter(Boolean).join(' ') || 'Um paciente';
+      if (nutritionist) {
+        await this.notifications.create({
+          userId: nutritionist.userId,
+          type: 'SYSTEM',
+          title: '📝 Recordatório 24h respondido',
+          body: `${name} preencheu o recordatório alimentar.`,
+        });
+      }
+    }
+    return updated;
+  }
+
   async getProgress(userId: string) {
     const student = await this.getStudent(userId);
     const [measurements, photos, assessments] = await Promise.all([

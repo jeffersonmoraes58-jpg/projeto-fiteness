@@ -151,6 +151,30 @@ export class NutritionistsController {
     return this.service.createPhysicalAssessment(user.id, studentId, body);
   }
 
+  @Get('me/patients/:studentId/food-recalls')
+  @ApiOperation({ summary: 'Listar recordatórios 24h do paciente' })
+  getFoodRecalls(@CurrentUser() user: any, @Param('studentId') studentId: string) {
+    return this.service.getFoodRecalls(user.id, studentId);
+  }
+
+  @Post('me/patients/:studentId/food-recalls')
+  @ApiOperation({ summary: 'Solicitar recordatório 24h ao paciente' })
+  requestFoodRecall(@CurrentUser() user: any, @Param('studentId') studentId: string) {
+    return this.service.requestFoodRecall(user.id, studentId);
+  }
+
+  @Patch('me/food-recalls/:recallId')
+  @ApiOperation({ summary: 'Anotar observação no recordatório' })
+  updateFoodRecallNotes(@CurrentUser() user: any, @Param('recallId') recallId: string, @Body() body: { nutritionistNotes: string }) {
+    return this.service.updateFoodRecallNotes(user.id, recallId, body.nutritionistNotes);
+  }
+
+  @Delete('me/food-recalls/:recallId')
+  @ApiOperation({ summary: 'Excluir recordatório' })
+  deleteFoodRecall(@CurrentUser() user: any, @Param('recallId') recallId: string) {
+    return this.service.deleteFoodRecall(user.id, recallId);
+  }
+
   @Get('me/patients/:studentId/clinical-notes')
   @ApiOperation({ summary: 'Listar notas clinicas do paciente' })
   getClinicalNotes(@CurrentUser() user: any, @Param('studentId') studentId: string) {
