@@ -141,7 +141,16 @@ export class DietsService {
     });
   }
 
-  async removePlan(planId: string) {
+  async removePlan(userId: string, planId: string) {
+    const n = await this.getNutritionist(userId);
+    const plan = await this.prisma.dietPlan.findUnique({
+      where: { id: planId },
+      include: { diet: { select: { nutritionistId: true } } },
+    });
+    if (!plan) throw new NotFoundException('Plano de dieta não encontrado');
+    if (plan.diet.nutritionistId !== n.id) {
+      throw new ForbiddenException('Este plano de dieta não pertence a você');
+    }
     await this.prisma.dietPlan.delete({ where: { id: planId } });
     return { message: 'Plano de dieta removido com sucesso' };
   }

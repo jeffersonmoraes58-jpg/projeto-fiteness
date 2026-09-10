@@ -8,7 +8,7 @@ import {
   Dumbbell, Users, Apple, BarChart3, MessageCircle, Bell,
   Settings, LogOut, ChevronLeft, Trophy,
   Calendar, CreditCard, Brain, Home, Utensils, Wand2,
-  Activity, Target, Star, Building2, Shield, Zap, Clock, Medal, ClipboardCheck,
+  Activity, Target, Star, Building2, Shield, Zap, Medal, ClipboardCheck,
   ArrowLeftRight,
 } from 'lucide-react';
 
@@ -59,7 +59,7 @@ const navByRole: Record<string, NavItem[]> = {
   STUDENT: [
     { icon: Home, label: 'Início', href: '/student' },
     { icon: Dumbbell, label: 'Meu Treino', href: '/student/workout' },
-    { icon: Clock, label: 'Minha Dieta', href: '#', disabled: true },
+    { icon: Apple, label: 'Minha Dieta', href: '/student/diet' },
     { icon: Activity, label: 'Evolução', href: '/student/progress' },
     { icon: Calendar, label: 'Agenda', href: '/student/schedule' },
     { icon: Target, label: 'Metas', href: '/student/goals' },

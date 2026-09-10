@@ -55,7 +55,7 @@ export class DietsController {
 
   @Delete('plans/:planId')
   @ApiOperation({ summary: 'Remover plano de dieta do paciente' })
-  removePlan(@Param('planId') planId: string) {
-    return this.service.removePlan(planId);
+  removePlan(@CurrentUser() user: any, @Param('planId') planId: string) {
+    return this.service.removePlan(user.id, planId);
   }
 }
