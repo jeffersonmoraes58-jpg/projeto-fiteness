@@ -393,18 +393,63 @@ export default function NutritionistPatientDetailPage() {
         {/* TAB: ANAMNESE */}
         {tab === 'anamnese' && (
           <motion.div key="anamnese" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="glass-card">
-            <h2 className="font-semibold flex items-center gap-2 mb-4">
-              <ClipboardList className="w-4 h-4 text-blue-400" />
-              Anamnese
-            </h2>
+            <div className="flex items-center justify-between mb-4 gap-3 flex-wrap">
+              <h2 className="font-semibold flex items-center gap-2">
+                <ClipboardList className="w-4 h-4 text-blue-400" />
+                Anamnese
+              </h2>
+              {patient?.userId && (
+                <button
+                  onClick={() => {
+                    const link = `${window.location.origin}/anamnese/${patient.userId}?type=${encodeURIComponent('Anamnese Nutricional')}`;
+                    navigator.clipboard.writeText(link);
+                    toast.success('Link da anamnese copiado! Envie para o paciente preencher.');
+                  }}
+                  className="text-xs px-3 py-1.5 rounded-lg bg-primary/15 text-primary hover:bg-primary/25 transition-all"
+                >
+                  Copiar link da anamnese
+                </button>
+              )}
+            </div>
             {anamnesis ? (
-              <div className="space-y-2 text-sm">
-                {anamnesis.mainGoal && <p><strong>Objetivo:</strong> {anamnesis.mainGoal}</p>}
-                {anamnesis.observations && <p><strong>Observações:</strong> {anamnesis.observations}</p>}
-                {anamnesis.practicesExercise !== undefined && <p><strong>Exercício:</strong> {anamnesis.practicesExercise ? 'Sim' : 'Não'}</p>}
-                {anamnesis.exerciseFrequency && <p><strong>Frequência:</strong> {anamnesis.exerciseFrequency}</p>}
-                {anamnesis.previousInjuries && <p><strong>Lesões:</strong> {anamnesis.previousInjuries}</p>}
-                {anamnesis.surgeries && <p><strong>Cirurgias:</strong> {anamnesis.surgeries}</p>}
+              <div className="space-y-4 text-sm">
+                {(() => {
+                  const rows: [string, any][] = [
+                    ['Objetivo', anamnesis.mainGoal],
+                    ['Refeições/dia', anamnesis.mealsPerDay],
+                    ['Horários das refeições', anamnesis.mealSchedule],
+                    ['Quem prepara', anamnesis.whoCooksMeals],
+                    ['Come fora', anamnesis.eatsOutFrequency],
+                    ['Apetite', anamnesis.appetite],
+                    ['Mastigação', anamnesis.chewing],
+                    ['Água (L/dia)', anamnesis.waterIntakeLiters],
+                    ['Doces/açúcar', anamnesis.sugarIntake],
+                    ['Ultraprocessados', anamnesis.processedFoodIntake],
+                    ['Álcool', anamnesis.alcohol],
+                    ['Funcionamento intestinal', anamnesis.bowelFunction],
+                    ['Padrão alimentar', anamnesis.dietaryPattern],
+                    ['Alergias alimentares', anamnesis.foodAllergies],
+                    ['Intolerâncias', anamnesis.foodIntolerances],
+                    ['Alimentos que não come', anamnesis.foodDislikes],
+                    ['Suplementos', anamnesis.supplementsInUse],
+                    ['Medicamentos contínuos', anamnesis.medicationsInUse],
+                    ['Doenças crônicas', anamnesis.chronicDiseases],
+                    ['Histórico familiar', anamnesis.familyHistory],
+                    ['Sono (h/noite)', anamnesis.sleepHours],
+                    ['Estresse (1-10)', anamnesis.stressLevel],
+                    ['Pratica exercício', anamnesis.practicesExercise === undefined ? undefined : (anamnesis.practicesExercise ? 'Sim' : 'Não')],
+                    ['Frequência de exercício', anamnesis.exerciseFrequency],
+                    ['Diabetes', anamnesis.diabetes ? 'Sim' : undefined],
+                    ['Pressão arterial', anamnesis.bloodPressure],
+                    ['Colesterol', anamnesis.cholesterol],
+                    ['Observações', anamnesis.observations],
+                  ];
+                  return rows
+                    .filter(([, v]) => v !== undefined && v !== null && v !== '')
+                    .map(([label, v]) => (
+                      <p key={label}><strong>{label}:</strong> {String(v)}</p>
+                    ));
+                })()}
               </div>
             ) : (
               <p className="text-sm text-muted-foreground text-center py-10">Anamnese não preenchida.</p>

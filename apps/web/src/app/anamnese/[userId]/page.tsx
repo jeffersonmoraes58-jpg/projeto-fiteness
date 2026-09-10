@@ -31,6 +31,25 @@ interface AnamneseAnswers {
   stressLevel?: number;
   mainGoal?: string;
   observations?: string;
+  // anamnese nutricional
+  mealsPerDay?: number;
+  mealSchedule?: string;
+  waterIntakeLiters?: number;
+  appetite?: string;
+  chewing?: string;
+  foodAllergies?: string;
+  foodIntolerances?: string;
+  foodDislikes?: string;
+  dietaryPattern?: string;
+  supplementsInUse?: string;
+  bowelFunction?: string;
+  sugarIntake?: string;
+  processedFoodIntake?: string;
+  whoCooksMeals?: string;
+  eatsOutFrequency?: string;
+  chronicDiseases?: string;
+  familyHistory?: string;
+  medicationsInUse?: string;
 }
 
 const QUESTIONS_BY_TYPE: Record<string, Question[]> = {
@@ -64,17 +83,31 @@ const QUESTIONS_BY_TYPE: Record<string, Question[]> = {
     { id: 'observations', label: 'Alguma informação adicional para seu personal trainer?', type: 'textarea', placeholder: 'Limitações, preferências de treino, horários... (opcional)' },
   ],
   'Anamnese Nutricional': [
-    { id: 'practicesExercise', label: 'Você pratica alguma atividade física?', type: 'boolean' },
-    { id: 'exerciseFrequency', label: 'Com que frequência?', type: 'select', options: ['1x por semana', '2x por semana', '3x por semana', '4x ou mais por semana'], dependsOn: { id: 'practicesExercise', value: true } },
-    { id: 'previousInjuries', label: 'Tem alguma restrição alimentar? (intolerância, alergia, preferência)', type: 'textarea', placeholder: 'Ex: intolerante a lactose, alergia a amendoim, vegetariano...' },
-    { id: 'diabetes', label: 'Você tem diabetes?', type: 'boolean' },
-    { id: 'cholesterol', label: 'Seu colesterol está:', type: 'select', options: ['Normal', 'Alto', 'Não sei'] },
-    { id: 'bloodPressure', label: 'Sua pressão arterial é:', type: 'select', options: ['Normal', 'Alta (hipertensão)', 'Baixa (hipotensão)', 'Não sei'] },
+    { id: 'mainGoal', label: 'Qual é o seu objetivo com o acompanhamento nutricional?', type: 'select', options: ['Emagrecimento', 'Ganho de massa muscular', 'Manutenção do peso', 'Reeducação alimentar', 'Performance esportiva', 'Saúde geral'] },
+    { id: 'mealsPerDay', label: 'Quantas refeições você faz por dia?', type: 'number', min: 1, max: 10, placeholder: '4' },
+    { id: 'mealSchedule', label: 'Quais os horários habituais das suas refeições?', type: 'textarea', placeholder: 'Ex: café 7h, almoço 12h, lanche 16h, jantar 20h...' },
+    { id: 'whoCooksMeals', label: 'Quem prepara as suas refeições?', type: 'select', options: ['Eu mesmo(a)', 'Outra pessoa da casa', 'Comida pronta / marmita', 'Restaurante', 'Varia'] },
+    { id: 'eatsOutFrequency', label: 'Com que frequência você come fora de casa?', type: 'select', options: ['Nunca', '1-2x por semana', '3-5x por semana', 'Quase todo dia'] },
+    { id: 'appetite', label: 'Como está o seu apetite?', type: 'select', options: ['Aumentado', 'Normal', 'Reduzido', 'Varia muito'] },
+    { id: 'chewing', label: 'Como você costuma mastigar?', type: 'select', options: ['Rápida / com pressa', 'Adequada', 'Lenta'] },
+    { id: 'waterIntakeLiters', label: 'Quantos litros de água você bebe por dia (aproximadamente)?', type: 'number', min: 0, max: 10, placeholder: '2' },
+    { id: 'sugarIntake', label: 'Com que frequência consome doces / açúcar?', type: 'select', options: ['Raramente', '1-2x por semana', '3-5x por semana', 'Todo dia', 'Várias vezes ao dia'] },
+    { id: 'processedFoodIntake', label: 'Com que frequência consome ultraprocessados (salgadinho, refrigerante, embutidos)?', type: 'select', options: ['Raramente', '1-2x por semana', '3-5x por semana', 'Todo dia'] },
     { id: 'alcohol', label: 'Com que frequência consome bebida alcoólica?', type: 'select', options: ['Nunca', 'Raramente', 'Fins de semana', 'Frequentemente'] },
+    { id: 'bowelFunction', label: 'Como é o seu funcionamento intestinal?', type: 'select', options: ['Regular (todo dia)', 'A cada 2-3 dias', 'Constipado (menos que isso)', 'Solto / diarreia', 'Alternado'] },
+    { id: 'dietaryPattern', label: 'Você segue algum padrão alimentar?', type: 'select', options: ['Onívoro (como de tudo)', 'Vegetariano', 'Vegano', 'Low carb', 'Sem glúten', 'Sem lactose', 'Outro'] },
+    { id: 'foodAllergies', label: 'Você tem alguma alergia alimentar?', type: 'textarea', placeholder: 'Ex: amendoim, frutos do mar, ovo... (ou "nenhuma")' },
+    { id: 'foodIntolerances', label: 'Você tem alguma intolerância alimentar?', type: 'textarea', placeholder: 'Ex: lactose, glúten, FODMAPs... (ou "nenhuma")' },
+    { id: 'foodDislikes', label: 'Quais alimentos você não gosta ou não come de jeito nenhum?', type: 'textarea', placeholder: 'Liste os alimentos...' },
+    { id: 'supplementsInUse', label: 'Você usa algum suplemento atualmente?', type: 'textarea', placeholder: 'Ex: whey, creatina, vitamina D... (ou "nenhum")' },
+    { id: 'medicationsInUse', label: 'Você faz uso contínuo de algum medicamento?', type: 'textarea', placeholder: 'Liste os medicamentos e para quê... (ou "nenhum")' },
+    { id: 'chronicDiseases', label: 'Você tem alguma doença crônica diagnosticada?', type: 'textarea', placeholder: 'Ex: diabetes, hipertensão, hipotireoidismo... (ou "nenhuma")' },
+    { id: 'familyHistory', label: 'Histórico familiar de doença crônica (pais/irmãos)?', type: 'textarea', placeholder: 'Ex: diabetes (pai), obesidade (mãe)... (ou "nenhum")' },
     { id: 'sleepHours', label: 'Quantas horas você dorme por noite?', type: 'number', min: 1, max: 14, placeholder: '7' },
     { id: 'stressLevel', label: 'Nível de estresse diário (1 a 10)', type: 'number', min: 1, max: 10, placeholder: '5' },
-    { id: 'mainGoal', label: 'Qual é o seu objetivo com o acompanhamento nutricional?', type: 'select', options: ['Emagrecimento', 'Ganho de massa muscular', 'Manutenção do peso', 'Reeducação alimentar', 'Performance esportiva', 'Saúde geral'] },
-    { id: 'observations', label: 'Informações adicionais (hábitos alimentares, alimentos que não gosta, etc.)', type: 'textarea', placeholder: 'Conte mais sobre sua alimentação atual... (opcional)' },
+    { id: 'practicesExercise', label: 'Você pratica alguma atividade física?', type: 'boolean' },
+    { id: 'exerciseFrequency', label: 'Com que frequência?', type: 'select', options: ['1x por semana', '2x por semana', '3x por semana', '4x ou mais por semana'], dependsOn: { id: 'practicesExercise', value: true } },
+    { id: 'observations', label: 'Mais alguma informação relevante sobre sua alimentação?', type: 'textarea', placeholder: 'Compulsões, beliscar, comer emocional, rotina... (opcional)' },
   ],
   'Anamnese de Saúde': [
     { id: 'practicesExercise', label: 'Você pratica alguma atividade física regularmente?', type: 'boolean' },

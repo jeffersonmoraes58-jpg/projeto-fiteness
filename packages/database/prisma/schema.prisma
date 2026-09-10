@@ -527,6 +527,27 @@ model Anamnesis {
   stressLevel          Int?
   mainGoal             String?
   observations         String?
+
+  // Anamnese nutricional (preenchida quando o convite é do tipo "Nutricional")
+  mealsPerDay          Int?
+  mealSchedule         String?
+  waterIntakeLiters    Float?
+  appetite             String?
+  chewing              String?
+  foodAllergies        String?
+  foodIntolerances     String?
+  foodDislikes         String?
+  dietaryPattern       String?
+  supplementsInUse     String?
+  bowelFunction        String?
+  sugarIntake          String?
+  processedFoodIntake  String?
+  whoCooksMeals        String?
+  eatsOutFrequency     String?
+  chronicDiseases      String?
+  familyHistory        String?
+  medicationsInUse     String?
+
   completedAt          DateTime @default(now())
   updatedAt            DateTime @updatedAt
 
