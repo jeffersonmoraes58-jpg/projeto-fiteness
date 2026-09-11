@@ -339,6 +339,12 @@ export class NutritionistsController {
     return this.service.getPatientAiContext(user.id, studentId);
   }
 
+  @Get('me/patients/:studentId/diet-suggestion')
+  @ApiOperation({ summary: 'Sugestão de kcal/macros + alertas de segurança para montar dieta do paciente' })
+  getDietSuggestion(@CurrentUser() user: any, @Param('studentId') studentId: string) {
+    return this.service.getDietSuggestion(user.id, studentId);
+  }
+
   @Post('me/calculate-tmb')
   @ApiOperation({ summary: 'Calcular TMB, GET e distribuicao de macronutrientes' })
   calculateTMB(@CurrentUser() user: any, @Body() body: {

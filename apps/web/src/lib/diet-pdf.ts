@@ -26,6 +26,10 @@ export function openDietPDF(diet: any, opts: DietPDFOptions = {}): boolean {
   const meals: any[] = diet.meals ?? [];
   const date = new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' });
 
+  const kcalTotal = diet.totalCalories ?? 0;
+  const pctOf = (grams: number | null | undefined, kcalPerG: number) =>
+    kcalTotal > 0 && grams ? ` (${Math.round(((grams * kcalPerG) / kcalTotal) * 100)}%)` : '';
+
   const mealRows = meals
     .map((m: any) => {
       const foodRows = (m.foods ?? [])
@@ -96,11 +100,12 @@ export function openDietPDF(diet: any, opts: DietPDFOptions = {}): boolean {
     </div>
   </div>
   <div class="macros-grid">
-    <div class="macro-box"><div class="macro-val">${diet.totalCalories ?? 0}</div><div class="macro-label">Calorias (kcal)</div></div>
-    <div class="macro-box"><div class="macro-val">${diet.totalProtein ?? 0}g</div><div class="macro-label">Proteína</div></div>
-    <div class="macro-box"><div class="macro-val">${diet.totalCarbs ?? 0}g</div><div class="macro-label">Carboidratos</div></div>
-    <div class="macro-box"><div class="macro-val">${diet.totalFat ?? 0}g</div><div class="macro-label">Gorduras</div></div>
+    <div class="macro-box"><div class="macro-val">${kcalTotal}</div><div class="macro-label">Calorias (kcal)</div></div>
+    <div class="macro-box"><div class="macro-val">${diet.totalProtein ?? 0}g</div><div class="macro-label">Proteína${pctOf(diet.totalProtein, 4)}</div></div>
+    <div class="macro-box"><div class="macro-val">${diet.totalCarbs ?? 0}g</div><div class="macro-label">Carboidratos${pctOf(diet.totalCarbs, 4)}</div></div>
+    <div class="macro-box"><div class="macro-val">${diet.totalFat ?? 0}g</div><div class="macro-label">Gorduras${pctOf(diet.totalFat, 9)}</div></div>
   </div>
+  ${diet.waterTargetMl ? `<p style="font-size:12px;color:#6b7280;margin-bottom:12px;">💧 Meta de água: ${diet.waterTargetMl}ml/dia</p>` : ''}
   <table>
     <thead><tr>
       <th style="text-align:left;">Alimento</th>

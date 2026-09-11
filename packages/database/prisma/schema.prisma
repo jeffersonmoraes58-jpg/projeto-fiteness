@@ -820,6 +820,7 @@ model Diet {
   totalCarbs     Float?
   totalFat       Float?
   totalFiber     Float?
+  waterTargetMl  Float?
   isTemplate     Boolean    @default(false)
   tags           String[]
   createdAt      DateTime   @default(now())

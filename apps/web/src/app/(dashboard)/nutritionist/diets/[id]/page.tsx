@@ -5,6 +5,7 @@ import { motion } from 'framer-motion';
 import {
   Apple, ChevronLeft, Flame, Beef, Wheat, Droplets, Users, UserCheck,
   Plus, Trash2, Save, CheckCircle, Clock, Search, X, Download, ShoppingCart,
+  AlertTriangle,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
@@ -24,6 +25,12 @@ const MEAL_TYPES = [
   { value: 'POST_WORKOUT', label: 'Pós-treino' },
 ];
 const MEAL_LABELS: Record<string, string> = Object.fromEntries(MEAL_TYPES.map((t) => [t.value, t.label]));
+
+const GOAL_LABELS: Record<string, string> = {
+  LOSE_WEIGHT: 'Perda de peso', GAIN_MUSCLE: 'Ganho muscular', MAINTAIN_WEIGHT: 'Manutenção',
+  IMPROVE_ENDURANCE: 'Resistência', INCREASE_FLEXIBILITY: 'Flexibilidade',
+  ATHLETIC_PERFORMANCE: 'Performance', REHABILITATION: 'Reabilitação',
+};
 
 interface FoodItem {
   foodId: string;
@@ -253,6 +260,13 @@ export default function DietDetailPage() {
     queryFn: () => api.get('/nutritionists/me/patients').then((r) => r.data?.data ?? r.data ?? []),
   });
 
+  const selectedPatientStudentId = (patients as any[] | undefined)?.find((p: any) => p.userId === selectedPatient)?.id;
+  const { data: assignSuggestion } = useQuery({
+    queryKey: ['diet-suggestion', selectedPatientStudentId],
+    queryFn: () => api.get(`/nutritionists/me/patients/${selectedPatientStudentId}/diet-suggestion`).then((r) => r.data?.data ?? r.data),
+    enabled: !!selectedPatientStudentId,
+  });
+
   // diet totals from all meals
   const dietTotals = meals.reduce(
     (acc, m) => {
@@ -450,19 +464,31 @@ export default function DietDetailPage() {
           Totais da Dieta {hasFoods && <span className="text-xs text-emerald-400 font-normal">(calculado dos alimentos)</span>}
         </h2>
         <div className="grid grid-cols-4 gap-3">
-          {[
-            { label: 'Calorias', value: hasFoods ? Math.round(dietTotals.calories) : (diet.totalCalories ?? 0), unit: 'kcal', color: 'text-orange-400', Icon: Flame },
-            { label: 'Proteína', value: hasFoods ? dietTotals.protein : (diet.totalProtein ?? 0), unit: 'g', color: 'text-red-400', Icon: Beef },
-            { label: 'Carboidratos', value: hasFoods ? dietTotals.carbs : (diet.totalCarbs ?? 0), unit: 'g', color: 'text-yellow-400', Icon: Wheat },
-            { label: 'Gordura', value: hasFoods ? dietTotals.fat : (diet.totalFat ?? 0), unit: 'g', color: 'text-blue-400', Icon: Droplets },
-          ].map((m) => (
+          {(() => {
+            const kcal = hasFoods ? dietTotals.calories : (diet.totalCalories ?? 0);
+            const protein = hasFoods ? dietTotals.protein : (diet.totalProtein ?? 0);
+            const carbs = hasFoods ? dietTotals.carbs : (diet.totalCarbs ?? 0);
+            const fat = hasFoods ? dietTotals.fat : (diet.totalFat ?? 0);
+            const pct = (grams: number, kcalPerG: number) => (kcal > 0 ? Math.round(((grams * kcalPerG) / kcal) * 100) : null);
+            return [
+              { label: 'Calorias', value: Math.round(kcal), unit: 'kcal', pct: null, color: 'text-orange-400', Icon: Flame },
+              { label: 'Proteína', value: protein, unit: 'g', pct: pct(protein, 4), color: 'text-red-400', Icon: Beef },
+              { label: 'Carboidratos', value: carbs, unit: 'g', pct: pct(carbs, 4), color: 'text-yellow-400', Icon: Wheat },
+              { label: 'Gordura', value: fat, unit: 'g', pct: pct(fat, 9), color: 'text-blue-400', Icon: Droplets },
+            ];
+          })().map((m) => (
             <div key={m.label} className="glass rounded-xl p-3 text-center">
               <m.Icon className={`w-5 h-5 ${m.color} mx-auto mb-1`} />
               <div className="font-bold text-sm">{m.value}{m.unit}</div>
-              <div className="text-[10px] text-muted-foreground">{m.label}</div>
+              <div className="text-[10px] text-muted-foreground">{m.label}{m.pct !== null ? ` · ${m.pct}%` : ''}</div>
             </div>
           ))}
         </div>
+        {diet.waterTargetMl && (
+          <p className="text-xs text-muted-foreground mt-3 flex items-center gap-1.5">
+            <Droplets className="w-3.5 h-3.5 text-cyan-400" /> Meta de água: {diet.waterTargetMl}ml/dia
+          </p>
+        )}
       </motion.div>
 
       {/* Meal editor */}
@@ -623,6 +649,32 @@ export default function DietDetailPage() {
             ))}
           </select>
         </div>
+        {assignSuggestion && (
+          <div className="rounded-xl border border-border/50 bg-white/5 p-3 space-y-2 text-xs">
+            {assignSuggestion.goalType && (
+              <p className="text-muted-foreground"><strong className="text-foreground">Objetivo do paciente:</strong> {GOAL_LABELS[assignSuggestion.goalType] || assignSuggestion.goalType}</p>
+            )}
+            {(assignSuggestion.foodAllergies || assignSuggestion.foodIntolerances) && (
+              <div className="flex items-start gap-2 p-2 rounded-lg bg-red-500/10 border border-red-500/20 text-red-300">
+                <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
+                <div>
+                  {assignSuggestion.foodAllergies && <p><strong>Alergias:</strong> {assignSuggestion.foodAllergies}</p>}
+                  {assignSuggestion.foodIntolerances && <p><strong>Intolerâncias:</strong> {assignSuggestion.foodIntolerances}</p>}
+                </div>
+              </div>
+            )}
+            {assignSuggestion.tmbCalc && diet.totalCalories && (
+              Math.abs(diet.totalCalories - assignSuggestion.tmbCalc.targetCalories) > assignSuggestion.tmbCalc.targetCalories * 0.15 ? (
+                <div className="flex items-start gap-2 p-2 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-300">
+                  <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
+                  <p>Esta dieta tem {diet.totalCalories} kcal, mas a meta sugerida para este paciente é ~{assignSuggestion.tmbCalc.targetCalories} kcal. Confira se faz sentido antes de atribuir.</p>
+                </div>
+              ) : (
+                <p className="text-emerald-400">Calorias da dieta compatíveis com a meta sugerida (~{assignSuggestion.tmbCalc.targetCalories} kcal).</p>
+              )
+            )}
+          </div>
+        )}
         {assignError && <div className="glass rounded-xl p-3 border border-red-500/20 text-red-400 text-sm">{assignError}</div>}
         <div className="flex items-center justify-between pt-1">
           <div className="flex items-center gap-2 text-xs text-muted-foreground">

@@ -959,6 +959,83 @@ export class NutritionistsService {
     };
   }
 
+  /**
+   * Consolida tudo que o nutricionista precisa pra montar (ou conferir) uma
+   * dieta de forma segura para ESTE paciente: sugestão de kcal/macros (via
+   * TMB/GET calculado com os dados mais recentes), alergias/intolerâncias da
+   * anamnese, e — se o paciente também tiver personal — os dias de treino,
+   * pra alinhar refeições pré/pós-treino.
+   */
+  async getDietSuggestion(userId: string, studentId: string) {
+    const n = await this.getNutritionist(userId);
+    const relation = await this.prisma.nutritionistPatient.findFirst({
+      where: { nutritionistId: n.id, studentId },
+    });
+    if (!relation) throw new NotFoundException('Paciente não encontrado');
+
+    const [student, lastAssessment, anamnesis] = await Promise.all([
+      this.prisma.student.findUnique({ where: { id: studentId } }),
+      this.prisma.physicalAssessment.findFirst({
+        where: { studentId },
+        orderBy: { assessedAt: 'desc' },
+      }),
+      this.prisma.anamnesis.findUnique({ where: { studentId } }),
+    ]);
+
+    let tmbCalc: any = null;
+    if (
+      lastAssessment?.weight &&
+      lastAssessment?.height &&
+      lastAssessment?.assessedAge &&
+      lastAssessment?.assessedGender &&
+      student
+    ) {
+      tmbCalc = await this.calculateTMB({
+        weight: lastAssessment.weight,
+        height: lastAssessment.height,
+        age: lastAssessment.assessedAge,
+        gender: lastAssessment.assessedGender,
+        activityLevel: student.activityLevel,
+        goal: student.goalType || 'MAINTAIN_WEIGHT',
+      });
+    }
+
+    // Dias de treino, se o paciente também tiver personal ativo — ajuda a
+    // alinhar refeições de pré/pós-treino.
+    const trainerRelation = await this.prisma.trainerStudent.findFirst({
+      where: { studentId, isActive: true },
+      include: { trainer: { include: { user: { include: { profile: true } } } } },
+    });
+    let trainerInfo: any = null;
+    if (trainerRelation) {
+      const plans = await this.prisma.workoutPlan.findMany({
+        where: { studentId, isActive: true },
+        select: { dayOfWeek: true },
+      });
+      const days = Array.from(new Set(plans.flatMap((p) => p.dayOfWeek))).sort();
+      trainerInfo = {
+        name: [trainerRelation.trainer.user.profile?.firstName, trainerRelation.trainer.user.profile?.lastName]
+          .filter(Boolean).join(' ') || 'Personal Trainer',
+        workoutDays: days, // 0=domingo ... 6=sábado
+      };
+    }
+
+    return {
+      goalType: student?.goalType ?? null,
+      activityLevel: student?.activityLevel ?? null,
+      lastAssessment: lastAssessment
+        ? { weight: lastAssessment.weight, height: lastAssessment.height, assessedAt: lastAssessment.assessedAt }
+        : null,
+      foodAllergies: anamnesis?.foodAllergies ?? null,
+      foodIntolerances: anamnesis?.foodIntolerances ?? null,
+      foodDislikes: anamnesis?.foodDislikes ?? null,
+      waterIntakeLiters: anamnesis?.waterIntakeLiters ?? null,
+      mealsPerDay: anamnesis?.mealsPerDay ?? null,
+      tmbCalc,
+      trainer: trainerInfo,
+    };
+  }
+
   async getPatientAiContext(userId: string, studentId: string) {
     const n = await this.getNutritionist(userId);
     const relation = await this.prisma.nutritionistPatient.findFirst({

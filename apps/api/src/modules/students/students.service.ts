@@ -431,10 +431,17 @@ export class StudentsService {
     const student = await this.getStudent(userId);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    const logs = await this.prisma.waterLog.findMany({
-      where: { studentId: student.id, loggedAt: { gte: today } },
-    });
-    return { total: logs.reduce((s, l) => s + l.amount, 0), logs };
+    const [logs, dietPlan] = await Promise.all([
+      this.prisma.waterLog.findMany({
+        where: { studentId: student.id, loggedAt: { gte: today } },
+      }),
+      this.prisma.dietPlan.findFirst({
+        where: { studentId: student.id, isActive: true },
+        include: { diet: { select: { waterTargetMl: true } } },
+      }),
+    ]);
+    const goal = dietPlan?.diet.waterTargetMl || 2000;
+    return { total: logs.reduce((s, l) => s + l.amount, 0), goal, logs };
   }
 
   async getFoodRecalls(userId: string) {

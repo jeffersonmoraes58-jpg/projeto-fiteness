@@ -246,10 +246,15 @@ export default function NutritionistPatientDetailPage() {
         {/* TAB: DIETAS */}
         {tab === 'dietas' && (
           <motion.div key="dietas" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="space-y-3">
-            <h2 className="font-semibold flex items-center gap-2">
-              <Apple className="w-4 h-4 text-emerald-400" />
-              Histórico de Dietas
-            </h2>
+            <div className="flex items-center justify-between">
+              <h2 className="font-semibold flex items-center gap-2">
+                <Apple className="w-4 h-4 text-emerald-400" />
+                Histórico de Dietas
+              </h2>
+              <Link href={`/nutritionist/diets/new?patientId=${id}`} className="btn-primary text-xs py-1.5 px-3">
+                Nova dieta pra este paciente
+              </Link>
+            </div>
             {(!dietHistory || (Array.isArray(dietHistory) ? dietHistory.length : 0) === 0) ? (
               <div className="glass-card text-center py-10 text-muted-foreground">
                 <Apple className="w-10 h-10 mx-auto mb-2 opacity-30" />

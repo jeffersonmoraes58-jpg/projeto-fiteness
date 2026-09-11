@@ -105,7 +105,7 @@ export default function StudentDiet() {
     fiber:    0,
   } : null;
   const waterTotal = waterData?.total ?? 0;
-  const waterGoal = 2000;
+  const waterGoal = waterData?.goal ?? 2000;
   const totalCalories = dietPlan?.diet?.totalCalories ?? 0;
   const consumedCalories = todayLog?.calories ?? 0;
   const remaining = Math.max(totalCalories - consumedCalories, 0);
