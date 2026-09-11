@@ -107,6 +107,12 @@ export default function StudentDiet() {
   const waterTotal = waterData?.total ?? 0;
   const waterGoal = waterData?.goal ?? 2000;
   const totalCalories = dietPlan?.diet?.totalCalories ?? 0;
+  // refeições marcadas com dia da semana específico só aparecem nesse dia
+  // (vazio = todos os dias, mesma convenção usada pelo treino)
+  const todayDow = new Date().getDay();
+  const todayMeals = (dietPlan?.diet?.meals || []).filter(
+    (m: any) => !m.dayOfWeek?.length || m.dayOfWeek.includes(todayDow),
+  );
   const consumedCalories = todayLog?.calories ?? 0;
   const remaining = Math.max(totalCalories - consumedCalories, 0);
 
@@ -338,7 +344,7 @@ export default function StudentDiet() {
       {/* Meals */}
       <div className="space-y-3">
         <h2 className="font-semibold">Refeições do Dia</h2>
-        {(dietPlan?.diet?.meals || [...Array(4)]).map((meal: any, i: number) => {
+        {(dietPlan?.diet?.meals ? todayMeals : [...Array(4)]).map((meal: any, i: number) => {
           const mealType = meal?.type || String(i);
           const ms = mealStates[mealType];
           const isLogged = loggedTypes.has(mealType) || ms?.step === 'done';

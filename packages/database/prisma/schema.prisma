@@ -840,6 +840,7 @@ model DietMeal {
   type     MealType
   order    Int      @default(0)
   time     String?
+  dayOfWeek Int[]   @default([]) // vazio = todos os dias (mesma convenção de Workout.dayOfWeek)
   calories Float?
   protein  Float?
   carbs    Float?

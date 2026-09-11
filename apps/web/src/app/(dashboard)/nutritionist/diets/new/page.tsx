@@ -2,24 +2,12 @@
 
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Apple, ChevronLeft, Plus, Trash2, Save, User, AlertTriangle, Sparkles, Dumbbell } from 'lucide-react';
+import { Apple, ChevronLeft, Plus, Save, User, AlertTriangle, Sparkles, Dumbbell } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { api } from '@/lib/api';
-
-const MEAL_TYPES = [
-  { value: 'BREAKFAST', label: 'Café da manhã' },
-  { value: 'MORNING_SNACK', label: 'Lanche da manhã' },
-  { value: 'LUNCH', label: 'Almoço' },
-  { value: 'AFTERNOON_SNACK', label: 'Lanche da tarde' },
-  { value: 'PRE_WORKOUT', label: 'Pré-treino' },
-  { value: 'POST_WORKOUT', label: 'Pós-treino' },
-  { value: 'DINNER', label: 'Jantar' },
-  { value: 'EVENING_SNACK', label: 'Ceia' },
-];
-
-const MEAL_LABEL: Record<string, string> = Object.fromEntries(MEAL_TYPES.map((t) => [t.value, t.label]));
+import { MealCard, emptyMeal, calcMealMacros, type MealRow } from '@/components/nutritionist/meal-editor';
 
 const GOAL_LABELS: Record<string, string> = {
   LOSE_WEIGHT: 'Perda de peso', GAIN_MUSCLE: 'Ganho muscular', MAINTAIN_WEIGHT: 'Manutenção',
@@ -41,7 +29,7 @@ export default function NewDietPage() {
   const [totalCarbs, setTotalCarbs] = useState('');
   const [totalFat, setTotalFat] = useState('');
   const [waterTargetMl, setWaterTargetMl] = useState('');
-  const [meals, setMeals] = useState([{ type: 'BREAKFAST', notes: '' }]);
+  const [meals, setMeals] = useState<MealRow[]>([emptyMeal()]);
   const [error, setError] = useState('');
 
   const [patientId, setPatientId] = useState(patientIdFromUrl);
@@ -75,9 +63,46 @@ export default function NewDietPage() {
     setTotalFat(String(suggestion.tmbCalc.macros.fat.grams));
   }
 
+  const hasFoods = meals.some((m) => m.foods.length > 0);
+  const dietTotals = meals.reduce(
+    (acc, m) => {
+      const t = calcMealMacros(m.foods);
+      return { calories: acc.calories + t.calories, protein: acc.protein + t.protein, carbs: acc.carbs + t.carbs, fat: acc.fat + t.fat };
+    },
+    { calories: 0, protein: 0, carbs: 0, fat: 0 },
+  );
+
   const createMutation = useMutation({
-    mutationFn: async (data: any) => {
-      const res = await api.post('/diets', data);
+    mutationFn: async () => {
+      const payload = {
+        name,
+        description,
+        // se já tem alimento nas refeições, os totais vêm deles (igual ao editor da dieta);
+        // senão usa a meta digitada/sugerida manualmente.
+        totalCalories: hasFoods ? Math.round(dietTotals.calories) : (totalCalories ? Number(totalCalories) : undefined),
+        totalProtein: hasFoods ? Math.round(dietTotals.protein * 10) / 10 : (totalProtein ? Number(totalProtein) : undefined),
+        totalCarbs: hasFoods ? Math.round(dietTotals.carbs * 10) / 10 : (totalCarbs ? Number(totalCarbs) : undefined),
+        totalFat: hasFoods ? Math.round(dietTotals.fat * 10) / 10 : (totalFat ? Number(totalFat) : undefined),
+        waterTargetMl: waterTargetMl ? Number(waterTargetMl) : undefined,
+        meals: meals.map((m) => ({
+          type: m.type,
+          name: m.name,
+          time: m.time || undefined,
+          dayOfWeek: m.dayOfWeek,
+          notes: m.notes || undefined,
+          foods: m.foods.map((f) => ({
+            foodId: f.foodId,
+            quantity: f.quantity,
+            unit: f.unit,
+            calories: f.calories,
+            protein: f.protein,
+            carbs: f.carbs,
+            fat: f.fat,
+          })),
+        })),
+        status: 'ACTIVE',
+      };
+      const res = await api.post('/diets', payload);
       const created = res.data?.data ?? res.data;
       if (autoAssign && patientId && selectedPatient?.userId) {
         await api.post(`/diets/${created.id}/assign`, { studentUserId: selectedPatient.userId });
@@ -88,26 +113,13 @@ export default function NewDietPage() {
     onError: (e: any) => setError(e.response?.data?.message || 'Erro ao criar dieta'),
   });
 
-  const addMeal = () => setMeals([...meals, { type: 'LUNCH', notes: '' }]);
-  const removeMeal = (i: number) => setMeals(meals.filter((_, idx) => idx !== i));
-  const updateMeal = (i: number, field: string, value: string) => {
-    setMeals(meals.map((m, idx) => idx === i ? { ...m, [field]: value } : m));
-  };
+  const addMeal = () => setMeals((prev) => [...prev, emptyMeal('LUNCH')]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) { setError('Nome é obrigatório'); return; }
-    createMutation.mutate({
-      name,
-      description,
-      totalCalories: totalCalories ? Number(totalCalories) : undefined,
-      totalProtein: totalProtein ? Number(totalProtein) : undefined,
-      totalCarbs: totalCarbs ? Number(totalCarbs) : undefined,
-      totalFat: totalFat ? Number(totalFat) : undefined,
-      waterTargetMl: waterTargetMl ? Number(waterTargetMl) : undefined,
-      meals: meals.map((m) => ({ ...m, name: MEAL_LABEL[m.type] || m.type })),
-      status: 'ACTIVE',
-    });
+    setError('');
+    createMutation.mutate();
   };
 
   const kcalSum = (Number(totalProtein) || 0) * 4 + (Number(totalCarbs) || 0) * 4 + (Number(totalFat) || 0) * 9;
@@ -227,25 +239,45 @@ export default function NewDietPage() {
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <div>
               <label className="text-xs text-muted-foreground mb-1 block">Calorias (kcal)</label>
-              <input type="number" value={totalCalories} onChange={(e) => setTotalCalories(e.target.value)} placeholder="2000" className="input-field" min={0} />
+              <input
+                type="number" value={hasFoods ? Math.round(dietTotals.calories) : totalCalories}
+                onChange={(e) => setTotalCalories(e.target.value)} placeholder="2000" className="input-field" min={0}
+                disabled={hasFoods} title={hasFoods ? 'Calculado a partir dos alimentos adicionados' : undefined}
+              />
             </div>
             <div>
               <label className="text-xs text-muted-foreground mb-1 block">Proteína (g)</label>
-              <input type="number" value={totalProtein} onChange={(e) => setTotalProtein(e.target.value)} placeholder="150" className="input-field" min={0} />
+              <input
+                type="number" value={hasFoods ? dietTotals.protein : totalProtein}
+                onChange={(e) => setTotalProtein(e.target.value)} placeholder="150" className="input-field" min={0}
+                disabled={hasFoods}
+              />
             </div>
             <div>
               <label className="text-xs text-muted-foreground mb-1 block">Carboidratos (g)</label>
-              <input type="number" value={totalCarbs} onChange={(e) => setTotalCarbs(e.target.value)} placeholder="220" className="input-field" min={0} />
+              <input
+                type="number" value={hasFoods ? dietTotals.carbs : totalCarbs}
+                onChange={(e) => setTotalCarbs(e.target.value)} placeholder="220" className="input-field" min={0}
+                disabled={hasFoods}
+              />
             </div>
             <div>
               <label className="text-xs text-muted-foreground mb-1 block">Gordura (g)</label>
-              <input type="number" value={totalFat} onChange={(e) => setTotalFat(e.target.value)} placeholder="55" className="input-field" min={0} />
+              <input
+                type="number" value={hasFoods ? dietTotals.fat : totalFat}
+                onChange={(e) => setTotalFat(e.target.value)} placeholder="55" className="input-field" min={0}
+                disabled={hasFoods}
+              />
             </div>
           </div>
-          {kcalSum > 0 && totalCalories && Math.abs(kcalSum - Number(totalCalories)) > Number(totalCalories) * 0.1 && (
-            <p className="text-xs text-amber-400">
-              Os macros somam ~{Math.round(kcalSum)} kcal, mas a meta está em {totalCalories} kcal — confira antes de salvar.
-            </p>
+          {hasFoods ? (
+            <p className="text-xs text-emerald-400">Calculado automaticamente a partir dos alimentos das refeições abaixo.</p>
+          ) : (
+            kcalSum > 0 && totalCalories && Math.abs(kcalSum - Number(totalCalories)) > Number(totalCalories) * 0.1 && (
+              <p className="text-xs text-amber-400">
+                Os macros somam ~{Math.round(kcalSum)} kcal, mas a meta está em {totalCalories} kcal — confira antes de salvar.
+              </p>
+            )
           )}
 
           <div>
@@ -265,35 +297,13 @@ export default function NewDietPage() {
 
           <div className="space-y-3">
             {meals.map((meal, i) => (
-              <div key={i} className="glass rounded-xl p-4 space-y-3">
-                <div className="flex items-center gap-3">
-                  <select
-                    value={meal.type}
-                    onChange={(e) => updateMeal(i, 'type', e.target.value)}
-                    className="input-field flex-1"
-                  >
-                    {MEAL_TYPES.map((t) => (
-                      <option key={t.value} value={t.value}>{t.label}</option>
-                    ))}
-                  </select>
-                  {meals.length > 1 && (
-                    <button
-                      type="button"
-                      onClick={() => removeMeal(i)}
-                      className="w-9 h-9 rounded-xl hover:bg-red-500/10 flex items-center justify-center transition-all text-red-400"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  )}
-                </div>
-                <input
-                  type="text"
-                  value={meal.notes}
-                  onChange={(e) => updateMeal(i, 'notes', e.target.value)}
-                  placeholder="Observações (opcional)"
-                  className="input-field"
-                />
-              </div>
+              <MealCard
+                key={i}
+                meal={meal}
+                onChange={(updated) => setMeals((prev) => prev.map((m, idx) => idx === i ? updated : m))}
+                onRemove={() => setMeals((prev) => prev.filter((_, idx) => idx !== i))}
+                canRemove={meals.length > 1}
+              />
             ))}
           </div>
         </motion.div>

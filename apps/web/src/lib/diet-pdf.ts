@@ -13,6 +13,8 @@ const MEAL_LABELS: Record<string, string> = {
   POST_WORKOUT: 'Pós-treino',
 };
 
+const WEEKDAYS_SHORT = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
+
 interface DietPDFOptions {
   /** Nome exibido no rodapé / carimbo — ex: "Dra. Ana Paula · CRN 12345". */
   professionalLine?: string;
@@ -46,10 +48,13 @@ export function openDietPDF(diet: any, opts: DietPDFOptions = {}): boolean {
         )
         .join('');
 
+      const dayBadge = m.dayOfWeek?.length
+        ? `<span style="font-weight:400;color:#10b981;font-size:11px;margin-left:8px;">(${m.dayOfWeek.map((d: number) => WEEKDAYS_SHORT[d]).join(', ')})</span>`
+        : '';
       return `
         <tr style="background:#f9fafb;">
           <td colspan="6" style="padding:10px 12px;font-weight:600;font-size:14px;color:#111827;border-top:1px solid #e5e7eb;">
-            ${MEAL_LABELS[m.type] ?? m.name ?? m.type}${m.time ? `<span style="font-weight:400;color:#6b7280;font-size:12px;margin-left:8px;">${m.time}</span>` : ''}
+            ${MEAL_LABELS[m.type] ?? m.name ?? m.type}${m.time ? `<span style="font-weight:400;color:#6b7280;font-size:12px;margin-left:8px;">${m.time}</span>` : ''}${dayBadge}
             <span style="float:right;font-weight:400;font-size:12px;color:#6b7280;">${m.calories ?? 0} kcal · P:${m.protein ?? 0}g C:${m.carbs ?? 0}g G:${m.fat ?? 0}g</span>
           </td>
         </tr>
