@@ -242,7 +242,7 @@ export default function NutritionistFoodsPage() {
   const groups = category === 'todos' && !search ? groupByCategory(foods) : null;
 
   const tableHeader = (
-    <div className="grid grid-cols-[1fr_80px_68px_68px_68px_68px_88px] gap-0 px-4 py-3 border-b border-border/50 text-xs text-muted-foreground font-medium">
+    <div className="hidden sm:grid grid-cols-[1fr_80px_68px_68px_68px_68px_88px] gap-0 px-4 py-3 border-b border-border/50 text-xs text-muted-foreground font-medium">
       <span>Alimento</span>
       <span className="text-center">Porção</span>
       <span className="text-center flex items-center justify-center gap-1"><Flame className="w-3 h-3 text-orange-400" />Kcal</span>
@@ -279,67 +279,101 @@ export default function NutritionistFoodsPage() {
       );
     }
 
-    return (
-      <motion.div
-        key={food.id}
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: i * 0.02 }}
-        className="grid grid-cols-[1fr_80px_68px_68px_68px_68px_88px] gap-0 px-4 py-3 hover:bg-accent/50 transition-all text-sm items-center border-b border-border/30 last:border-0"
-      >
-        <div className="min-w-0 pr-2">
-          <div className="font-medium truncate flex items-center gap-2">
-            {food.name}
-            {!food.nutritionistId && <Leaf className="w-3 h-3 text-emerald-400 flex-shrink-0" aria-label="Alimento público" />}
-          </div>
-          {food.brand && <div className="text-xs text-muted-foreground truncate">{food.brand}</div>}
-        </div>
-        <div className="text-center text-xs text-muted-foreground">{food.portion}{food.portionUnit}</div>
-        <div className="text-center font-medium">{food.calories}</div>
-        <div className="text-center text-muted-foreground">{food.protein}g</div>
-        <div className="text-center text-muted-foreground">{food.carbs}g</div>
-        <div className="text-center text-muted-foreground">{food.fat}g</div>
-        <div className="flex items-center justify-center gap-1">
-          {food.nutritionistId ? (
-            <>
-              <button
-                onClick={() => { setEditingId(food.id); setConfirmDeleteId(null); }}
-                className="w-7 h-7 rounded-lg hover:bg-accent flex items-center justify-center text-muted-foreground hover:text-foreground transition-all"
-                title="Editar"
-              >
-                <Pencil className="w-3.5 h-3.5" />
-              </button>
-              {confirmDeleteId === food.id ? (
-                <div className="flex items-center gap-1">
-                  <button
-                    onClick={() => deleteMutation.mutate(food.id)}
-                    disabled={deleteMutation.isPending}
-                    className="w-7 h-7 rounded-lg bg-red-500/20 hover:bg-red-500/40 flex items-center justify-center text-red-400 transition-all"
-                    title="Confirmar exclusão"
-                  >
-                    <Check className="w-3.5 h-3.5" />
-                  </button>
-                  <button
-                    onClick={() => setConfirmDeleteId(null)}
-                    className="w-7 h-7 rounded-lg hover:bg-accent flex items-center justify-center text-muted-foreground transition-all"
-                    title="Cancelar"
-                  >
-                    <X className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              ) : (
+    const actions = (
+      <>
+        {food.nutritionistId ? (
+          <>
+            <button
+              onClick={() => { setEditingId(food.id); setConfirmDeleteId(null); }}
+              className="w-7 h-7 rounded-lg hover:bg-accent flex items-center justify-center text-muted-foreground hover:text-foreground transition-all"
+              title="Editar"
+            >
+              <Pencil className="w-3.5 h-3.5" />
+            </button>
+            {confirmDeleteId === food.id ? (
+              <div className="flex items-center gap-1">
                 <button
-                  onClick={() => { setConfirmDeleteId(food.id); setEditingId(null); }}
-                  className="w-7 h-7 rounded-lg hover:bg-red-500/10 flex items-center justify-center text-muted-foreground hover:text-red-400 transition-all"
-                  title="Excluir"
+                  onClick={() => deleteMutation.mutate(food.id)}
+                  disabled={deleteMutation.isPending}
+                  className="w-7 h-7 rounded-lg bg-red-500/20 hover:bg-red-500/40 flex items-center justify-center text-red-400 transition-all"
+                  title="Confirmar exclusão"
                 >
-                  <Trash2 className="w-3.5 h-3.5" />
+                  <Check className="w-3.5 h-3.5" />
                 </button>
-              )}
-            </>
-          ) : (
-            <span className="text-xs text-muted-foreground px-1">público</span>
-          )}
+                <button
+                  onClick={() => setConfirmDeleteId(null)}
+                  className="w-7 h-7 rounded-lg hover:bg-accent flex items-center justify-center text-muted-foreground transition-all"
+                  title="Cancelar"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => { setConfirmDeleteId(food.id); setEditingId(null); }}
+                className="w-7 h-7 rounded-lg hover:bg-red-500/10 flex items-center justify-center text-muted-foreground hover:text-red-400 transition-all"
+                title="Excluir"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </>
+        ) : (
+          <span className="text-xs text-muted-foreground px-1">público</span>
+        )}
+      </>
+    );
+
+    return (
+      <motion.div key={food.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: i * 0.02 }}>
+        {/* Mobile: cartão — a tabela em grade não cabe numa tela pequena */}
+        <div className="sm:hidden p-3 border-b border-border/30 last:border-0">
+          <div className="flex items-start justify-between gap-2 mb-2.5">
+            <div className="min-w-0">
+              <div className="font-medium text-sm flex items-center gap-1.5">
+                <span className="truncate">{food.name}</span>
+                {!food.nutritionistId && <Leaf className="w-3 h-3 text-emerald-400 flex-shrink-0" aria-label="Alimento público" />}
+              </div>
+              {food.brand && <div className="text-xs text-muted-foreground truncate">{food.brand}</div>}
+              <div className="text-xs text-muted-foreground mt-0.5">Porção: {food.portion}{food.portionUnit}</div>
+            </div>
+            <div className="flex items-center gap-1 flex-shrink-0">{actions}</div>
+          </div>
+          <div className="grid grid-cols-4 gap-2 text-center">
+            <div>
+              <div className="text-sm font-semibold flex items-center justify-center gap-1"><Flame className="w-3 h-3 text-orange-400" />{food.calories}</div>
+              <div className="text-[10px] text-muted-foreground">kcal</div>
+            </div>
+            <div>
+              <div className="text-sm font-semibold flex items-center justify-center gap-1"><Beef className="w-3 h-3 text-red-400" />{food.protein}g</div>
+              <div className="text-[10px] text-muted-foreground">prot</div>
+            </div>
+            <div>
+              <div className="text-sm font-semibold flex items-center justify-center gap-1"><Wheat className="w-3 h-3 text-yellow-400" />{food.carbs}g</div>
+              <div className="text-[10px] text-muted-foreground">carb</div>
+            </div>
+            <div>
+              <div className="text-sm font-semibold flex items-center justify-center gap-1"><Droplets className="w-3 h-3 text-blue-400" />{food.fat}g</div>
+              <div className="text-[10px] text-muted-foreground">gord</div>
+            </div>
+          </div>
+        </div>
+
+        {/* Tablet/desktop: tabela em grade */}
+        <div className="hidden sm:grid grid-cols-[1fr_80px_68px_68px_68px_68px_88px] gap-0 px-4 py-3 hover:bg-accent/50 transition-all text-sm items-center border-b border-border/30 last:border-0">
+          <div className="min-w-0 pr-2">
+            <div className="font-medium truncate flex items-center gap-2">
+              {food.name}
+              {!food.nutritionistId && <Leaf className="w-3 h-3 text-emerald-400 flex-shrink-0" aria-label="Alimento público" />}
+            </div>
+            {food.brand && <div className="text-xs text-muted-foreground truncate">{food.brand}</div>}
+          </div>
+          <div className="text-center text-xs text-muted-foreground">{food.portion}{food.portionUnit}</div>
+          <div className="text-center font-medium">{food.calories}</div>
+          <div className="text-center text-muted-foreground">{food.protein}g</div>
+          <div className="text-center text-muted-foreground">{food.carbs}g</div>
+          <div className="text-center text-muted-foreground">{food.fat}g</div>
+          <div className="flex items-center justify-center gap-1">{actions}</div>
         </div>
       </motion.div>
     );
@@ -413,9 +447,15 @@ export default function NutritionistFoodsPage() {
           {tableHeader}
           <div className="divide-y divide-border/30">
             {[...Array(8)].map((_, i) => (
-              <div key={i} className="grid grid-cols-[1fr_80px_68px_68px_68px_68px_88px] gap-0 px-4 py-3 animate-pulse">
-                <div className="h-3 bg-white/10 rounded w-2/3" />
-                {[...Array(6)].map((__, j) => <div key={j} className="h-3 bg-white/5 rounded mx-auto w-10" />)}
+              <div key={i} className="animate-pulse">
+                <div className="sm:hidden p-3 space-y-2">
+                  <div className="h-3 bg-white/10 rounded w-1/2" />
+                  <div className="h-3 bg-white/5 rounded w-full" />
+                </div>
+                <div className="hidden sm:grid grid-cols-[1fr_80px_68px_68px_68px_68px_88px] gap-0 px-4 py-3">
+                  <div className="h-3 bg-white/10 rounded w-2/3" />
+                  {[...Array(6)].map((__, j) => <div key={j} className="h-3 bg-white/5 rounded mx-auto w-10" />)}
+                </div>
               </div>
             ))}
           </div>
@@ -447,7 +487,7 @@ export default function NutritionistFoodsPage() {
                     transition={{ duration: 0.2 }}
                     className="overflow-hidden"
                   >
-                    <div className="grid grid-cols-[1fr_80px_68px_68px_68px_68px_88px] gap-0 px-4 py-2 text-xs text-muted-foreground font-medium border-b border-border/30 bg-white/2">
+                    <div className="hidden sm:grid grid-cols-[1fr_80px_68px_68px_68px_68px_88px] gap-0 px-4 py-2 text-xs text-muted-foreground font-medium border-b border-border/30 bg-white/2">
                       <span>Alimento</span>
                       <span className="text-center">Porção</span>
                       <span className="text-center">Kcal</span>
